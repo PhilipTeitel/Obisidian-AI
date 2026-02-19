@@ -349,5 +349,93 @@ Secrets (stored in SecretStorage, not in `data.json`):
 
 ## Backlog Items
 
-TBD — Epics and stories will be defined in the next planning step.
+### Epic 1: Plugin Foundation and Runtime Shell
+
+Establish the plugin skeleton, lifecycle wiring, and baseline developer workflows.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| [FND-1](docs/features/FND-1-initialize-obsidian-plugin-scaffold-and-build-pipeline.md) | Not Started | Initialize Obsidian plugin scaffold and build pipeline | S | Ensure `manifest.json`, `versions.json`, `esbuild`, lint, and test scripts are wired |
+| [FND-2](docs/features/FND-2-register-plugin-lifecycle-views-commands-and-settings-tab-shell.md) | Not Started | Register plugin lifecycle, views, commands, and settings tab shell | M | `onload()` should only register components; no heavy startup work |
+| FND-3 | Not Started | Define shared domain types for chunks, providers, search, chat, and jobs | S | Types should support future providers without refactors |
+| FND-4 | Not Started | Implement service container/bootstrap orchestration | M | Keep construction order explicit and testable |
+| FND-5 | Not Started | Add structured logging and error normalization | S | Provide actionable errors for provider/network/storage failures |
+| FND-6 | Not Started | Set up unit/integration test harness with Obsidian-compatible mocks | M | Required for service-level and command-level planning in later stories |
+
+### Epic 2: Indexing and Metadata Pipeline
+
+Build full and incremental indexing that preserves note structure and metadata.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| IDX-1 | Not Started | Implement markdown chunker preserving heading, paragraph/bullet context, and tags | M | Metadata minimum: note name, heading, paragraph/bullet, tags |
+| IDX-2 | Not Started | Implement vault crawler with configurable include/exclude folders | M | Folder scoping comes from plugin settings |
+| IDX-3 | Not Started | Build full reindex workflow and `Reindex vault` command | M | Always rebuild chunks/embeddings for configured scope |
+| IDX-4 | Not Started | Build incremental index workflow and `Index changes` command | L | Detect new/updated/deleted content via content hash strategy |
+| IDX-5 | Not Started | Persist index job state and progress events for long-running tasks | M | Drives slideout progress UI and prevents duplicate jobs |
+| IDX-6 | Not Started | Add index consistency checks and recovery flow | S | Handle partial failures and resume safely |
+
+### Epic 3: Local Vector Storage and Embedding Providers
+
+Provide local embedding storage and provider-backed embedding generation.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| STO-1 | Not Started | Implement wa-SQLite/sqlite-vec schema, migrations, and local storage paths | M | Indexed data must remain local in plugin directory |
+| STO-2 | Not Started | Implement vector store repository for upsert, delete, and nearest-neighbor query | M | Optimize for vaults with thousands of notes |
+| STO-3 | Not Started | Implement embedding provider abstraction and registry | S | Keep provider interface extensible for post-MVP providers |
+| STO-4 | Not Started | Implement OpenAI embedding provider integration | M | Endpoint and API key configurable; key from secret store |
+| STO-5 | Not Started | Implement Ollama embedding provider integration | M | Endpoint/model configurable for local runtime |
+| STO-6 | Not Started | Add batching, retry, and timeout handling for embedding jobs | M | Use safe defaults and surface per-note failures |
+
+### Epic 4: Semantic Search Experience
+
+Deliver semantic search end to end from query entry to note navigation.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| SRCH-1 | Not Started | Implement search service using query embeddings and vector similarity | M | Return ranked results with metadata and excerpts |
+| SRCH-2 | Not Started | Build Semantic Search pane UI | M | Include query input, loading state, result list, empty/error states |
+| SRCH-3 | Not Started | Implement `Semantic search selection` command | S | Uses selected note text as query input |
+| SRCH-4 | Not Started | Wire result actions to open note at relevant location | S | Preserve heading context when navigating |
+| SRCH-5 | Not Started | Add search quality controls and result limits | S | Include top-k, relevance threshold, and sane defaults |
+
+### Epic 5: Chat Completions and Agent File Operations
+
+Deliver vault-grounded chat and controlled note creation/update workflows.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| CHAT-1 | Not Started | Implement chat provider abstraction with streaming completion support | M | Shared contract for OpenAI and Ollama |
+| CHAT-2 | Not Started | Implement OpenAI chat provider integration | M | Configurable model, endpoint, timeout |
+| CHAT-3 | Not Started | Implement Ollama chat provider integration | M | Configurable model, endpoint, timeout |
+| CHAT-4 | Not Started | Implement retrieval-augmented chat orchestration | L | Chat context must come only from indexed vault content |
+| CHAT-5 | Not Started | Build Chat pane UI with streaming responses and source context display | M | Include conversation history and cancellation controls |
+| CHAT-6 | Not Started | Implement agent create-note workflow with allowed-folder enforcement | M | Allowed output folders configurable and validated |
+| CHAT-7 | Not Started | Implement agent update-note workflow with max-size enforcement | M | Default max generated note size: 5,000 characters |
+
+### Epic 6: Settings, Secrets, and Configuration Guardrails
+
+Provide secure, configurable runtime settings for indexing, providers, and chat behavior.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| CFG-1 | Not Started | Implement settings schema with defaults and runtime validation | M | Include folders, providers, models, endpoints, limits, and timeout |
+| CFG-2 | Not Started | Build settings UI for indexing scope and agent output folder controls | M | Keep indexing scope and write scope independently configurable |
+| CFG-3 | Not Started | Integrate Obsidian secret store for API key management | S | No secrets in plain config files |
+| CFG-4 | Not Started | Implement provider/model selection for embeddings and chat | S | Must support OpenAI and Ollama in MVP |
+| CFG-5 | Not Started | Add configurable chat timeout with 30s default | S | Should support slower local models and remote APIs |
+| CFG-6 | Not Started | Add settings migration/versioning support | S | Preserve compatibility across plugin updates |
+
+### Epic 7: Performance, Reliability, and MVP Readiness
+
+Validate performance constraints and readiness for MVP release.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| REL-1 | Not Started | Implement lazy initialization strategy to keep plugin startup under 2 seconds | M | Defer DB/provider-heavy work until first use/background task |
+| REL-2 | Not Started | Run scale validation on vaults with hundreds to thousands of notes | M | Verify indexing/search latency remains practical |
+| REL-3 | Not Started | Add end-to-end tests for core user journeys | L | Reindex, index changes, semantic search, chat, and agent note writes |
+| REL-4 | Not Started | Harden failure handling for provider outages and partial indexing failures | M | Include retries, user-facing errors, and recovery actions |
+| REL-5 | Not Started | Prepare MVP release checklist and acceptance criteria | S | Ensure success criteria map to measurable verification steps |
 
