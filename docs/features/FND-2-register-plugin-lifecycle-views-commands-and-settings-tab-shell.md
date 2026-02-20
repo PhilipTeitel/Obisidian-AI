@@ -1,6 +1,6 @@
 # FND-2: Register plugin lifecycle, views, commands, and settings tab shell
 
-**Story**: Wire the plugin runtime shell so Obsidian registers the core panes, commands, and settings entrypoints during lifecycle load/unload.
+**Story**: Implement the runtime shell registrations so the plugin can load cleanly in Obsidian with placeholder views, commands, and settings wiring.
 **Epic**: Epic 1 — Plugin Foundation and Runtime Shell
 **Size**: Medium
 **Status**: Open
@@ -9,19 +9,19 @@
 
 ## 1. Summary
 
-This story implements the runtime registration shell of the plugin by extending the FND-1 scaffold. It wires `onload()` and `onunload()` in `src/main.ts` so Obsidian can register two primary views (semantic search and chat), a progress slideout shell for long-running tasks, three MVP commands, and a plugin settings tab.
+This story builds directly on the FND-1 scaffold by wiring the plugin lifecycle entrypoints to register runtime surfaces: search and chat views, baseline commands, a progress slideout shell, and a settings tab shell. The outcome is a navigable plugin skeleton that Obsidian can load, display, and unload safely.
 
-FND-2 is the structural bridge between scaffolding and feature logic. Later stories for indexing, search, and chat assume these registrations already exist, with stable view IDs, command IDs, and settings wiring. Completing this story enables downstream teams to implement actual service behavior without revisiting plugin bootstrapping.
+FND-2 is the integration seam between "project scaffolding exists" and "feature logic can be implemented." Downstream stories in indexing, search, chat, and settings rely on stable view IDs, command IDs, and registration behavior being in place first. Completing this story prevents repeated bootstrap changes later.
 
-The design constraint is strict startup minimalism: registration only, no expensive I/O, no indexing, no provider network calls, and no database initialization during `onload()`. This preserves the startup performance goal and keeps lifecycle side effects predictable.
+The key constraint is startup minimalism and deterministic lifecycle behavior. `onload()` should register components only; it must not perform expensive initialization such as indexing jobs, provider calls, or database setup. `onunload()` must clean up leaves/resources predictably to avoid stale UI state.
 
 ---
 
 ## 2. API Endpoints + Schemas
 
-No API endpoint changes are needed for this story.
+No API endpoint or shared schema changes are needed for this story.
 
-FND-2 is strictly Obsidian plugin runtime wiring and UI shell registration. No REST endpoints are introduced, and no `shared/types.ts` contract updates are required.
+FND-2 is lifecycle and UI shell registration inside an Obsidian plugin process. It does not add or modify REST routes, and it does not require NEW or CHANGED interfaces in `shared/types.ts`.
 
 ---
 
@@ -34,36 +34,35 @@ ObsidianAIPlugin (src/main.ts)
 ├── onload()
 │   ├── registerView(SEARCH_VIEW_TYPE, SearchView)
 │   ├── registerView(CHAT_VIEW_TYPE, ChatView)
-│   ├── registerCommand(reindex-vault)
-│   ├── registerCommand(index-changes)
-│   ├── registerCommand(search-selection)
+│   ├── registerCommand("obsidian-ai:reindex-vault")
+│   ├── registerCommand("obsidian-ai:index-changes")
+│   ├── registerCommand("obsidian-ai:search-selection")
 │   ├── addSettingTab(new ObsidianAISettingTab(...))
-│   └── initialize ProgressSlideout shell (no long-running jobs started)
+│   └── initialize ProgressSlideout shell (idle only)
 └── onunload()
-    ├── detachSearchViewLeaves()
-    ├── detachChatViewLeaves()
-    └── dispose slideout/shell resources
+    ├── detach leaves for registered view types
+    └── dispose shell references/resources
 ```
 
 ### 3b. Props & Contracts
 
 | Component / Hook | Props / Signature | State | Notes |
 |------------------|-------------------|-------|-------|
-| `ObsidianAIPlugin.onload` | `async onload(): Promise<void>` | None beyond plugin-managed references | Registers views, commands, and settings tab only |
-| `ObsidianAIPlugin.onunload` | `async onunload(): Promise<void>` | Tracks registered leaves/disposables | Must cleanly detach views and avoid orphaned leaves |
-| `SearchView` | `class SearchView extends ItemView` | Local empty-shell state | Renders placeholder root; no search logic yet |
-| `ChatView` | `class ChatView extends ItemView` | Local empty-shell state | Renders placeholder root; no provider calls yet |
-| `ProgressSlideout` | `class ProgressSlideout` shell API | Hidden/idle by default | Registration-ready shell only; no indexing progress flow yet |
-| `ObsidianAISettingTab` | `class ObsidianAISettingTab extends PluginSettingTab` | Reads/saves plugin data shell | Displays section placeholders and safe defaults |
+| `ObsidianAIPlugin.onload` | `async onload(): Promise<void>` | Internal refs for views/settings/shells | Registration-only startup behavior |
+| `ObsidianAIPlugin.onunload` | `async onunload(): Promise<void>` | Tracks cleanup/disposal path | Must detach view leaves and release resources |
+| `SearchView` | `class SearchView extends ItemView` | Placeholder view state | Shell content only; no search execution logic |
+| `ChatView` | `class ChatView extends ItemView` | Placeholder view state | Shell content only; no provider streaming logic |
+| `ProgressSlideout` | Shell class API (`show`, `hide`, `setStatus`/equivalent) | Hidden by default | Prepares integration point for later indexing job updates |
+| `ObsidianAISettingTab` | `class ... extends PluginSettingTab` | Default settings shell state | Renders placeholders and basic save/load path |
 
 ### 3c. States (Loading / Error / Empty / Success)
 
 | State   | UI Behavior |
 |---------|-------------|
-| Loading | During plugin enable, Obsidian loads plugin and executes registration logic quickly |
-| Error   | Registration failure shows Obsidian plugin load error; plugin does not leave partial registrations |
-| Empty   | Search/chat panes open with placeholder text; commands exist but can show "not implemented yet" notices |
-| Success | Plugin enables cleanly, panes can be opened, commands are available, and settings tab renders shell controls |
+| Loading | Plugin enable path runs registration logic quickly, without heavy startup work |
+| Error   | Registration failure surfaces as plugin load error; no partial registration leftovers |
+| Empty   | Views/commands/settings are visible but intentionally placeholder-only in this story |
+| Success | Plugin loads, both panes can open, commands appear, and settings tab renders shell controls |
 
 ---
 
@@ -73,72 +72,72 @@ ObsidianAIPlugin (src/main.ts)
 
 | # | Path | Purpose |
 |---|------|---------|
-| 1 | `src/ui/SearchView.ts` | Define semantic search pane shell (`ItemView`) with stable view type wiring |
-| 2 | `src/ui/ChatView.ts` | Define chat pane shell (`ItemView`) with stable view type wiring |
-| 3 | `src/ui/ProgressSlideout.ts` | Define progress slideout shell class/interface used by registration flow |
-| 4 | `src/settings.ts` | Define `PluginSettingTab` shell and initial settings model/default wiring |
-| 5 | `src/constants.ts` | Centralize command IDs and view type IDs to avoid hardcoded strings |
+| 1 | `src/constants.ts` | Centralize stable IDs for view types and commands |
+| 2 | `src/ui/SearchView.ts` | Implement semantic search pane shell (`ItemView`) |
+| 3 | `src/ui/ChatView.ts` | Implement chat pane shell (`ItemView`) |
+| 4 | `src/ui/ProgressSlideout.ts` | Implement progress slideout shell interface and placeholder rendering |
+| 5 | `src/settings.ts` | Implement plugin settings tab shell and default settings wiring |
 
 ### Files to MODIFY
 
 | # | Path | Change |
 |---|------|--------|
-| 1 | `src/main.ts` | Register views, commands, settings tab, and unload cleanup logic |
-| 2 | `src/types.ts` | Add/adjust lightweight shell types (command/view IDs, plugin settings shape if needed) |
-| 3 | `src/__tests__/smoke.test.ts` | Expand baseline test to assert registration surfaces are defined or importable |
+| 1 | `src/main.ts` | Register views/commands/settings and implement unload cleanup |
+| 2 | `src/types.ts` | Add shell-level types for view IDs, command IDs, or settings shape as needed |
+| 3 | `src/__tests__/smoke.test.ts` | Expand smoke coverage for importability/registration surface sanity |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
-- `manifest.json` — plugin metadata from FND-1 remains valid; no schema changes needed
-- `versions.json` — compatibility map unchanged for runtime-shell wiring
+- `manifest.json` — plugin metadata remains valid from FND-1
+- `versions.json` — compatibility mapping unchanged by runtime shell registration
 - `docs/prompts/initial.md` — requirements source remains unchanged
-- `README.md` — only the backlog ID link for FND-2 should be updated during planning; architecture text unchanged
+- `docs/features/FND-1-initialize-obsidian-plugin-scaffold-and-build-pipeline.md` — previous story plan remains unchanged
 
 ---
 
 ## 5. Acceptance Criteria Checklist
 
-### Phase A: Lifecycle and Registration Constants
+### Phase A: Registration Constants and Lifecycle Wiring
 
-- [ ] **A1** — View and command identifiers are defined as shared constants
-  - Stable IDs exist for search view, chat view, reindex command, index changes command, and semantic-search-selection command.
-  - `src/main.ts` imports constants instead of hardcoded string literals.
+- [ ] **A1** — Shared IDs exist for all registered runtime surfaces
+  - Constants are defined for search/chat view types and the three MVP command IDs.
+  - `src/main.ts` consumes constants rather than hardcoded string literals.
 
-- [ ] **A2** — `onload()` registers runtime shell components only
-  - Search and chat views are registered with Obsidian via `registerView`.
-  - Settings tab is registered via `addSettingTab`, and no indexing/database/provider calls are executed in `onload()`.
+- [ ] **A2** — `onload()` registers shell surfaces without heavy initialization
+  - Search and chat views are registered and can be activated by type.
+  - Commands and settings tab are registered, with no indexing/provider/database work executed in `onload()`.
 
-- [ ] **A3** — `onunload()` performs cleanup
-  - Any open leaves for registered views are detached during unload.
-  - Shell resources are disposed without uncaught exceptions.
+- [ ] **A3** — `onunload()` performs deterministic cleanup
+  - Leaves for registered view types are detached (or otherwise safely closed).
+  - Shell resources are disposed without uncaught runtime exceptions.
 
-### Phase B: View and Settings Shells
+### Phase B: View, Slideout, and Settings Shells
 
-- [ ] **B1** — Search and chat view shells render
-  - `SearchView` and `ChatView` extend `ItemView` and implement required methods (`getViewType`, `getDisplayText`, `onOpen`, `onClose`).
-  - Opening each pane shows placeholder content indicating shell readiness.
+- [ ] **B1** — Search and chat shells implement valid `ItemView` contracts
+  - Each view implements required methods (`getViewType`, `getDisplayText`, `onOpen`, `onClose`).
+  - Opening each view shows clear placeholder content indicating "shell only."
 
-- [ ] **B2** — Progress slideout shell is wired for future job updates
-  - A minimal slideout class exists with explicit `show`, `hide`, and `update`-style shell methods (exact names can vary but must be documented).
-  - No long-running indexing workflow is triggered in this story.
+- [ ] **B2** — Progress slideout shell is wired for later job integration
+  - A minimal slideout API exists (show/hide/status update methods; exact naming documented).
+  - No indexing progress producer is wired in this story.
 
-- [ ] **B3** — Settings tab shell is available
-  - `PluginSettingTab` subclass renders basic sections for provider/config placeholders.
-  - Save/load roundtrip for default settings works without secrets.
+- [ ] **B3** — Settings tab shell renders and persists defaults
+  - A `PluginSettingTab` subclass is registered and visible.
+  - Default settings save/load path works without storing secrets in plain config.
 
-### Phase C: Command Shell Wiring
+### Phase C: Command Shell Behavior
 
-- [ ] **C1** — All MVP command IDs are registered
-  - `Reindex vault`, `Index changes`, and `Semantic search selection` commands appear in Obsidian command palette.
-  - Command IDs match backlog/API contract naming convention.
+- [ ] **C1** — MVP command set is present in command palette
+  - `Reindex vault`, `Index changes`, and `Semantic search selection` commands are registered.
+  - Command IDs match naming conventions documented in `README.md`.
 
 - [ ] **C2** — Command callbacks are safe placeholders
-  - Callbacks run without crashing and provide explicit "not implemented in FND-2" feedback.
-  - Selection command handles empty selection gracefully.
+  - Callbacks execute without crashes and return explicit "not implemented in FND-2" feedback.
+  - Selection-based command handles empty selection gracefully.
 
-- [ ] **C3** — Pane activation commands/helpers are available
-  - Plugin can open or reveal search/chat panes via helper methods invoked by future command callbacks.
-  - Helper logic does not create duplicate leaves unnecessarily.
+- [ ] **C3** — View activation helper behavior avoids duplicate leaf spam
+  - Command/view helper path reuses or reveals an existing pane when possible.
+  - Opening/closing behavior remains stable across repeated invocations.
 
 ### Phase Z: Quality Gates
 
@@ -153,25 +152,25 @@ ObsidianAIPlugin (src/main.ts)
 
 | # | Risk / Tradeoff | Mitigation |
 |---|-----------------|------------|
-| 1 | Registering too much behavior in `onload()` can violate startup performance targets | Restrict this story to registration and placeholders; defer all heavy service initialization |
-| 2 | Inconsistent IDs for views/commands can break downstream integration | Centralize IDs in `src/constants.ts` and reuse across registration/tests |
-| 3 | Missing unload cleanup may leave orphaned leaves or memory references | Add explicit unload detach logic and include unload path checks in testing |
-| 4 | Template quality gate `Z4` references client/shared alias patterns outside this plugin-only repo | Keep for template compliance and mark as not-applicable during implementation verification |
+| 1 | Registration logic can unintentionally grow into startup work that hurts load time | Enforce explicit "registration-only" scope in lifecycle methods |
+| 2 | Inconsistent IDs across files can break command/view integration in later stories | Centralize IDs in `src/constants.ts` and reuse them everywhere |
+| 3 | Incomplete unload cleanup can leave stale leaves and brittle plugin reload behavior | Add explicit cleanup helpers and verify enable/disable cycle in Obsidian |
+| 4 | `Z4` may be not-applicable before client/shared split exists | Retain gate for template consistency and mark applicability during implementation verification |
 
 ---
 
 ## Implementation Order
 
-1. `src/constants.ts` and `src/types.ts` — define command/view IDs and shell-level types/settings shape (covers A1).
-2. `src/ui/SearchView.ts` and `src/ui/ChatView.ts` — implement `ItemView` shells with placeholder render and lifecycle methods (covers B1).
-3. `src/ui/ProgressSlideout.ts` — add slideout shell API for future long-running task integration (covers B2).
-4. `src/settings.ts` — create `PluginSettingTab` shell and default setting rendering/saving behavior (covers B3).
-5. `src/main.ts` — wire `onload()` registrations, command callbacks, pane activation helpers, and `onunload()` cleanup (covers A2, A3, C1, C2, C3).
-6. `src/__tests__/smoke.test.ts` — add or expand tests to validate imported registration surfaces and IDs (covers A1, C1).
+1. `src/constants.ts` and `src/types.ts` — define stable command/view identifiers and shell-level types (covers A1).
+2. `src/ui/SearchView.ts` and `src/ui/ChatView.ts` — implement minimal `ItemView` shells with placeholder rendering (covers B1).
+3. `src/ui/ProgressSlideout.ts` — add slideout shell API and placeholder behavior (covers B2).
+4. `src/settings.ts` — implement settings tab shell and default settings save/load wiring (covers B3).
+5. `src/main.ts` — register all views/commands/settings in `onload()` and cleanup in `onunload()` (covers A2, A3, C1, C2, C3).
+6. `src/__tests__/smoke.test.ts` — extend smoke checks for shell-level surfaces and importability (covers A1, C1).
 7. **Verify** — run `npm run build`, `npm run lint`, `npm run typecheck`, and `npm run test` (covers Z1, Z2, Z3).
-8. **Verify in Obsidian** — enable plugin in a test vault, open both panes, run all three commands from command palette, open settings tab, then disable plugin to validate unload path (covers B1, B3, C1, C2, A3).
-9. **Final verify** — confirm no heavy startup side effects and no files changed outside scoped runtime-shell touchpoints (covers A2 and Phase Z).
+8. **Verify in Obsidian** — enable plugin in a test vault, open both panes, run all three commands, open settings, disable plugin, and re-enable to confirm cleanup path stability (covers B1, B3, C1, C2, A3).
+9. **Final verify** — confirm no out-of-scope edits and no heavy startup side effects were introduced (covers A2 and Phase Z).
 
 ---
 
-*Created: 2026-02-19 | Story: FND-2 | Epic: Epic 1 — Plugin Foundation and Runtime Shell*
+*Created: 2026-02-20 | Story: FND-2 | Epic: Epic 1 — Plugin Foundation and Runtime Shell*
