@@ -1,0 +1,23 @@
+{
+  "name": "obsidian-ai-mvp",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs --watch",
+    "build": "node esbuild.config.mjs --production",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint \"src/**/*.ts\" \"vitest.config.ts\"",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.4.0",
+    "@typescript-eslint/eslint-plugin": "^8.42.0",
+    "@typescript-eslint/parser": "^8.42.0",
+    "esbuild": "^0.25.9",
+    "eslint": "^9.35.0",
+    "obsidian": "^1.8.10",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/main.ts"],
+  "sourcesContent": ["import { Plugin } from \"obsidian\";\n\nexport default class ObsidianAIPlugin extends Plugin {\n  public async onload(): Promise<void> {\n    // Intentionally minimal for scaffold story.\n  }\n\n  public onunload(): void {\n    // Intentionally minimal for scaffold story.\n  }\n}\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA,sBAAuB;AAEvB,IAAqB,mBAArB,cAA8C,uBAAO;AAAA,EACnD,MAAa,SAAwB;AAAA,EAErC;AAAA,EAEO,WAAiB;AAAA,EAExB;AACF;",
+  "names": []
+}

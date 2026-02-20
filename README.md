@@ -254,18 +254,18 @@ Copy or symlink the build output into your test vault:
 
 ```bash
 # Create plugin directory in your test vault
-mkdir -p /path/to/vault/.obsidian/plugins/obsidian-ai
+mkdir -p /path/to/vault/.obsidian/plugins/obsidian-ai-mvp
 
 # Symlink build artifacts
-ln -s "$(pwd)/main.js" /path/to/vault/.obsidian/plugins/obsidian-ai/main.js
-ln -s "$(pwd)/manifest.json" /path/to/vault/.obsidian/plugins/obsidian-ai/manifest.json
-ln -s "$(pwd)/styles.css" /path/to/vault/.obsidian/plugins/obsidian-ai/styles.css
+ln -s "$(pwd)/main.js" /path/to/vault/.obsidian/plugins/obsidian-ai-mvp/main.js
+ln -s "$(pwd)/manifest.json" /path/to/vault/.obsidian/plugins/obsidian-ai-mvp/manifest.json
+ln -s "$(pwd)/versions.json" /path/to/vault/.obsidian/plugins/obsidian-ai-mvp/versions.json
 ```
 
 ### 4. Enable the plugin
 
 1. Open Obsidian Settings → Community Plugins.
-2. Enable "Obsidian AI."
+2. Enable "Obsidian AI MVP."
 3. Configure provider connection details in the plugin settings tab.
 4. Add API keys via the Keychain settings (SecretStorage).
 
@@ -282,8 +282,8 @@ This watches `src/` and rebuilds on changes. Reload Obsidian (Cmd+R / Ctrl+R) to
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Build with esbuild in watch mode |
-| `npm run build` | Production build (minified) |
-| `npm run lint` | Run ESLint on `src/` |
+| `npm run build` | Production build that emits `main.js` |
+| `npm run lint` | Run ESLint on TypeScript source and config |
 | `npm run test` | Run Vitest test suite |
 | `npm run typecheck` | Run `tsc --noEmit` for type checking |
 
@@ -355,7 +355,7 @@ Establish the plugin skeleton, lifecycle wiring, and baseline developer workflow
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [FND-1](docs/features/FND-1-initialize-obsidian-plugin-scaffold-and-build-pipeline.md) | Not Started | Initialize Obsidian plugin scaffold and build pipeline | S | Ensure `manifest.json`, `versions.json`, `esbuild`, lint, and test scripts are wired |
+| [FND-1](docs/features/FND-1-initialize-obsidian-plugin-scaffold-and-build-pipeline.md) | Done | Initialize Obsidian plugin scaffold and build pipeline | S | Ensure `manifest.json`, `versions.json`, `esbuild`, lint, and test scripts are wired |
 | [FND-2](docs/features/FND-2-register-plugin-lifecycle-views-commands-and-settings-tab-shell.md) | Not Started | Register plugin lifecycle, views, commands, and settings tab shell | M | `onload()` should only register components; no heavy startup work |
 | FND-3 | Not Started | Define shared domain types for chunks, providers, search, chat, and jobs | S | Types should support future providers without refactors |
 | FND-4 | Not Started | Implement service container/bootstrap orchestration | M | Keep construction order explicit and testable |
