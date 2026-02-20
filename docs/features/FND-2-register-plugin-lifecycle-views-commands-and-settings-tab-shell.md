@@ -3,7 +3,7 @@
 **Story**: Implement the runtime shell registrations so the plugin can load cleanly in Obsidian with placeholder views, commands, and settings wiring.
 **Epic**: Epic 1 — Plugin Foundation and Runtime Shell
 **Size**: Medium
-**Status**: Open
+**Status**: Done
 
 ---
 
@@ -99,52 +99,52 @@ ObsidianAIPlugin (src/main.ts)
 
 ### Phase A: Registration Constants and Lifecycle Wiring
 
-- [ ] **A1** — Shared IDs exist for all registered runtime surfaces
+- [x] **A1** — Shared IDs exist for all registered runtime surfaces
   - Constants are defined for search/chat view types and the three MVP command IDs.
   - `src/main.ts` consumes constants rather than hardcoded string literals.
 
-- [ ] **A2** — `onload()` registers shell surfaces without heavy initialization
+- [x] **A2** — `onload()` registers shell surfaces without heavy initialization
   - Search and chat views are registered and can be activated by type.
   - Commands and settings tab are registered, with no indexing/provider/database work executed in `onload()`.
 
-- [ ] **A3** — `onunload()` performs deterministic cleanup
+- [x] **A3** — `onunload()` performs deterministic cleanup
   - Leaves for registered view types are detached (or otherwise safely closed).
   - Shell resources are disposed without uncaught runtime exceptions.
 
 ### Phase B: View, Slideout, and Settings Shells
 
-- [ ] **B1** — Search and chat shells implement valid `ItemView` contracts
+- [x] **B1** — Search and chat shells implement valid `ItemView` contracts
   - Each view implements required methods (`getViewType`, `getDisplayText`, `onOpen`, `onClose`).
   - Opening each view shows clear placeholder content indicating "shell only."
 
-- [ ] **B2** — Progress slideout shell is wired for later job integration
+- [x] **B2** — Progress slideout shell is wired for later job integration
   - A minimal slideout API exists (show/hide/status update methods; exact naming documented).
   - No indexing progress producer is wired in this story.
 
-- [ ] **B3** — Settings tab shell renders and persists defaults
+- [x] **B3** — Settings tab shell renders and persists defaults
   - A `PluginSettingTab` subclass is registered and visible.
   - Default settings save/load path works without storing secrets in plain config.
 
 ### Phase C: Command Shell Behavior
 
-- [ ] **C1** — MVP command set is present in command palette
+- [x] **C1** — MVP command set is present in command palette
   - `Reindex vault`, `Index changes`, and `Semantic search selection` commands are registered.
   - Command IDs match naming conventions documented in `README.md`.
 
-- [ ] **C2** — Command callbacks are safe placeholders
+- [x] **C2** — Command callbacks are safe placeholders
   - Callbacks execute without crashes and return explicit "not implemented in FND-2" feedback.
   - Selection-based command handles empty selection gracefully.
 
-- [ ] **C3** — View activation helper behavior avoids duplicate leaf spam
+- [x] **C3** — View activation helper behavior avoids duplicate leaf spam
   - Command/view helper path reuses or reveals an existing pane when possible.
   - Opening/closing behavior remains stable across repeated invocations.
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
 
 ---
 

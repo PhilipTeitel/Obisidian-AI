@@ -190,6 +190,7 @@ CREATE TABLE metadata (
 obsidian-ai-plugin/
 ├── src/
 │   ├── main.ts                     # Plugin entry: onload/onunload, register views/commands
+│   ├── constants.ts                # Stable command and view identifiers
 │   ├── settings.ts                 # PluginSettingTab + defaults
 │   ├── types.ts                    # Shared type definitions
 │   ├── ui/
@@ -356,7 +357,7 @@ Establish the plugin skeleton, lifecycle wiring, and baseline developer workflow
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
 | [FND-1](docs/features/FND-1-initialize-obsidian-plugin-scaffold-and-build-pipeline.md) | Done | Initialize Obsidian plugin scaffold and build pipeline | S | Ensure `manifest.json`, `versions.json`, `esbuild`, lint, and test scripts are wired |
-| [FND-2](docs/features/FND-2-register-plugin-lifecycle-views-commands-and-settings-tab-shell.md) | Not Started | Register plugin lifecycle, views, commands, and settings tab shell | M | `onload()` should only register components; no heavy startup work |
+| [FND-2](docs/features/FND-2-register-plugin-lifecycle-views-commands-and-settings-tab-shell.md) | Done | Register plugin lifecycle, views, commands, and settings tab shell | M | View/command/settings/progress shells registered with deterministic unload cleanup |
 | FND-3 | Not Started | Define shared domain types for chunks, providers, search, chat, and jobs | S | Types should support future providers without refactors |
 | FND-4 | Not Started | Implement service container/bootstrap orchestration | M | Keep construction order explicit and testable |
 | FND-5 | Not Started | Add structured logging and error normalization | S | Provide actionable errors for provider/network/storage failures |
