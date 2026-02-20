@@ -103,20 +103,43 @@ graph TD
 Both embedding and chat operations go through a `Provider` interface so that adding new providers (e.g., Anthropic, local llama.cpp) requires only implementing the interface and registering it — no changes to core services.
 
 ```typescript
-interface EmbeddingProvider {
-  id: string;
-  name: string;
-  embed(texts: string[]): Promise<number[][]>;
-  dimensions(): number;
+type ProviderId = "openai" | "ollama" | (string & {});
+
+interface EmbeddingRequest {
+  providerId: ProviderId;
+  model: string;
+  inputs: string[];
 }
 
+interface EmbeddingResponse {
+  providerId: ProviderId;
+  model: string;
+  vectors: EmbeddingVector[];
+}
+
+interface EmbeddingProvider {
+  readonly id: ProviderId;
+  readonly name: string;
+  embed(request: EmbeddingRequest): Promise<EmbeddingResponse>;
+}
+
+interface ChatRequest {
+  providerId: ProviderId;
+  model: string;
+  messages: ChatMessage[];
+  context: ChatContextChunk[];
+  timeoutMs: number;
+}
+
+type ChatStreamEvent =
+  | { type: "token"; text: string }
+  | { type: "done"; finishReason: "stop" | "length" | "error" }
+  | { type: "error"; message: string; retryable: boolean };
+
 interface ChatProvider {
-  id: string;
-  name: string;
-  complete(
-    messages: ChatMessage[],
-    options: ChatOptions,
-  ): AsyncIterable<string>;
+  readonly id: ProviderId;
+  readonly name: string;
+  complete(request: ChatRequest): AsyncIterable<ChatStreamEvent>;
 }
 ```
 
@@ -314,11 +337,11 @@ This is an Obsidian plugin, not a REST API. The table below describes the key in
 |---------|--------|-----------|-------------|
 | `IndexingService` | `reindexVault()` | `() → Promise<IndexResult>` | Full reindex of all configured folders |
 | `IndexingService` | `indexChanges()` | `() → Promise<IndexResult>` | Incremental index of changed files |
-| `SearchService` | `search(query, opts?)` | `(string, SearchOptions?) → Promise<SearchResult[]>` | Embed query and return nearest chunks |
-| `ChatService` | `chat(messages, opts?)` | `(ChatMessage[], ChatOptions?) → AsyncIterable<ChatEvent>` | RAG chat: retrieve context, stream completion |
+| `SearchService` | `search(request)` | `(SearchRequest) → Promise<SearchResult[]>` | Embed query and return nearest chunks |
+| `ChatService` | `chat(request)` | `(ChatRequest) → AsyncIterable<ChatStreamEvent>` | RAG chat: retrieve context, stream completion |
 | `AgentService` | `createNote(path, content)` | `(string, string) → Promise<void>` | Create a note in an allowed folder |
 | `AgentService` | `updateNote(path, content)` | `(string, string) → Promise<void>` | Update an existing note in an allowed folder |
-| `EmbeddingService` | `embed(texts)` | `(string[]) → Promise<number[][]>` | Generate embeddings via configured provider |
+| `EmbeddingService` | `embed(request)` | `(EmbeddingRequest) → Promise<EmbeddingResponse>` | Generate embeddings via configured provider |
 | `VectorStore` | `upsertChunks(chunks)` | `(ChunkWithEmbedding[]) → Promise<void>` | Insert or update chunks + vectors |
 | `VectorStore` | `queryNearest(vec, k)` | `(number[], number) → Promise<ChunkResult[]>` | k-nearest-neighbor search |
 | `ProviderRegistry` | `getEmbedding()` | `() → EmbeddingProvider` | Return the active embedding provider |
@@ -358,7 +381,7 @@ Establish the plugin skeleton, lifecycle wiring, and baseline developer workflow
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
 | [FND-1](docs/features/FND-1-initialize-obsidian-plugin-scaffold-and-build-pipeline.md) | Done | Initialize Obsidian plugin scaffold and build pipeline | S | Ensure `manifest.json`, `versions.json`, `esbuild`, lint, and test scripts are wired |
 | [FND-2](docs/features/FND-2-register-plugin-lifecycle-views-commands-and-settings-tab-shell.md) | Done | Register plugin lifecycle, views, commands, and settings tab shell | M | View/command/settings/progress shells registered with deterministic unload cleanup |
-| FND-3 | Not Started | Define shared domain types for chunks, providers, search, chat, and jobs | S | Types should support future providers without refactors |
+| [FND-3](docs/features/FND-3-define-shared-domain-types-for-chunks-providers-search-chat-and-jobs.md) | Done | Define shared domain types for chunks, providers, search, chat, and jobs | S | Types should support future providers without refactors |
 | FND-4 | Not Started | Implement service container/bootstrap orchestration | M | Keep construction order explicit and testable |
 | FND-5 | Not Started | Add structured logging and error normalization | S | Provide actionable errors for provider/network/storage failures |
 | FND-6 | Not Started | Set up unit/integration test harness with Obsidian-compatible mocks | M | Required for service-level and command-level planning in later stories |

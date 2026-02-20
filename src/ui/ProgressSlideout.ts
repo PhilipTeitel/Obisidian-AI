@@ -1,7 +1,24 @@
 import { App } from "obsidian";
-import type { ProgressSlideoutStatus } from "../types";
+import type { JobSnapshot } from "../types";
 
 const PROGRESS_SHELLOUT_CLASS = "obsidian-ai-progress-slideout";
+
+const createIdleSnapshot = (): JobSnapshot => {
+  const now = Date.now();
+  return {
+    id: "shell-idle",
+    type: "index-changes",
+    status: "succeeded",
+    startedAt: now,
+    finishedAt: now,
+    progress: {
+      completed: 0,
+      total: 0,
+      label: "Idle",
+      detail: "No indexing tasks are running."
+    }
+  };
+};
 
 export class ProgressSlideout {
   private readonly containerEl: HTMLElement;
@@ -19,11 +36,7 @@ export class ProgressSlideout {
     this.statusEl = this.containerEl.createEl("p");
     this.detailEl = this.containerEl.createEl("p");
 
-    this.setStatus({
-      label: "Idle",
-      detail: "No indexing tasks are running.",
-      isActive: false
-    });
+    this.setStatus(createIdleSnapshot());
     this.hide();
   }
 
@@ -35,10 +48,10 @@ export class ProgressSlideout {
     this.containerEl.style.display = "none";
   }
 
-  public setStatus(status: ProgressSlideoutStatus): void {
-    this.statusEl.setText(status.label);
-    this.detailEl.setText(status.detail);
-    this.containerEl.dataset.state = status.isActive ? "active" : "idle";
+  public setStatus(snapshot: JobSnapshot): void {
+    this.statusEl.setText(snapshot.progress.label);
+    this.detailEl.setText(snapshot.errorMessage ?? snapshot.progress.detail ?? "");
+    this.containerEl.dataset.state = snapshot.status;
   }
 
   public dispose(): void {

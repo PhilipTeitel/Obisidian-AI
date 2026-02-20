@@ -2,9 +2,11 @@ import { MarkdownView, Notice, Plugin, type WorkspaceLeaf } from "obsidian";
 import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "./constants";
 import { DEFAULT_SETTINGS, ObsidianAISettingTab } from "./settings";
 import type {
+  JobSnapshot,
+  JobStatus,
+  JobType,
   ObsidianAISettings,
-  ObsidianAIViewType,
-  ProgressSlideoutStatus
+  ObsidianAIViewType
 } from "./types";
 import { ChatView } from "./ui/ChatView";
 import { SearchView } from "./ui/SearchView";
@@ -22,11 +24,14 @@ export default class ObsidianAIPlugin extends Plugin {
     this.registerView(CHAT_VIEW_TYPE, (leaf: WorkspaceLeaf) => new ChatView(leaf));
 
     this.progressSlideout = new ProgressSlideout(this.app);
-    this.progressSlideout.setStatus({
-      label: "Idle",
-      detail: "No indexing tasks are running.",
-      isActive: false
-    });
+    this.progressSlideout.setStatus(
+      this.createProgressSnapshot({
+        type: "index-changes",
+        status: "succeeded",
+        label: "Idle",
+        detail: "No indexing tasks are running."
+      })
+    );
 
     this.registerCommands();
     this.addSettingTab(new ObsidianAISettingTab(this.app, this));
@@ -62,7 +67,7 @@ export default class ObsidianAIPlugin extends Plugin {
       id: COMMAND_IDS.REINDEX_VAULT,
       name: COMMAND_NAMES.REINDEX_VAULT,
       callback: () => {
-        this.runPlaceholderIndexCommand(COMMAND_NAMES.REINDEX_VAULT);
+        this.runPlaceholderIndexCommand(COMMAND_NAMES.REINDEX_VAULT, "reindex-vault");
       }
     });
 
@@ -70,7 +75,7 @@ export default class ObsidianAIPlugin extends Plugin {
       id: COMMAND_IDS.INDEX_CHANGES,
       name: COMMAND_NAMES.INDEX_CHANGES,
       callback: () => {
-        this.runPlaceholderIndexCommand(COMMAND_NAMES.INDEX_CHANGES);
+        this.runPlaceholderIndexCommand(COMMAND_NAMES.INDEX_CHANGES, "index-changes");
       }
     });
 
@@ -90,22 +95,25 @@ export default class ObsidianAIPlugin extends Plugin {
     });
   }
 
-  private runPlaceholderIndexCommand(commandName: string): void {
-    this.setProgressStatus({
-      label: commandName,
-      detail: "Not implemented in FND-2.",
-      isActive: false
-    });
+  private runPlaceholderIndexCommand(commandName: string, jobType: JobType): void {
+    this.setProgressStatus(
+      this.createProgressSnapshot({
+        type: jobType,
+        status: "succeeded",
+        label: commandName,
+        detail: "Not implemented in FND-2."
+      })
+    );
 
     new Notice(`${commandName} is not implemented in FND-2 yet.`);
   }
 
-  private setProgressStatus(status: ProgressSlideoutStatus): void {
+  private setProgressStatus(snapshot: JobSnapshot): void {
     if (!this.progressSlideout) {
       return;
     }
 
-    this.progressSlideout.setStatus(status);
+    this.progressSlideout.setStatus(snapshot);
     this.progressSlideout.show();
 
     if (this.progressHideTimeoutId !== null) {
@@ -116,6 +124,31 @@ export default class ObsidianAIPlugin extends Plugin {
       this.progressSlideout?.hide();
       this.progressHideTimeoutId = null;
     }, 1800);
+  }
+
+  private createProgressSnapshot(params: {
+    type: JobType;
+    status: JobStatus;
+    label: string;
+    detail: string;
+    errorMessage?: string;
+  }): JobSnapshot {
+    const now = Date.now();
+    const isFinished = params.status === "succeeded" || params.status === "failed" || params.status === "cancelled";
+    return {
+      id: `${params.type}:${now}`,
+      type: params.type,
+      status: params.status,
+      startedAt: now,
+      finishedAt: isFinished ? now : undefined,
+      progress: {
+        completed: 0,
+        total: 0,
+        label: params.label,
+        detail: params.detail
+      },
+      errorMessage: params.errorMessage
+    };
   }
 
   private getActiveSelection(): string | null {

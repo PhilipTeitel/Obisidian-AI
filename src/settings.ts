@@ -1,5 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
-import type { ObsidianAISettings } from "./types";
+import { MVP_PROVIDER_IDS, type MVPProviderId, type ObsidianAISettings } from "./types";
 
 type SettingsHostPlugin = Plugin & {
   settings: ObsidianAISettings;
@@ -29,6 +29,18 @@ const parseCsvList = (value: string): string[] => {
 
 const formatCsvList = (values: string[]): string => values.join(", ");
 
+const PROVIDER_LABELS: Record<MVPProviderId, string> = {
+  openai: "OpenAI",
+  ollama: "Ollama"
+};
+
+const toKnownProviderId = (value: string): MVPProviderId => {
+  if (MVP_PROVIDER_IDS.includes(value as MVPProviderId)) {
+    return value as MVPProviderId;
+  }
+  return "openai";
+};
+
 export class ObsidianAISettingTab extends PluginSettingTab {
   private readonly plugin: SettingsHostPlugin;
 
@@ -50,12 +62,14 @@ export class ObsidianAISettingTab extends PluginSettingTab {
       .setName("Embedding provider")
       .setDesc("Placeholder provider choice for upcoming embedding service wiring.")
       .addDropdown((dropdown) => {
+        for (const providerId of MVP_PROVIDER_IDS) {
+          dropdown.addOption(providerId, PROVIDER_LABELS[providerId]);
+        }
+
         dropdown
-          .addOption("openai", "OpenAI")
-          .addOption("ollama", "Ollama")
-          .setValue(this.plugin.settings.embeddingProvider)
+          .setValue(toKnownProviderId(this.plugin.settings.embeddingProvider))
           .onChange(async (value) => {
-            this.plugin.settings.embeddingProvider = value;
+            this.plugin.settings.embeddingProvider = toKnownProviderId(value);
             await this.plugin.saveSettings();
           });
       });
@@ -64,12 +78,14 @@ export class ObsidianAISettingTab extends PluginSettingTab {
       .setName("Chat provider")
       .setDesc("Placeholder provider choice for upcoming chat service wiring.")
       .addDropdown((dropdown) => {
+        for (const providerId of MVP_PROVIDER_IDS) {
+          dropdown.addOption(providerId, PROVIDER_LABELS[providerId]);
+        }
+
         dropdown
-          .addOption("openai", "OpenAI")
-          .addOption("ollama", "Ollama")
-          .setValue(this.plugin.settings.chatProvider)
+          .setValue(toKnownProviderId(this.plugin.settings.chatProvider))
           .onChange(async (value) => {
-            this.plugin.settings.chatProvider = value;
+            this.plugin.settings.chatProvider = toKnownProviderId(value);
             await this.plugin.saveSettings();
           });
       });

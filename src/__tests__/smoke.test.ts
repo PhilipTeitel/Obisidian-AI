@@ -1,8 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "../constants";
+import { MVP_PROVIDER_IDS } from "../types";
+import type {
+  ChatProvider,
+  ChatRequest,
+  ChatStreamEvent,
+  ChunkRecord,
+  EmbeddingProvider,
+  EmbeddingRequest,
+  EmbeddingResponse,
+  JobSnapshot,
+  SearchRequest,
+  SearchResult
+} from "../types";
 
 const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
 const sourcePath = (...segments: string[]): string => resolve(CURRENT_DIR, "..", ...segments);
@@ -50,5 +63,103 @@ describe("plugin shell smoke test", () => {
     expect(settingsSource.includes("chatProvider: \"openai\"")).toBe(true);
     expect(settingsSource.includes("indexedFolders: [\"/\"]")).toBe(true);
     expect(settingsSource.includes("openai-api-key")).toBe(false);
+  });
+
+  it("exports compile-safe domain contracts", async () => {
+    const chunk: ChunkRecord = {
+      id: "chunk-1",
+      source: {
+        notePath: "notes/example.md",
+        noteTitle: "Example",
+        headingTrail: ["Top", "Nested"],
+        tags: ["ai", "mvp"]
+      },
+      content: "Chunk body",
+      hash: "abc123",
+      updatedAt: Date.now()
+    };
+
+    const embeddingRequest: EmbeddingRequest = {
+      providerId: "openai",
+      model: "text-embedding-3-small",
+      inputs: [chunk.content]
+    };
+
+    const embeddingResponse: EmbeddingResponse = {
+      providerId: embeddingRequest.providerId,
+      model: embeddingRequest.model,
+      vectors: [{ values: [0.1, 0.2], dimensions: 2 }]
+    };
+
+    const embeddingProvider: EmbeddingProvider = {
+      id: "openai",
+      name: "OpenAI",
+      embed: async () => embeddingResponse
+    };
+
+    const searchRequest: SearchRequest = {
+      query: "semantic query",
+      topK: 5
+    };
+
+    const searchResult: SearchResult = {
+      chunkId: chunk.id,
+      score: 0.9,
+      notePath: chunk.source.notePath,
+      noteTitle: chunk.source.noteTitle,
+      heading: chunk.source.headingTrail[1],
+      snippet: "Example snippet"
+    };
+
+    const chatRequest: ChatRequest = {
+      providerId: "ollama",
+      model: "llama3.1",
+      messages: [{ role: "user", content: "Summarize context." }],
+      context: [
+        {
+          chunkId: searchResult.chunkId,
+          notePath: searchResult.notePath,
+          heading: searchResult.heading,
+          snippet: searchResult.snippet,
+          score: searchResult.score
+        }
+      ],
+      timeoutMs: 30000
+    };
+
+    const tokenEvent: ChatStreamEvent = { type: "token", text: "Hello" };
+    const doneEvent: ChatStreamEvent = { type: "done", finishReason: "stop" };
+    const chatProvider: ChatProvider = {
+      id: "ollama",
+      name: "Ollama",
+      async *complete(): AsyncIterable<ChatStreamEvent> {
+        yield tokenEvent;
+        yield doneEvent;
+      }
+    };
+
+    const streamEvents: ChatStreamEvent[] = [];
+    for await (const event of chatProvider.complete(chatRequest)) {
+      streamEvents.push(event);
+    }
+
+    const snapshot: JobSnapshot = {
+      id: "job-1",
+      type: "index-changes",
+      status: "running",
+      startedAt: Date.now(),
+      progress: {
+        completed: 1,
+        total: 2,
+        label: "Indexing",
+        detail: "Reading notes"
+      }
+    };
+
+    expectTypeOf(MVP_PROVIDER_IDS).toEqualTypeOf<readonly ["openai", "ollama"]>();
+    expectTypeOf(searchRequest.topK).toEqualTypeOf<number>();
+    expectTypeOf(snapshot.progress.label).toEqualTypeOf<string>();
+    expect(streamEvents).toHaveLength(2);
+    expect(await embeddingProvider.embed(embeddingRequest)).toEqual(embeddingResponse);
   });
 });
