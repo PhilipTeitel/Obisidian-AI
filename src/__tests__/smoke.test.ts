@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { bootstrapRuntimeServices } from "../bootstrap/bootstrapRuntimeServices";
 import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "../constants";
+import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
 import { disposeRuntimeServices } from "../services/ServiceContainer";
 import { MVP_PROVIDER_IDS, RUNTIME_SERVICE_CONSTRUCTION_ORDER } from "../types";
 import type {
@@ -92,6 +93,16 @@ describe("plugin shell smoke test", () => {
     expect(mainSource.includes("this.registerView(SEARCH_VIEW_TYPE")).toBe(true);
     expect(mainSource.includes("this.registerView(CHAT_VIEW_TYPE")).toBe(true);
     expect(mainSource.includes("this.addSettingTab(new ObsidianAISettingTab")).toBe(true);
+  });
+
+  it("wires normalized errors and structured logging in runtime shell source", () => {
+    const mainSource = readSource("main.ts");
+    const bootstrapSource = readSource("bootstrap", "bootstrapRuntimeServices.ts");
+    const serviceContainerSource = readSource("services", "ServiceContainer.ts");
+    expect(mainSource.includes("createRuntimeLogger")).toBe(true);
+    expect(mainSource.includes("normalizeRuntimeError")).toBe(true);
+    expect(bootstrapSource.includes("runtime.service.init_failed")).toBe(true);
+    expect(serviceContainerSource.includes("runtime.service.dispose_failed")).toBe(true);
   });
 
   it("keeps view shell contract methods in source", () => {
@@ -213,6 +224,25 @@ describe("plugin shell smoke test", () => {
     expect(await embeddingProvider.embed(embeddingRequest)).toEqual(embeddingResponse);
   });
 
+  it("normalizes representative provider, network, storage, and runtime errors", () => {
+    const providerError = normalizeRuntimeError(new Error("OpenAI provider returned 401 unauthorized"));
+    expect(providerError.domain).toBe("provider");
+    expect(providerError.code).toBe("PROVIDER_AUTH_FAILURE");
+    expect(providerError.userMessage.length).toBeGreaterThan(0);
+
+    const networkError = normalizeRuntimeError(new Error("fetch failed: ETIMEDOUT"));
+    expect(networkError.domain).toBe("network");
+    expect(networkError.retryable).toBe(true);
+
+    const storageError = normalizeRuntimeError(new Error("sqlite disk I/O error"));
+    expect(storageError.domain).toBe("storage");
+    expect(storageError.code).toBe("STORAGE_IO_FAILURE");
+
+    const runtimeError = normalizeRuntimeError(new Error("Unexpected runtime invariant"));
+    expect(runtimeError.domain).toBe("runtime");
+    expect(runtimeError.code).toBe("RUNTIME_FAILURE");
+  });
+
   it("bootstraps runtime services in deterministic order", async () => {
     const firstRuntime = await bootstrapRuntimeServices(createRuntimeContext());
     const secondRuntime = await bootstrapRuntimeServices(createRuntimeContext());
@@ -247,7 +277,8 @@ describe("plugin shell smoke test", () => {
     expect(failingService.disposeCount).toBe(1);
     expect(succeedingService.disposeCount).toBe(1);
     expect(failures).toHaveLength(1);
-    expect(failures[0]).toContain("indexingService");
+    expect(failures[0].name).toBe("indexingService");
+    expect(failures[0].error.code).toBe("RUNTIME_FAILURE");
 
     const runtime = await bootstrapRuntimeServices(createRuntimeContext());
     await runtime.services.dispose();

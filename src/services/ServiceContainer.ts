@@ -1,8 +1,11 @@
+import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
+import { createRuntimeLogger } from "../logging/runtimeLogger";
 import type {
   AgentServiceContract,
   ChatServiceContract,
   EmbeddingServiceContract,
   IndexingServiceContract,
+  NormalizedRuntimeError,
   ProviderRegistryContract,
   RuntimeServiceLifecycle,
   RuntimeServiceName,
@@ -15,6 +18,11 @@ export interface NamedRuntimeService {
   service: RuntimeServiceLifecycle;
 }
 
+export interface RuntimeDisposalFailure {
+  name: RuntimeServiceName;
+  error: NormalizedRuntimeError;
+}
+
 export interface ServiceContainerDeps {
   indexingService: IndexingServiceContract;
   embeddingService: EmbeddingServiceContract;
@@ -25,14 +33,34 @@ export interface ServiceContainerDeps {
   disposeOrder: RuntimeServiceName[];
 }
 
-export const disposeRuntimeServices = async (entries: NamedRuntimeService[]): Promise<string[]> => {
-  const failures: string[] = [];
+const logger = createRuntimeLogger("ServiceContainer");
+
+export const disposeRuntimeServices = async (
+  entries: NamedRuntimeService[]
+): Promise<RuntimeDisposalFailure[]> => {
+  const failures: RuntimeDisposalFailure[] = [];
   for (const entry of entries) {
     try {
       await entry.service.dispose();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      failures.push(`${entry.name}: ${message}`);
+      const normalized = normalizeRuntimeError(error, {
+        operation: "runtimeServices.dispose",
+        phase: "dispose",
+        service: entry.name
+      });
+      failures.push({ name: entry.name, error: normalized });
+      logger.log({
+        level: "error",
+        event: "runtime.service.dispose_failed",
+        message: `Failed to dispose runtime service: ${entry.name}.`,
+        domain: normalized.domain,
+        context: {
+          operation: "runtimeServices.dispose",
+          phase: "dispose",
+          service: entry.name
+        },
+        error: normalized
+      });
     }
   }
   return failures;
@@ -81,7 +109,15 @@ export class ServiceContainer implements RuntimeServices {
 
     const failures = await disposeRuntimeServices(orderedEntries);
     if (failures.length > 0) {
-      console.error("Runtime service disposal encountered errors:", failures.join(" | "));
+      logger.log({
+        level: "warn",
+        event: "runtime.dispose.completed_with_failures",
+        message: "Runtime service disposal completed with failures.",
+        context: {
+          operation: "runtimeServices.dispose",
+          failureCount: failures.length
+        }
+      });
     }
   }
 }

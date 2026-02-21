@@ -139,6 +139,36 @@ export interface ObsidianAISettings {
   chatTimeout: number;
 }
 
+export type RuntimeLogContextValue = string | number | boolean | null | undefined;
+export type RuntimeLogContext = Record<string, RuntimeLogContextValue>;
+
+export type RuntimeErrorDomain = "provider" | "network" | "storage" | "runtime";
+
+export interface NormalizedRuntimeError {
+  domain: RuntimeErrorDomain;
+  code: string;
+  message: string;
+  userMessage: string;
+  retryable: boolean;
+  cause?: unknown;
+  context?: RuntimeLogContext;
+}
+
+export type RuntimeLogLevel = "debug" | "info" | "warn" | "error";
+
+export interface RuntimeLogEvent {
+  level: RuntimeLogLevel;
+  event: string;
+  message: string;
+  domain?: RuntimeErrorDomain;
+  context?: RuntimeLogContext;
+  error?: NormalizedRuntimeError;
+}
+
+export interface RuntimeLoggerContract {
+  log(event: RuntimeLogEvent): void;
+}
+
 export interface RuntimeServiceLifecycle {
   init(): Promise<void>;
   dispose(): Promise<void>;

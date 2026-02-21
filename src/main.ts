@@ -1,6 +1,8 @@
 import { MarkdownView, Notice, Plugin, type WorkspaceLeaf } from "obsidian";
 import { bootstrapRuntimeServices } from "./bootstrap/bootstrapRuntimeServices";
 import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "./constants";
+import { normalizeRuntimeError } from "./errors/normalizeRuntimeError";
+import { createRuntimeLogger } from "./logging/runtimeLogger";
 import { DEFAULT_SETTINGS, ObsidianAISettingTab, snapshotSettings } from "./settings";
 import type {
   JobSnapshot,
@@ -16,12 +18,18 @@ import { ProgressSlideout } from "./ui/ProgressSlideout";
 
 export default class ObsidianAIPlugin extends Plugin {
   public settings: ObsidianAISettings = { ...DEFAULT_SETTINGS };
+  private readonly logger = createRuntimeLogger("ObsidianAIPlugin");
   private runtimeServices: RuntimeServices | null = null;
   private progressSlideout: ProgressSlideout | null = null;
   private progressHideTimeoutId: number | null = null;
 
   public async onload(): Promise<void> {
     await this.loadSettings();
+    this.logger.log({
+      level: "info",
+      event: "plugin.onload.start",
+      message: "Plugin onload started."
+    });
 
     try {
       const bootstrapResult = await bootstrapRuntimeServices({
@@ -33,10 +41,32 @@ export default class ObsidianAIPlugin extends Plugin {
         }
       });
       this.runtimeServices = bootstrapResult.services;
+      this.logger.log({
+        level: "info",
+        event: "plugin.onload.bootstrap_succeeded",
+        message: "Runtime services bootstrapped.",
+        context: {
+          initializedServices: bootstrapResult.initializationOrder.length
+        }
+      });
     } catch (error: unknown) {
-      console.error("Failed to bootstrap runtime services.", error);
-      new Notice("Failed to initialize Obsidian AI services. Check console for details.");
-      throw error;
+      const normalized = normalizeRuntimeError(error, {
+        operation: "plugin.onload",
+        phase: "bootstrap"
+      });
+      this.logger.log({
+        level: "error",
+        event: "plugin.onload.bootstrap_failed",
+        message: "Failed to bootstrap runtime services.",
+        domain: normalized.domain,
+        context: {
+          operation: "plugin.onload",
+          phase: "bootstrap"
+        },
+        error: normalized
+      });
+      new Notice(normalized.userMessage);
+      throw normalized;
     }
 
     this.registerView(SEARCH_VIEW_TYPE, (leaf: WorkspaceLeaf) => new SearchView(leaf));
@@ -54,9 +84,20 @@ export default class ObsidianAIPlugin extends Plugin {
 
     this.registerCommands();
     this.addSettingTab(new ObsidianAISettingTab(this.app, this));
+    this.logger.log({
+      level: "info",
+      event: "plugin.onload.succeeded",
+      message: "Plugin onload completed."
+    });
   }
 
   public async onunload(): Promise<void> {
+    this.logger.log({
+      level: "info",
+      event: "plugin.onunload.start",
+      message: "Plugin onunload started."
+    });
+
     if (this.progressHideTimeoutId !== null) {
       window.clearTimeout(this.progressHideTimeoutId);
       this.progressHideTimeoutId = null;
@@ -73,8 +114,28 @@ export default class ObsidianAIPlugin extends Plugin {
     try {
       await servicesToDispose?.dispose();
     } catch (error: unknown) {
-      console.error("Failed to dispose runtime services.", error);
+      const normalized = normalizeRuntimeError(error, {
+        operation: "plugin.onunload",
+        phase: "dispose"
+      });
+      this.logger.log({
+        level: "error",
+        event: "plugin.onunload.dispose_failed",
+        message: "Failed to dispose runtime services.",
+        domain: normalized.domain,
+        context: {
+          operation: "plugin.onunload",
+          phase: "dispose"
+        },
+        error: normalized
+      });
     }
+
+    this.logger.log({
+      level: "info",
+      event: "plugin.onunload.succeeded",
+      message: "Plugin onunload completed."
+    });
   }
 
   public async loadSettings(): Promise<void> {
@@ -132,23 +193,57 @@ export default class ObsidianAIPlugin extends Plugin {
     jobType: JobType,
     runCommand: () => Promise<JobSnapshot>
   ): Promise<void> {
+    this.logger.log({
+      level: "info",
+      event: "plugin.command.start",
+      message: `Starting command: ${commandName}.`,
+      context: {
+        command: commandName,
+        jobType
+      }
+    });
     try {
       const snapshot = await runCommand();
       this.setProgressStatus(snapshot);
+      this.logger.log({
+        level: "info",
+        event: "plugin.command.succeeded",
+        message: `Command completed: ${commandName}.`,
+        context: {
+          command: commandName,
+          jobType,
+          status: snapshot.status
+        }
+      });
       new Notice(`${commandName} is not implemented in FND-4 yet.`);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`Failed to run ${commandName}.`, error);
+      const normalized = normalizeRuntimeError(error, {
+        operation: "plugin.command",
+        command: commandName,
+        jobType
+      });
+      this.logger.log({
+        level: "error",
+        event: "plugin.command.failed",
+        message: `Failed to run command: ${commandName}.`,
+        domain: normalized.domain,
+        context: {
+          operation: "plugin.command",
+          command: commandName,
+          jobType
+        },
+        error: normalized
+      });
       this.setProgressStatus(
         this.createProgressSnapshot({
           type: jobType,
           status: "failed",
           label: commandName,
           detail: "Runtime command failed.",
-          errorMessage: message
+          errorMessage: normalized.message
         })
       );
-      new Notice(`Failed to run ${commandName}.`);
+      new Notice(normalized.userMessage);
     }
   }
 
@@ -232,7 +327,21 @@ export default class ObsidianAIPlugin extends Plugin {
       try {
         await leaf.detach();
       } catch (error: unknown) {
-        console.error(`Failed to detach leaf for ${viewType}`, error);
+        const normalized = normalizeRuntimeError(error, {
+          operation: "plugin.detachViewLeaves",
+          viewType
+        });
+        this.logger.log({
+          level: "error",
+          event: "plugin.view.detach_failed",
+          message: `Failed to detach leaf for ${viewType}.`,
+          domain: normalized.domain,
+          context: {
+            operation: "plugin.detachViewLeaves",
+            viewType
+          },
+          error: normalized
+        });
       }
     }
   }
