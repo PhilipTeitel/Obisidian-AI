@@ -313,6 +313,16 @@ This watches `src/` and rebuilds on changes. Reload Obsidian (Cmd+R / Ctrl+R) to
 | `npm run test` | Run Vitest test suite |
 | `npm run typecheck` | Run `tsc --noEmit` for type checking |
 
+### Test Suite Layout
+
+| Path | Purpose |
+|------|---------|
+| `src/__tests__/smoke.test.ts` | Lightweight compile-safe and contract smoke checks |
+| `src/__tests__/unit/**/*.test.ts` | Service-level unit tests with typed collaborators |
+| `src/__tests__/integration/**/*.test.ts` | Plugin lifecycle/command integration tests with Obsidian-compatible mocks |
+| `src/__tests__/harness/` | Reusable test harness factories for app/plugin runtime setup |
+| `src/__tests__/setup/mockObsidianModule.ts` | Test-time `obsidian` compatibility shim used by Vitest |
+
 ## UI Components
 
 Obsidian UI views registered by the plugin:
@@ -394,7 +404,7 @@ Establish the plugin skeleton, lifecycle wiring, and baseline developer workflow
 | [FND-3](docs/features/FND-3-define-shared-domain-types-for-chunks-providers-search-chat-and-jobs.md) | Done | Define shared domain types for chunks, providers, search, chat, and jobs | S | Types should support future providers without refactors |
 | [FND-4](docs/features/FND-4-implement-service-container-bootstrap-orchestration.md) | Done | Implement service container/bootstrap orchestration | M | Runtime bootstrap and service disposal order are explicit and tested |
 | [FND-5](docs/features/FND-5-add-structured-logging-and-error-normalization.md) | Done | Add structured logging and error normalization | S | Provide actionable errors for provider/network/storage failures |
-| FND-6 | Not Started | Set up unit/integration test harness with Obsidian-compatible mocks | M | Required for service-level and command-level planning in later stories |
+| [FND-6](docs/features/FND-6-set-up-unit-integration-test-harness-with-obsidian-compatible-mocks.md) | Done | Set up unit/integration test harness with Obsidian-compatible mocks | M | Required for service-level and command-level planning in later stories |
 
 ### Epic 2: Indexing and Metadata Pipeline
 

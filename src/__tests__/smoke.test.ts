@@ -1,10 +1,8 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { bootstrapRuntimeServices } from "../bootstrap/bootstrapRuntimeServices";
 import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "../constants";
 import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
+import { DEFAULT_SETTINGS, snapshotSettings } from "../settings";
 import { disposeRuntimeServices } from "../services/ServiceContainer";
 import { MVP_PROVIDER_IDS, RUNTIME_SERVICE_CONSTRUCTION_ORDER } from "../types";
 import type {
@@ -22,10 +20,6 @@ import type {
   SearchRequest,
   SearchResult
 } from "../types";
-
-const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
-const sourcePath = (...segments: string[]): string => resolve(CURRENT_DIR, "..", ...segments);
-const readSource = (...segments: string[]): string => readFileSync(sourcePath(...segments), "utf8");
 const createSettingsSnapshot = (): ObsidianAISettings => {
   return {
     embeddingProvider: "openai",
@@ -86,44 +80,13 @@ describe("plugin shell smoke test", () => {
     expect(COMMAND_NAMES.SEARCH_SELECTION).toBe("Semantic search selection");
   });
 
-  it("registers lifecycle shell surfaces in source", () => {
-    const mainSource = readSource("main.ts");
-    expect(mainSource.includes("public async onload(): Promise<void>")).toBe(true);
-    expect(mainSource.includes("public async onunload(): Promise<void>")).toBe(true);
-    expect(mainSource.includes("this.registerView(SEARCH_VIEW_TYPE")).toBe(true);
-    expect(mainSource.includes("this.registerView(CHAT_VIEW_TYPE")).toBe(true);
-    expect(mainSource.includes("this.addSettingTab(new ObsidianAISettingTab")).toBe(true);
-  });
-
-  it("wires normalized errors and structured logging in runtime shell source", () => {
-    const mainSource = readSource("main.ts");
-    const bootstrapSource = readSource("bootstrap", "bootstrapRuntimeServices.ts");
-    const serviceContainerSource = readSource("services", "ServiceContainer.ts");
-    expect(mainSource.includes("createRuntimeLogger")).toBe(true);
-    expect(mainSource.includes("normalizeRuntimeError")).toBe(true);
-    expect(bootstrapSource.includes("runtime.service.init_failed")).toBe(true);
-    expect(serviceContainerSource.includes("runtime.service.dispose_failed")).toBe(true);
-  });
-
-  it("keeps view shell contract methods in source", () => {
-    const searchViewSource = readSource("ui", "SearchView.ts");
-    const chatViewSource = readSource("ui", "ChatView.ts");
-    expect(searchViewSource.includes("public getViewType(): string")).toBe(true);
-    expect(searchViewSource.includes("public async onOpen(): Promise<void>")).toBe(true);
-    expect(searchViewSource.includes("public async onClose(): Promise<void>")).toBe(true);
-    expect(chatViewSource.includes("public getViewType(): string")).toBe(true);
-    expect(chatViewSource.includes("public async onOpen(): Promise<void>")).toBe(true);
-    expect(chatViewSource.includes("public async onClose(): Promise<void>")).toBe(true);
-  });
-
-  it("keeps non-secret defaults in settings source", () => {
-    const settingsSource = readSource("settings.ts");
-    expect(settingsSource.includes("export const DEFAULT_SETTINGS")).toBe(true);
-    expect(settingsSource.includes("export const snapshotSettings")).toBe(true);
-    expect(settingsSource.includes("embeddingProvider: \"openai\"")).toBe(true);
-    expect(settingsSource.includes("chatProvider: \"openai\"")).toBe(true);
-    expect(settingsSource.includes("indexedFolders: [\"/\"]")).toBe(true);
-    expect(settingsSource.includes("openai-api-key")).toBe(false);
+  it("keeps non-secret default settings and snapshot behavior", () => {
+    const snapshot = snapshotSettings(DEFAULT_SETTINGS);
+    expect(snapshot.embeddingProvider).toBe("openai");
+    expect(snapshot.chatProvider).toBe("openai");
+    expect(snapshot.indexedFolders).toEqual(["/"]);
+    expect(snapshot).not.toBe(DEFAULT_SETTINGS);
+    expect(snapshot.indexedFolders).not.toBe(DEFAULT_SETTINGS.indexedFolders);
   });
 
   it("exports compile-safe domain contracts", async () => {
