@@ -1,3 +1,5 @@
+import type { App, Plugin } from "obsidian";
+
 export type ObsidianAIViewType = "obsidian-ai:search-view" | "obsidian-ai:chat-view";
 
 export type ObsidianAICommandId =
@@ -135,4 +137,70 @@ export interface ObsidianAISettings {
   agentOutputFolders: string[];
   maxGeneratedNoteSize: number;
   chatTimeout: number;
+}
+
+export interface RuntimeServiceLifecycle {
+  init(): Promise<void>;
+  dispose(): Promise<void>;
+}
+
+export interface ProviderRegistryContract extends RuntimeServiceLifecycle {
+  getEmbeddingProviderId(): ProviderId;
+  getChatProviderId(): ProviderId;
+}
+
+export interface EmbeddingServiceContract extends RuntimeServiceLifecycle {
+  embed(request: EmbeddingRequest): Promise<EmbeddingResponse>;
+}
+
+export interface SearchServiceContract extends RuntimeServiceLifecycle {
+  search(request: SearchRequest): Promise<SearchResult[]>;
+  searchSelection(selection: string): Promise<SearchResult[]>;
+}
+
+export interface ChatServiceContract extends RuntimeServiceLifecycle {
+  chat(request: ChatRequest): AsyncIterable<ChatStreamEvent>;
+}
+
+export interface AgentServiceContract extends RuntimeServiceLifecycle {
+  createNote(path: string, content: string): Promise<void>;
+  updateNote(path: string, content: string): Promise<void>;
+}
+
+export interface IndexingServiceContract extends RuntimeServiceLifecycle {
+  reindexVault(): Promise<JobSnapshot>;
+  indexChanges(): Promise<JobSnapshot>;
+}
+
+export interface RuntimeBootstrapContext {
+  app: App;
+  plugin: Plugin;
+  getSettings: () => ObsidianAISettings;
+  notify: (message: string) => void;
+}
+
+export interface RuntimeServices {
+  indexingService: IndexingServiceContract;
+  embeddingService: EmbeddingServiceContract;
+  searchService: SearchServiceContract;
+  chatService: ChatServiceContract;
+  agentService: AgentServiceContract;
+  providerRegistry: ProviderRegistryContract;
+  dispose(): Promise<void>;
+}
+
+export const RUNTIME_SERVICE_CONSTRUCTION_ORDER = [
+  "providerRegistry",
+  "embeddingService",
+  "searchService",
+  "agentService",
+  "chatService",
+  "indexingService"
+] as const;
+
+export type RuntimeServiceName = (typeof RUNTIME_SERVICE_CONSTRUCTION_ORDER)[number];
+
+export interface RuntimeBootstrapResult {
+  services: RuntimeServices;
+  initializationOrder: RuntimeServiceName[];
 }

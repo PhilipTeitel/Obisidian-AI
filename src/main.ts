@@ -1,12 +1,14 @@
 import { MarkdownView, Notice, Plugin, type WorkspaceLeaf } from "obsidian";
+import { bootstrapRuntimeServices } from "./bootstrap/bootstrapRuntimeServices";
 import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "./constants";
-import { DEFAULT_SETTINGS, ObsidianAISettingTab } from "./settings";
+import { DEFAULT_SETTINGS, ObsidianAISettingTab, snapshotSettings } from "./settings";
 import type {
   JobSnapshot,
   JobStatus,
   JobType,
   ObsidianAISettings,
-  ObsidianAIViewType
+  ObsidianAIViewType,
+  RuntimeServices
 } from "./types";
 import { ChatView } from "./ui/ChatView";
 import { SearchView } from "./ui/SearchView";
@@ -14,11 +16,28 @@ import { ProgressSlideout } from "./ui/ProgressSlideout";
 
 export default class ObsidianAIPlugin extends Plugin {
   public settings: ObsidianAISettings = { ...DEFAULT_SETTINGS };
+  private runtimeServices: RuntimeServices | null = null;
   private progressSlideout: ProgressSlideout | null = null;
   private progressHideTimeoutId: number | null = null;
 
   public async onload(): Promise<void> {
     await this.loadSettings();
+
+    try {
+      const bootstrapResult = await bootstrapRuntimeServices({
+        app: this.app,
+        plugin: this,
+        getSettings: () => snapshotSettings(this.settings),
+        notify: (message) => {
+          new Notice(message);
+        }
+      });
+      this.runtimeServices = bootstrapResult.services;
+    } catch (error: unknown) {
+      console.error("Failed to bootstrap runtime services.", error);
+      new Notice("Failed to initialize Obsidian AI services. Check console for details.");
+      throw error;
+    }
 
     this.registerView(SEARCH_VIEW_TYPE, (leaf: WorkspaceLeaf) => new SearchView(leaf));
     this.registerView(CHAT_VIEW_TYPE, (leaf: WorkspaceLeaf) => new ChatView(leaf));
@@ -48,14 +67,22 @@ export default class ObsidianAIPlugin extends Plugin {
 
     this.progressSlideout?.dispose();
     this.progressSlideout = null;
+
+    const servicesToDispose = this.runtimeServices;
+    this.runtimeServices = null;
+    try {
+      await servicesToDispose?.dispose();
+    } catch (error: unknown) {
+      console.error("Failed to dispose runtime services.", error);
+    }
   }
 
   public async loadSettings(): Promise<void> {
     const loadedData = (await this.loadData()) as Partial<ObsidianAISettings> | null;
-    this.settings = {
+    this.settings = snapshotSettings({
       ...DEFAULT_SETTINGS,
       ...loadedData
-    };
+    });
   }
 
   public async saveSettings(): Promise<void> {
@@ -66,16 +93,20 @@ export default class ObsidianAIPlugin extends Plugin {
     this.addCommand({
       id: COMMAND_IDS.REINDEX_VAULT,
       name: COMMAND_NAMES.REINDEX_VAULT,
-      callback: () => {
-        this.runPlaceholderIndexCommand(COMMAND_NAMES.REINDEX_VAULT, "reindex-vault");
+      callback: async () => {
+        await this.runIndexCommand(COMMAND_NAMES.REINDEX_VAULT, "reindex-vault", async () => {
+          return this.requireRuntimeServices().indexingService.reindexVault();
+        });
       }
     });
 
     this.addCommand({
       id: COMMAND_IDS.INDEX_CHANGES,
       name: COMMAND_NAMES.INDEX_CHANGES,
-      callback: () => {
-        this.runPlaceholderIndexCommand(COMMAND_NAMES.INDEX_CHANGES, "index-changes");
+      callback: async () => {
+        await this.runIndexCommand(COMMAND_NAMES.INDEX_CHANGES, "index-changes", async () => {
+          return this.requireRuntimeServices().indexingService.indexChanges();
+        });
       }
     });
 
@@ -90,22 +121,42 @@ export default class ObsidianAIPlugin extends Plugin {
         }
 
         await this.activateView(SEARCH_VIEW_TYPE);
-        new Notice("Semantic search selection is not implemented in FND-2 yet.");
+        await this.requireRuntimeServices().searchService.searchSelection(selection);
+        new Notice("Semantic search selection is not implemented in FND-4 yet.");
       }
     });
   }
 
-  private runPlaceholderIndexCommand(commandName: string, jobType: JobType): void {
-    this.setProgressStatus(
-      this.createProgressSnapshot({
-        type: jobType,
-        status: "succeeded",
-        label: commandName,
-        detail: "Not implemented in FND-2."
-      })
-    );
+  private async runIndexCommand(
+    commandName: string,
+    jobType: JobType,
+    runCommand: () => Promise<JobSnapshot>
+  ): Promise<void> {
+    try {
+      const snapshot = await runCommand();
+      this.setProgressStatus(snapshot);
+      new Notice(`${commandName} is not implemented in FND-4 yet.`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to run ${commandName}.`, error);
+      this.setProgressStatus(
+        this.createProgressSnapshot({
+          type: jobType,
+          status: "failed",
+          label: commandName,
+          detail: "Runtime command failed.",
+          errorMessage: message
+        })
+      );
+      new Notice(`Failed to run ${commandName}.`);
+    }
+  }
 
-    new Notice(`${commandName} is not implemented in FND-2 yet.`);
+  private requireRuntimeServices(): RuntimeServices {
+    if (!this.runtimeServices) {
+      throw new Error("Runtime services are unavailable.");
+    }
+    return this.runtimeServices;
   }
 
   private setProgressStatus(snapshot: JobSnapshot): void {

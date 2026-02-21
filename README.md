@@ -216,6 +216,8 @@ obsidian-ai-plugin/
 │   ├── constants.ts                # Stable command and view identifiers
 │   ├── settings.ts                 # PluginSettingTab + defaults
 │   ├── types.ts                    # Shared type definitions
+│   ├── bootstrap/
+│   │   └── bootstrapRuntimeServices.ts # Runtime composition root + deterministic init order
 │   ├── ui/
 │   │   ├── SearchView.ts           # Semantic search pane (ItemView)
 │   │   ├── ChatView.ts             # Chat completions pane (ItemView)
@@ -382,7 +384,7 @@ Establish the plugin skeleton, lifecycle wiring, and baseline developer workflow
 | [FND-1](docs/features/FND-1-initialize-obsidian-plugin-scaffold-and-build-pipeline.md) | Done | Initialize Obsidian plugin scaffold and build pipeline | S | Ensure `manifest.json`, `versions.json`, `esbuild`, lint, and test scripts are wired |
 | [FND-2](docs/features/FND-2-register-plugin-lifecycle-views-commands-and-settings-tab-shell.md) | Done | Register plugin lifecycle, views, commands, and settings tab shell | M | View/command/settings/progress shells registered with deterministic unload cleanup |
 | [FND-3](docs/features/FND-3-define-shared-domain-types-for-chunks-providers-search-chat-and-jobs.md) | Done | Define shared domain types for chunks, providers, search, chat, and jobs | S | Types should support future providers without refactors |
-| FND-4 | Not Started | Implement service container/bootstrap orchestration | M | Keep construction order explicit and testable |
+| [FND-4](docs/features/FND-4-implement-service-container-bootstrap-orchestration.md) | Done | Implement service container/bootstrap orchestration | M | Runtime bootstrap and service disposal order are explicit and tested |
 | FND-5 | Not Started | Add structured logging and error normalization | S | Provide actionable errors for provider/network/storage failures |
 | FND-6 | Not Started | Set up unit/integration test harness with Obsidian-compatible mocks | M | Required for service-level and command-level planning in later stories |
 

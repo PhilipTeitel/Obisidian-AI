@@ -20,6 +20,15 @@ export const DEFAULT_SETTINGS: ObsidianAISettings = {
   chatTimeout: 30000
 };
 
+export const snapshotSettings = (settings: ObsidianAISettings): ObsidianAISettings => {
+  return {
+    ...settings,
+    indexedFolders: [...settings.indexedFolders],
+    excludedFolders: [...settings.excludedFolders],
+    agentOutputFolders: [...settings.agentOutputFolders]
+  };
+};
+
 const parseCsvList = (value: string): string[] => {
   return value
     .split(",")

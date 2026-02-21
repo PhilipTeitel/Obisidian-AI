@@ -2,8 +2,10 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bootstrapRuntimeServices } from "../bootstrap/bootstrapRuntimeServices";
 import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "../constants";
-import { MVP_PROVIDER_IDS } from "../types";
+import { disposeRuntimeServices } from "../services/ServiceContainer";
+import { MVP_PROVIDER_IDS, RUNTIME_SERVICE_CONSTRUCTION_ORDER } from "../types";
 import type {
   ChatProvider,
   ChatRequest,
@@ -13,6 +15,9 @@ import type {
   EmbeddingRequest,
   EmbeddingResponse,
   JobSnapshot,
+  ObsidianAISettings,
+  RuntimeBootstrapContext,
+  RuntimeServiceLifecycle,
   SearchRequest,
   SearchResult
 } from "../types";
@@ -20,6 +25,50 @@ import type {
 const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
 const sourcePath = (...segments: string[]): string => resolve(CURRENT_DIR, "..", ...segments);
 const readSource = (...segments: string[]): string => readFileSync(sourcePath(...segments), "utf8");
+const createSettingsSnapshot = (): ObsidianAISettings => {
+  return {
+    embeddingProvider: "openai",
+    chatProvider: "openai",
+    embeddingModel: "text-embedding-3-small",
+    chatModel: "gpt-4o-mini",
+    ollamaEndpoint: "http://localhost:11434",
+    openaiEndpoint: "https://api.openai.com/v1",
+    indexedFolders: ["/"],
+    excludedFolders: [],
+    agentOutputFolders: [],
+    maxGeneratedNoteSize: 5000,
+    chatTimeout: 30000
+  };
+};
+
+const createRuntimeContext = (): RuntimeBootstrapContext => {
+  return {
+    app: {} as RuntimeBootstrapContext["app"],
+    plugin: {} as RuntimeBootstrapContext["plugin"],
+    getSettings: () => createSettingsSnapshot(),
+    notify: () => undefined
+  };
+};
+
+class RecordingService implements RuntimeServiceLifecycle {
+  public disposeCount = 0;
+  private readonly shouldThrowOnDispose: boolean;
+
+  public constructor(shouldThrowOnDispose = false) {
+    this.shouldThrowOnDispose = shouldThrowOnDispose;
+  }
+
+  public async init(): Promise<void> {
+    return undefined;
+  }
+
+  public async dispose(): Promise<void> {
+    this.disposeCount += 1;
+    if (this.shouldThrowOnDispose) {
+      throw new Error("dispose failure");
+    }
+  }
+}
 
 describe("plugin shell smoke test", () => {
   it("exposes stable runtime IDs", () => {
@@ -59,6 +108,7 @@ describe("plugin shell smoke test", () => {
   it("keeps non-secret defaults in settings source", () => {
     const settingsSource = readSource("settings.ts");
     expect(settingsSource.includes("export const DEFAULT_SETTINGS")).toBe(true);
+    expect(settingsSource.includes("export const snapshotSettings")).toBe(true);
     expect(settingsSource.includes("embeddingProvider: \"openai\"")).toBe(true);
     expect(settingsSource.includes("chatProvider: \"openai\"")).toBe(true);
     expect(settingsSource.includes("indexedFolders: [\"/\"]")).toBe(true);
@@ -161,5 +211,46 @@ describe("plugin shell smoke test", () => {
     expectTypeOf(snapshot.progress.label).toEqualTypeOf<string>();
     expect(streamEvents).toHaveLength(2);
     expect(await embeddingProvider.embed(embeddingRequest)).toEqual(embeddingResponse);
+  });
+
+  it("bootstraps runtime services in deterministic order", async () => {
+    const firstRuntime = await bootstrapRuntimeServices(createRuntimeContext());
+    const secondRuntime = await bootstrapRuntimeServices(createRuntimeContext());
+
+    expect(firstRuntime.initializationOrder).toEqual([...RUNTIME_SERVICE_CONSTRUCTION_ORDER]);
+    expect(secondRuntime.initializationOrder).toEqual([...RUNTIME_SERVICE_CONSTRUCTION_ORDER]);
+
+    const singleRuntimeServiceSet = new Set([
+      firstRuntime.services.providerRegistry,
+      firstRuntime.services.embeddingService,
+      firstRuntime.services.searchService,
+      firstRuntime.services.agentService,
+      firstRuntime.services.chatService,
+      firstRuntime.services.indexingService
+    ]);
+    expect(singleRuntimeServiceSet.size).toBe(6);
+    expect(firstRuntime.services.providerRegistry).not.toBe(secondRuntime.services.providerRegistry);
+
+    await firstRuntime.services.dispose();
+    await secondRuntime.services.dispose();
+  });
+
+  it("continues disposal after service-level failures and supports idempotent container dispose", async () => {
+    const failingService = new RecordingService(true);
+    const succeedingService = new RecordingService(false);
+
+    const failures = await disposeRuntimeServices([
+      { name: "indexingService", service: failingService },
+      { name: "chatService", service: succeedingService }
+    ]);
+
+    expect(failingService.disposeCount).toBe(1);
+    expect(succeedingService.disposeCount).toBe(1);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toContain("indexingService");
+
+    const runtime = await bootstrapRuntimeServices(createRuntimeContext());
+    await runtime.services.dispose();
+    await expect(runtime.services.dispose()).resolves.toBeUndefined();
   });
 });
