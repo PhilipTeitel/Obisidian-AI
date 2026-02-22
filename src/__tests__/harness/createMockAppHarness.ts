@@ -95,8 +95,14 @@ export const createMockAppHarness = (): MockAppHarness => {
     }
   };
 
+  const vault = {
+    getMarkdownFiles: () => [],
+    cachedRead: async () => ""
+  };
+
   const app = {
-    workspace
+    workspace,
+    vault
   } as unknown as App;
 
   return {

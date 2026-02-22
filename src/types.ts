@@ -11,6 +11,7 @@ export const MVP_PROVIDER_IDS = ["openai", "ollama"] as const;
 export type MVPProviderId = (typeof MVP_PROVIDER_IDS)[number];
 export type ProviderId = MVPProviderId | (string & {});
 export type ProviderKind = "embedding" | "chat";
+export type ChunkContextKind = "paragraph" | "bullet";
 
 export interface ChunkReference {
   notePath: string;
@@ -18,6 +19,7 @@ export interface ChunkReference {
   headingTrail: string[];
   blockRef?: string;
   tags: string[];
+  contextKind?: ChunkContextKind;
 }
 
 export interface ChunkRecord {
@@ -27,6 +29,17 @@ export interface ChunkRecord {
   hash: string;
   tokenEstimate?: number;
   updatedAt: number;
+}
+
+export interface ChunkerInput {
+  notePath: string;
+  noteTitle: string;
+  markdown: string;
+  updatedAt: number;
+}
+
+export interface ChunkerOptions {
+  maxChunkChars?: number;
 }
 
 export interface EmbeddingVector {

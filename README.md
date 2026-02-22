@@ -412,8 +412,8 @@ Build full and incremental indexing that preserves note structure and metadata.
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| IDX-1 | Not Started | Implement markdown chunker preserving heading, paragraph/bullet context, and tags | M | Metadata minimum: note name, heading, paragraph/bullet, tags |
-| IDX-2 | Not Started | Implement vault crawler with configurable include/exclude folders | M | Folder scoping comes from plugin settings |
+| [IDX-1](docs/features/IDX-1-implement-markdown-chunker-preserving-heading-paragraph-bullet-context-and-tags.md) | Done | Implement markdown chunker preserving heading, paragraph/bullet context, and tags | M | Metadata minimum: note name, heading, paragraph/bullet, tags |
+| [IDX-2](docs/features/IDX-2-implement-vault-crawler-with-configurable-include-exclude-folders.md) | Done | Implement vault crawler with configurable include/exclude folders | M | Folder scoping comes from plugin settings |
 | IDX-3 | Not Started | Build full reindex workflow and `Reindex vault` command | M | Always rebuild chunks/embeddings for configured scope |
 | IDX-4 | Not Started | Build incremental index workflow and `Index changes` command | L | Detect new/updated/deleted content via content hash strategy |
 | IDX-5 | Not Started | Persist index job state and progress events for long-running tasks | M | Drives slideout progress UI and prevents duplicate jobs |

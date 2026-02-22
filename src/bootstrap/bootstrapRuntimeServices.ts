@@ -98,6 +98,7 @@ export const bootstrapRuntimeServices = async (
     providerRegistry
   });
   const indexingService = new IndexingService({
+    app: context.app,
     embeddingService,
     getSettings: context.getSettings
   });

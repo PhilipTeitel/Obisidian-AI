@@ -96,6 +96,12 @@ describe("runtime service unit behavior", () => {
     };
 
     const service = new IndexingService({
+      app: {
+        vault: {
+          getMarkdownFiles: () => [],
+          cachedRead: async () => ""
+        }
+      } as unknown as RuntimeBootstrapContext["app"],
       embeddingService: spyingEmbeddingService,
       getSettings: () => settings
     });

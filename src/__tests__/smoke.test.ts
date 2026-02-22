@@ -9,7 +9,10 @@ import type {
   ChatProvider,
   ChatRequest,
   ChatStreamEvent,
+  ChunkContextKind,
   ChunkRecord,
+  ChunkerInput,
+  ChunkerOptions,
   EmbeddingProvider,
   EmbeddingRequest,
   EmbeddingResponse,
@@ -90,17 +93,29 @@ describe("plugin shell smoke test", () => {
   });
 
   it("exports compile-safe domain contracts", async () => {
+    const contextKind: ChunkContextKind = "paragraph";
     const chunk: ChunkRecord = {
       id: "chunk-1",
       source: {
         notePath: "notes/example.md",
         noteTitle: "Example",
         headingTrail: ["Top", "Nested"],
-        tags: ["ai", "mvp"]
+        tags: ["ai", "mvp"],
+        contextKind
       },
       content: "Chunk body",
       hash: "abc123",
       updatedAt: Date.now()
+    };
+
+    const chunkerInput: ChunkerInput = {
+      notePath: chunk.source.notePath,
+      noteTitle: chunk.source.noteTitle,
+      markdown: chunk.content,
+      updatedAt: chunk.updatedAt
+    };
+    const chunkerOptions: ChunkerOptions = {
+      maxChunkChars: 500
     };
 
     const embeddingRequest: EmbeddingRequest = {
@@ -183,6 +198,8 @@ describe("plugin shell smoke test", () => {
     expectTypeOf(MVP_PROVIDER_IDS).toEqualTypeOf<readonly ["openai", "ollama"]>();
     expectTypeOf(searchRequest.topK).toEqualTypeOf<number>();
     expectTypeOf(snapshot.progress.label).toEqualTypeOf<string>();
+    expectTypeOf(chunkerInput.notePath).toEqualTypeOf<string>();
+    expectTypeOf(chunkerOptions.maxChunkChars).toEqualTypeOf<number | undefined>();
     expect(streamEvents).toHaveLength(2);
     expect(await embeddingProvider.embed(embeddingRequest)).toEqual(embeddingResponse);
   });
