@@ -52,14 +52,63 @@ describe("plugin runtime integration", () => {
 
   it("runs reindex and index-changes commands through registered callbacks", async () => {
     const harness = createPluginTestHarness();
+    harness.appHarness.setVaultMarkdownFiles([
+      {
+        path: "notes/runtime.md",
+        markdown: "# Runtime\n\nIndexed note",
+        mtime: 1
+      }
+    ]);
     await harness.runOnload();
 
     await harness.invokeCommand(COMMAND_IDS.REINDEX_VAULT);
     await harness.invokeCommand(COMMAND_IDS.INDEX_CHANGES);
 
     const notices = harness.appHarness.getNoticeMessages();
-    expect(notices).toContain("Reindex vault is not implemented in FND-4 yet.");
-    expect(notices).toContain("Index changes is not implemented in FND-4 yet.");
+    expect(notices.some((message) => message.startsWith("Reindex vault completed."))).toBe(true);
+    expect(notices.some((message) => message.startsWith("Index changes completed."))).toBe(true);
+    expect(notices.some((message) => message.includes("not implemented in FND-4"))).toBe(false);
+
+    await harness.runOnunload();
+  });
+
+  it("recovers stale indexing state before running index-changes", async () => {
+    const harness = createPluginTestHarness();
+    harness.appHarness.setVaultMarkdownFiles([
+      {
+        path: "notes/recovery.md",
+        markdown: "# Recovery\n\nRun after stale state",
+        mtime: 1
+      }
+    ]);
+    await harness.plugin.saveData({
+      indexManifest: {
+        version: 1,
+        notes: "broken"
+      },
+      indexJobState: {
+        activeJob: {
+          id: "stale-job",
+          type: "index-changes",
+          status: "running",
+          startedAt: 1,
+          progress: {
+            completed: 0,
+            total: 1,
+            label: "Index changes · Crawl",
+            detail: "Stale"
+          }
+        },
+        history: []
+      }
+    });
+
+    await harness.runOnload();
+    await harness.invokeCommand(COMMAND_IDS.INDEX_CHANGES);
+
+    const notices = harness.appHarness.getNoticeMessages();
+    expect(notices.some((message) => message.startsWith("Index changes completed."))).toBe(true);
+    expect(notices.some((message) => message.includes("Recovery:"))).toBe(true);
 
     await harness.runOnunload();
   });

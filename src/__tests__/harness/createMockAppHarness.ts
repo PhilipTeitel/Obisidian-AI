@@ -27,14 +27,37 @@ export interface MockAppHarness {
   rightLeaf: MockWorkspaceLeafLike | null;
   setSelection: (selection: string) => void;
   clearSelection: () => void;
+  setVaultMarkdownFiles: (files: MockVaultMarkdownSeed[]) => void;
   getNoticeMessages: () => string[];
   getRevealedLeaves: () => MockWorkspaceLeafLike[];
   getLeavesForType: (viewType: string) => MockWorkspaceLeafLike[];
 }
 
+export interface MockVaultMarkdownSeed {
+  path: string;
+  markdown: string;
+  mtime?: number;
+  basename?: string;
+}
+
+interface MockVaultMarkdownFile {
+  path: string;
+  basename: string;
+  stat: {
+    mtime: number;
+  };
+}
+
+const inferBasename = (path: string): string => {
+  const fileName = path.split("/").pop() ?? path;
+  return fileName.replace(/\.md$/i, "");
+};
+
 export const createMockAppHarness = (): MockAppHarness => {
   const leavesByType = new Map<string, MockWorkspaceLeafLike[]>();
   const revealedLeaves: MockWorkspaceLeafLike[] = [];
+  const markdownContentByPath = new Map<string, string>();
+  let markdownFiles: MockVaultMarkdownFile[] = [];
   let activeSelection = "";
 
   const registerLeafType = (viewType: string, leaf: MockWorkspaceLeafLike): void => {
@@ -96,8 +119,12 @@ export const createMockAppHarness = (): MockAppHarness => {
   };
 
   const vault = {
-    getMarkdownFiles: () => [],
-    cachedRead: async () => ""
+    getMarkdownFiles: (): MockVaultMarkdownFile[] => {
+      return [...markdownFiles];
+    },
+    cachedRead: async (file: MockVaultMarkdownFile): Promise<string> => {
+      return markdownContentByPath.get(file.path) ?? "";
+    }
   };
 
   const app = {
@@ -114,6 +141,21 @@ export const createMockAppHarness = (): MockAppHarness => {
     },
     clearSelection: (): void => {
       activeSelection = "";
+    },
+    setVaultMarkdownFiles: (files: MockVaultMarkdownSeed[]): void => {
+      markdownContentByPath.clear();
+      markdownFiles = files.map((file, index) => {
+        const mtime = file.mtime ?? Date.now() + index;
+        const basename = file.basename ?? inferBasename(file.path);
+        markdownContentByPath.set(file.path, file.markdown);
+        return {
+          path: file.path,
+          basename,
+          stat: {
+            mtime
+          }
+        };
+      });
     },
     getNoticeMessages: (): string[] => {
       return getNoticeMessages();

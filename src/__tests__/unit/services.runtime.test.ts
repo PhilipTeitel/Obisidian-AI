@@ -3,6 +3,8 @@ import { AgentService } from "../../services/AgentService";
 import { ChatService } from "../../services/ChatService";
 import { EmbeddingService } from "../../services/EmbeddingService";
 import { IndexingService } from "../../services/IndexingService";
+import { IndexJobStateStore } from "../../services/indexing/IndexJobStateStore";
+import { IndexManifestStore } from "../../services/indexing/IndexManifestStore";
 import { ProviderRegistry } from "../../providers/ProviderRegistry";
 import { SearchService } from "../../services/SearchService";
 import type {
@@ -49,6 +51,16 @@ const collectEvents = async (stream: AsyncIterable<ChatStreamEvent>): Promise<Ch
   return events;
 };
 
+const createMemoryPlugin = (): RuntimeBootstrapContext["plugin"] => {
+  let data: unknown = null;
+  return {
+    loadData: async () => data,
+    saveData: async (nextData: unknown) => {
+      data = nextData;
+    }
+  } as unknown as RuntimeBootstrapContext["plugin"];
+};
+
 describe("runtime service unit behavior", () => {
   it("ProviderRegistry reads active providers from settings and tracks disposal state", async () => {
     const settings = createSettings();
@@ -72,8 +84,9 @@ describe("runtime service unit behavior", () => {
     expect(registry.isDisposed()).toBe(true);
   });
 
-  it("IndexingService calls embedding dependency and enforces disposed guard", async () => {
+  it("IndexingService runs reindex/incremental paths and enforces disposed guard", async () => {
     const settings = createSettings();
+    const plugin = createMemoryPlugin();
     const embeddingRequests: EmbeddingRequest[] = [];
     const embeddingService = new EmbeddingService({
       providerRegistry: {
@@ -98,12 +111,26 @@ describe("runtime service unit behavior", () => {
     const service = new IndexingService({
       app: {
         vault: {
-          getMarkdownFiles: () => [],
-          cachedRead: async () => ""
+          getMarkdownFiles: () => [
+            {
+              path: "notes/example.md",
+              basename: "example",
+              stat: {
+                mtime: 1
+              }
+            }
+          ],
+          cachedRead: async () => "# Example\n\nBody text"
         }
       } as unknown as RuntimeBootstrapContext["app"],
       embeddingService: spyingEmbeddingService,
-      getSettings: () => settings
+      getSettings: () => settings,
+      manifestStore: new IndexManifestStore({
+        plugin
+      }),
+      jobStateStore: new IndexJobStateStore({
+        plugin
+      })
     });
 
     await service.init();
@@ -112,12 +139,10 @@ describe("runtime service unit behavior", () => {
 
     expect(reindexSnapshot.type).toBe("reindex-vault");
     expect(incrementalSnapshot.type).toBe("index-changes");
-    expect(embeddingRequests).toHaveLength(2);
-    expect(embeddingRequests[0]).toEqual({
-      providerId: "openai",
-      model: "text-embedding-3-small",
-      inputs: []
-    });
+    expect(embeddingRequests).toHaveLength(1);
+    expect(embeddingRequests[0]?.providerId).toBe("openai");
+    expect(embeddingRequests[0]?.model).toBe("text-embedding-3-small");
+    expect((embeddingRequests[0]?.inputs.length ?? 0) > 0).toBe(true);
 
     await service.dispose();
     await expect(service.reindexVault()).rejects.toThrow("IndexingService is disposed.");

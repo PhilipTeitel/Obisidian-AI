@@ -156,7 +156,11 @@ export default class ObsidianAIPlugin extends Plugin {
       name: COMMAND_NAMES.REINDEX_VAULT,
       callback: async () => {
         await this.runIndexCommand(COMMAND_NAMES.REINDEX_VAULT, "reindex-vault", async () => {
-          return this.requireRuntimeServices().indexingService.reindexVault();
+          return this.requireRuntimeServices().indexingService.reindexVault({
+            onProgress: (snapshot) => {
+              this.setProgressStatus(snapshot);
+            }
+          });
         });
       }
     });
@@ -166,7 +170,11 @@ export default class ObsidianAIPlugin extends Plugin {
       name: COMMAND_NAMES.INDEX_CHANGES,
       callback: async () => {
         await this.runIndexCommand(COMMAND_NAMES.INDEX_CHANGES, "index-changes", async () => {
-          return this.requireRuntimeServices().indexingService.indexChanges();
+          return this.requireRuntimeServices().indexingService.indexChanges({
+            onProgress: (snapshot) => {
+              this.setProgressStatus(snapshot);
+            }
+          });
         });
       }
     });
@@ -215,7 +223,7 @@ export default class ObsidianAIPlugin extends Plugin {
           status: snapshot.status
         }
       });
-      new Notice(`${commandName} is not implemented in FND-4 yet.`);
+      new Notice(this.createCompletionNotice(commandName, snapshot));
     } catch (error: unknown) {
       const normalized = normalizeRuntimeError(error, {
         operation: "plugin.command",
@@ -264,12 +272,25 @@ export default class ObsidianAIPlugin extends Plugin {
 
     if (this.progressHideTimeoutId !== null) {
       window.clearTimeout(this.progressHideTimeoutId);
+      this.progressHideTimeoutId = null;
+    }
+
+    if (snapshot.status === "running" || snapshot.status === "queued") {
+      return;
     }
 
     this.progressHideTimeoutId = window.setTimeout(() => {
       this.progressSlideout?.hide();
       this.progressHideTimeoutId = null;
     }, 1800);
+  }
+
+  private createCompletionNotice(commandName: string, snapshot: JobSnapshot): string {
+    const detail = snapshot.progress.detail?.trim();
+    if (!detail) {
+      return `${commandName} completed.`;
+    }
+    return `${commandName} completed. ${detail}`;
   }
 
   private createProgressSnapshot(params: {

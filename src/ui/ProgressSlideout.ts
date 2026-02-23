@@ -50,7 +50,11 @@ export class ProgressSlideout {
 
   public setStatus(snapshot: JobSnapshot): void {
     this.statusEl.setText(snapshot.progress.label);
-    this.detailEl.setText(snapshot.errorMessage ?? snapshot.progress.detail ?? "");
+    const detail =
+      snapshot.errorMessage ??
+      snapshot.progress.detail ??
+      (snapshot.status === "running" ? "Indexing in progress..." : "");
+    this.detailEl.setText(detail);
     this.containerEl.dataset.state = snapshot.status;
   }
 

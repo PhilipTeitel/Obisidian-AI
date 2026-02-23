@@ -120,6 +120,7 @@ export interface SearchResult {
 
 export type JobType = "reindex-vault" | "index-changes" | "embed-batch" | "chat-completion";
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type IndexingStage = "queued" | "crawl" | "chunk" | "embed" | "finalize";
 
 export interface JobProgress {
   completed: number;
@@ -136,6 +137,47 @@ export interface JobSnapshot {
   finishedAt?: number;
   progress: JobProgress;
   errorMessage?: string;
+}
+
+export interface IndexingRunOptions {
+  onProgress?: (snapshot: JobSnapshot) => void;
+}
+
+export interface IndexedNoteFingerprint {
+  notePath: string;
+  noteHash: string;
+  updatedAt: number;
+}
+
+export interface IndexManifest {
+  version: 1;
+  updatedAt: number;
+  notes: IndexedNoteFingerprint[];
+}
+
+export interface IncrementalDiffResult {
+  created: IndexedNoteFingerprint[];
+  updated: IndexedNoteFingerprint[];
+  unchanged: IndexedNoteFingerprint[];
+  deleted: IndexedNoteFingerprint[];
+}
+
+export interface PersistedIndexJobState {
+  activeJob: JobSnapshot | null;
+  lastCompletedJob: JobSnapshot | null;
+  history: JobSnapshot[];
+}
+
+export interface IndexConsistencyIssue {
+  code: "STALE_ACTIVE_JOB" | "MANIFEST_SHAPE_INVALID" | "MANIFEST_VERSION_UNSUPPORTED";
+  message: string;
+  recoverable: boolean;
+}
+
+export interface IndexConsistencyReport {
+  ok: boolean;
+  issues: IndexConsistencyIssue[];
+  requiresFullReindexBaseline: boolean;
 }
 
 export interface ObsidianAISettings {
@@ -211,8 +253,9 @@ export interface AgentServiceContract extends RuntimeServiceLifecycle {
 }
 
 export interface IndexingServiceContract extends RuntimeServiceLifecycle {
-  reindexVault(): Promise<JobSnapshot>;
-  indexChanges(): Promise<JobSnapshot>;
+  reindexVault(options?: IndexingRunOptions): Promise<JobSnapshot>;
+  indexChanges(options?: IndexingRunOptions): Promise<JobSnapshot>;
+  getActiveJob(): JobSnapshot | null;
 }
 
 export interface RuntimeBootstrapContext {

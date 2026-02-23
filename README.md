@@ -414,10 +414,10 @@ Build full and incremental indexing that preserves note structure and metadata.
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
 | [IDX-1](docs/features/IDX-1-implement-markdown-chunker-preserving-heading-paragraph-bullet-context-and-tags.md) | Done | Implement markdown chunker preserving heading, paragraph/bullet context, and tags | M | Metadata minimum: note name, heading, paragraph/bullet, tags |
 | [IDX-2](docs/features/IDX-2-implement-vault-crawler-with-configurable-include-exclude-folders.md) | Done | Implement vault crawler with configurable include/exclude folders | M | Folder scoping comes from plugin settings |
-| IDX-3 | Not Started | Build full reindex workflow and `Reindex vault` command | M | Always rebuild chunks/embeddings for configured scope |
-| IDX-4 | Not Started | Build incremental index workflow and `Index changes` command | L | Detect new/updated/deleted content via content hash strategy |
-| IDX-5 | Not Started | Persist index job state and progress events for long-running tasks | M | Drives slideout progress UI and prevents duplicate jobs |
-| IDX-6 | Not Started | Add index consistency checks and recovery flow | S | Handle partial failures and resume safely |
+| [IDX-3](docs/features/IDX-3-build-full-reindex-workflow-and-reindex-vault-command.md) | Done | Build full reindex workflow and `Reindex vault` command | M | Always rebuild chunks/embeddings for configured scope |
+| [IDX-4](docs/features/IDX-4-build-incremental-index-workflow-and-index-changes-command.md) | Done | Build incremental index workflow and `Index changes` command | L | Detect new/updated/deleted content via content hash strategy |
+| [IDX-5](docs/features/IDX-5-persist-index-job-state-and-progress-events-for-long-running-tasks.md) | Done | Persist index job state and progress events for long-running tasks | M | Drives slideout progress UI and prevents duplicate jobs |
+| [IDX-6](docs/features/IDX-6-add-index-consistency-checks-and-recovery-flow.md) | Done | Add index consistency checks and recovery flow | S | Handle partial failures and resume safely |
 
 ### Epic 3: Local Vector Storage and Embedding Providers
 

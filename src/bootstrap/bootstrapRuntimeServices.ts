@@ -5,6 +5,8 @@ import { AgentService } from "../services/AgentService";
 import { ChatService } from "../services/ChatService";
 import { EmbeddingService } from "../services/EmbeddingService";
 import { IndexingService } from "../services/IndexingService";
+import { IndexJobStateStore } from "../services/indexing/IndexJobStateStore";
+import { IndexManifestStore } from "../services/indexing/IndexManifestStore";
 import { SearchService } from "../services/SearchService";
 import { ServiceContainer, type NamedRuntimeService } from "../services/ServiceContainer";
 import type {
@@ -100,7 +102,13 @@ export const bootstrapRuntimeServices = async (
   const indexingService = new IndexingService({
     app: context.app,
     embeddingService,
-    getSettings: context.getSettings
+    getSettings: context.getSettings,
+    manifestStore: new IndexManifestStore({
+      plugin: context.plugin
+    }),
+    jobStateStore: new IndexJobStateStore({
+      plugin: context.plugin
+    })
   });
 
   const servicesByName: Record<RuntimeServiceName, RuntimeServiceLifecycle> = {
