@@ -1,6 +1,9 @@
 import { ProviderRegistry } from "../providers/ProviderRegistry";
+import { OllamaEmbeddingProvider } from "../providers/embeddings/OllamaEmbeddingProvider";
+import { OpenAIEmbeddingProvider } from "../providers/embeddings/OpenAIEmbeddingProvider";
 import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
 import { createRuntimeLogger } from "../logging/runtimeLogger";
+import { PluginSecretStore } from "../secrets/PluginSecretStore";
 import { AgentService } from "../services/AgentService";
 import { ChatService } from "../services/ChatService";
 import { EmbeddingService } from "../services/EmbeddingService";
@@ -9,6 +12,7 @@ import { IndexJobStateStore } from "../services/indexing/IndexJobStateStore";
 import { IndexManifestStore } from "../services/indexing/IndexManifestStore";
 import { SearchService } from "../services/SearchService";
 import { ServiceContainer, type NamedRuntimeService } from "../services/ServiceContainer";
+import { LocalVectorStoreRepository } from "../storage/LocalVectorStoreRepository";
 import type {
   NormalizedRuntimeError,
   RuntimeBootstrapContext,
@@ -82,12 +86,35 @@ export const bootstrapRuntimeServices = async (
   const initializedServices: NamedRuntimeService[] = [];
 
   const providerRegistry = new ProviderRegistry(context);
+  const secretStore = new PluginSecretStore(context.plugin);
+  const pluginWithManifest = context.plugin as RuntimeBootstrapContext["plugin"] & {
+    manifest?: { id?: string };
+  };
+  const pluginId = pluginWithManifest.manifest?.id ?? "obsidian-ai-mvp";
+  const vectorStoreRepository = new LocalVectorStoreRepository({
+    plugin: context.plugin,
+    pluginId
+  });
+
+  providerRegistry.registerEmbeddingProvider(
+    new OpenAIEmbeddingProvider({
+      getEndpoint: () => context.getSettings().openaiEndpoint,
+      getApiKey: () => secretStore.getSecret("openai-api-key")
+    })
+  );
+  providerRegistry.registerEmbeddingProvider(
+    new OllamaEmbeddingProvider({
+      getEndpoint: () => context.getSettings().ollamaEndpoint
+    })
+  );
+
   const embeddingService = new EmbeddingService({
     providerRegistry,
     getSettings: context.getSettings
   });
   const searchService = new SearchService({
     embeddingService,
+    vectorStoreRepository,
     getSettings: context.getSettings
   });
   const agentService = new AgentService({
@@ -102,6 +129,7 @@ export const bootstrapRuntimeServices = async (
   const indexingService = new IndexingService({
     app: context.app,
     embeddingService,
+    vectorStoreRepository,
     getSettings: context.getSettings,
     manifestStore: new IndexManifestStore({
       plugin: context.plugin

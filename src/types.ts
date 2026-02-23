@@ -55,6 +55,9 @@ export interface EmbeddingRequest {
   providerId: ProviderId;
   model: string;
   inputs: string[];
+  batchSize?: number;
+  maxRetries?: number;
+  timeoutMs?: number;
 }
 
 export interface EmbeddingResponse {
@@ -63,10 +66,66 @@ export interface EmbeddingResponse {
   vectors: EmbeddingVector[];
 }
 
+export interface EmbeddingInputFailure {
+  inputIndex: number;
+  message: string;
+}
+
 export interface EmbeddingProvider {
   readonly id: ProviderId;
   readonly name: string;
   embed(request: EmbeddingRequest): Promise<EmbeddingResponse>;
+}
+
+export interface LocalVectorStorePaths {
+  rootDir: string;
+  sqliteDbPath: string;
+  migrationsDir: string;
+}
+
+export interface VectorStoreMigration {
+  id: string;
+  description: string;
+  statements: string[];
+}
+
+export interface VectorStoreSchemaMetadata {
+  schemaVersion: number;
+  appliedMigrationIds: string[];
+  paths: LocalVectorStorePaths;
+}
+
+export interface VectorStoreRow {
+  chunkId: string;
+  notePath: string;
+  noteTitle: string;
+  heading?: string;
+  snippet: string;
+  tags: string[];
+  embedding: EmbeddingVector;
+  updatedAt: number;
+}
+
+export interface VectorStoreQuery {
+  vector: EmbeddingVector;
+  topK: number;
+  minScore?: number;
+}
+
+export interface VectorStoreMatch extends VectorStoreRow {
+  score: number;
+}
+
+export interface VectorStoreRepositoryContract {
+  getSchemaMetadata(): Promise<VectorStoreSchemaMetadata>;
+  replaceAllFromChunks(chunks: ChunkRecord[], vectors: EmbeddingVector[]): Promise<void>;
+  upsertFromChunks(chunks: ChunkRecord[], vectors: EmbeddingVector[]): Promise<void>;
+  deleteByNotePaths(notePaths: string[]): Promise<void>;
+  queryNearestNeighbors(query: VectorStoreQuery): Promise<VectorStoreMatch[]>;
+}
+
+export interface SecretStoreContract {
+  getSecret(key: string): Promise<string | null>;
 }
 
 export type ChatRole = "system" | "user" | "assistant" | "tool";
@@ -232,6 +291,9 @@ export interface RuntimeServiceLifecycle {
 export interface ProviderRegistryContract extends RuntimeServiceLifecycle {
   getEmbeddingProviderId(): ProviderId;
   getChatProviderId(): ProviderId;
+  registerEmbeddingProvider(provider: EmbeddingProvider): void;
+  getEmbeddingProvider(providerId?: ProviderId): EmbeddingProvider;
+  listEmbeddingProviders(): EmbeddingProvider[];
 }
 
 export interface EmbeddingServiceContract extends RuntimeServiceLifecycle {

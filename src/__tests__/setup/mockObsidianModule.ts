@@ -137,7 +137,61 @@ const setWindowShim = (): void => {
   }
 };
 
+const setFetchShim = (): void => {
+  const globalObject = globalThis as unknown as {
+    fetch?: typeof fetch;
+  };
+
+  globalObject.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
+    const bodyText = typeof init?.body === "string" ? init.body : "";
+    let inputCount = 1;
+    if (bodyText.length > 0) {
+      try {
+        const parsedBody = JSON.parse(bodyText) as Record<string, unknown>;
+        if (Array.isArray(parsedBody.input)) {
+          inputCount = parsedBody.input.length;
+        }
+      } catch {
+        inputCount = 1;
+      }
+    }
+
+    if (url.includes("/embeddings")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: Array.from({ length: inputCount }, () => ({ embedding: [0.1, 0.2] }))
+        })
+      } as Response;
+    }
+
+    if (url.includes("/api/embed")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          embeddings: Array.from({ length: inputCount }, () => [0.1, 0.2])
+        })
+      } as Response;
+    }
+
+    return {
+      ok: false,
+      status: 404,
+      json: async () => ({})
+    } as Response;
+  }) as typeof fetch;
+};
+
 setWindowShim();
+setFetchShim();
 
 beforeEach(() => {
   clearNoticeMessages();
@@ -183,6 +237,7 @@ export class Plugin {
   public readonly __commands: MockRegisteredCommand[] = [];
   public readonly __settingTabs: unknown[] = [];
   private data: unknown = null;
+  private readonly secrets = new Map<string, string>([["openai-api-key", "test-openai-api-key"]]);
 
   public constructor(public readonly app: unknown, public readonly manifest: unknown) {}
 
@@ -204,6 +259,10 @@ export class Plugin {
 
   public async saveData(data: unknown): Promise<void> {
     this.data = data;
+  }
+
+  public async loadSecret(key: string): Promise<string | null> {
+    return this.secrets.get(key) ?? null;
   }
 }
 

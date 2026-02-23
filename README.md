@@ -425,12 +425,12 @@ Provide local embedding storage and provider-backed embedding generation.
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| STO-1 | Not Started | Implement wa-SQLite/sqlite-vec schema, migrations, and local storage paths | M | Indexed data must remain local in plugin directory |
-| STO-2 | Not Started | Implement vector store repository for upsert, delete, and nearest-neighbor query | M | Optimize for vaults with thousands of notes |
-| STO-3 | Not Started | Implement embedding provider abstraction and registry | S | Keep provider interface extensible for post-MVP providers |
-| STO-4 | Not Started | Implement OpenAI embedding provider integration | M | Endpoint and API key configurable; key from secret store |
-| STO-5 | Not Started | Implement Ollama embedding provider integration | M | Endpoint/model configurable for local runtime |
-| STO-6 | Not Started | Add batching, retry, and timeout handling for embedding jobs | M | Use safe defaults and surface per-note failures |
+| [STO-1](docs/features/STO-1-implement-wa-sqlite-sqlite-vec-schema-migrations-and-local-storage-paths.md) | Done | Implement wa-SQLite/sqlite-vec schema, migrations, and local storage paths | M | Indexed data must remain local in plugin directory |
+| [STO-2](docs/features/STO-2-implement-vector-store-repository-for-upsert-delete-and-nearest-neighbor-query.md) | Done | Implement vector store repository for upsert, delete, and nearest-neighbor query | M | Optimize for vaults with thousands of notes |
+| [STO-3](docs/features/STO-3-implement-embedding-provider-abstraction-and-registry.md) | Done | Implement embedding provider abstraction and registry | S | Keep provider interface extensible for post-MVP providers |
+| [STO-4](docs/features/STO-4-implement-openai-embedding-provider-integration.md) | Done | Implement OpenAI embedding provider integration | M | Endpoint and API key configurable; key from secret store |
+| [STO-5](docs/features/STO-5-implement-ollama-embedding-provider-integration.md) | Done | Implement Ollama embedding provider integration | M | Endpoint/model configurable for local runtime |
+| [STO-6](docs/features/STO-6-add-batching-retry-and-timeout-handling-for-embedding-jobs.md) | Done | Add batching, retry, and timeout handling for embedding jobs | M | Use safe defaults and surface per-note failures |
 
 ### Epic 4: Semantic Search Experience
 

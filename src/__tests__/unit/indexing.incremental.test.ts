@@ -89,6 +89,24 @@ const createEmbeddingResponse = (request: EmbeddingRequest): EmbeddingResponse =
   };
 };
 
+const createVectorStoreRepository = () => {
+  return {
+    getSchemaMetadata: async () => ({
+      schemaVersion: 1,
+      appliedMigrationIds: [],
+      paths: {
+        rootDir: ".obsidian/plugins/obsidian-ai-mvp/storage",
+        sqliteDbPath: ".obsidian/plugins/obsidian-ai-mvp/storage/vector-store.sqlite3",
+        migrationsDir: ".obsidian/plugins/obsidian-ai-mvp/storage/migrations"
+      }
+    }),
+    replaceAllFromChunks: async () => undefined,
+    upsertFromChunks: async () => undefined,
+    deleteByNotePaths: async () => undefined,
+    queryNearestNeighbors: async () => []
+  };
+};
+
 describe("incremental indexing workflow", () => {
   it("classifies created, updated, unchanged, and deleted notes deterministically", () => {
     const previous = [
@@ -147,6 +165,7 @@ describe("incremental indexing workflow", () => {
           return createEmbeddingResponse(request);
         }
       },
+      vectorStoreRepository: createVectorStoreRepository(),
       getSettings: () => settings,
       manifestStore,
       jobStateStore
@@ -204,6 +223,7 @@ describe("incremental indexing workflow", () => {
           return createEmbeddingResponse(request);
         }
       },
+      vectorStoreRepository: createVectorStoreRepository(),
       getSettings: () => settings,
       manifestStore,
       jobStateStore

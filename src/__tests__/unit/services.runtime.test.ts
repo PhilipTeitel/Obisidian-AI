@@ -10,6 +10,7 @@ import { SearchService } from "../../services/SearchService";
 import type {
   ChatRequest,
   ChatStreamEvent,
+  EmbeddingProvider,
   EmbeddingRequest,
   EmbeddingResponse,
   ObsidianAISettings,
@@ -40,6 +41,24 @@ const createEmbeddingResponse = (request: EmbeddingRequest): EmbeddingResponse =
       values: [0.1, 0.2],
       dimensions: 2
     }))
+  };
+};
+
+const createVectorStoreRepository = () => {
+  return {
+    getSchemaMetadata: async () => ({
+      schemaVersion: 1,
+      appliedMigrationIds: [],
+      paths: {
+        rootDir: ".obsidian/plugins/obsidian-ai-mvp/storage",
+        sqliteDbPath: ".obsidian/plugins/obsidian-ai-mvp/storage/vector-store.sqlite3",
+        migrationsDir: ".obsidian/plugins/obsidian-ai-mvp/storage/migrations"
+      }
+    }),
+    replaceAllFromChunks: async () => undefined,
+    upsertFromChunks: async () => undefined,
+    deleteByNotePaths: async () => undefined,
+    queryNearestNeighbors: async () => []
   };
 };
 
@@ -75,6 +94,15 @@ describe("runtime service unit behavior", () => {
     expect(registry.getEmbeddingProviderId()).toBe("openai");
     expect(registry.getChatProviderId()).toBe("openai");
 
+    const provider: EmbeddingProvider = {
+      id: "openai",
+      name: "OpenAI",
+      embed: async (request: EmbeddingRequest) => createEmbeddingResponse(request)
+    };
+    registry.registerEmbeddingProvider(provider);
+    expect(registry.getEmbeddingProvider("openai").name).toBe("OpenAI");
+    expect(registry.listEmbeddingProviders()).toHaveLength(1);
+
     settings.embeddingProvider = "ollama";
     settings.chatProvider = "ollama";
     expect(registry.getEmbeddingProviderId()).toBe("ollama");
@@ -88,12 +116,20 @@ describe("runtime service unit behavior", () => {
     const settings = createSettings();
     const plugin = createMemoryPlugin();
     const embeddingRequests: EmbeddingRequest[] = [];
+    const provider: EmbeddingProvider = {
+      id: "openai",
+      name: "OpenAI",
+      embed: async (request: EmbeddingRequest): Promise<EmbeddingResponse> => createEmbeddingResponse(request)
+    };
     const embeddingService = new EmbeddingService({
       providerRegistry: {
         init: async () => undefined,
         dispose: async () => undefined,
         getEmbeddingProviderId: () => "openai",
-        getChatProviderId: () => "openai"
+        getChatProviderId: () => "openai",
+        registerEmbeddingProvider: () => undefined,
+        getEmbeddingProvider: () => provider,
+        listEmbeddingProviders: () => [provider]
       },
       getSettings: () => settings
     });
@@ -124,6 +160,7 @@ describe("runtime service unit behavior", () => {
         }
       } as unknown as RuntimeBootstrapContext["app"],
       embeddingService: spyingEmbeddingService,
+      vectorStoreRepository: createVectorStoreRepository(),
       getSettings: () => settings,
       manifestStore: new IndexManifestStore({
         plugin
@@ -151,6 +188,7 @@ describe("runtime service unit behavior", () => {
   it("SearchService embeds query text for search and selection paths", async () => {
     const settings = createSettings();
     const embeddingRequests: EmbeddingRequest[] = [];
+    const searchQueries: string[] = [];
     const service = new SearchService({
       embeddingService: {
         init: async () => undefined,
@@ -158,6 +196,13 @@ describe("runtime service unit behavior", () => {
         embed: async (request: EmbeddingRequest): Promise<EmbeddingResponse> => {
           embeddingRequests.push(request);
           return createEmbeddingResponse(request);
+        }
+      },
+      vectorStoreRepository: {
+        ...createVectorStoreRepository(),
+        queryNearestNeighbors: async ({ topK }) => {
+          searchQueries.push(`topK:${topK}`);
+          return [];
         }
       },
       getSettings: () => settings
@@ -170,6 +215,7 @@ describe("runtime service unit behavior", () => {
     expect(embeddingRequests).toHaveLength(2);
     expect(embeddingRequests[0].inputs).toEqual(["semantic query"]);
     expect(embeddingRequests[1].inputs).toEqual(["selected paragraph"]);
+    expect(searchQueries).toEqual(["topK:5", "topK:5"]);
 
     await service.dispose();
     await expect(service.search({ query: "after-dispose", topK: 1 })).rejects.toThrow("SearchService is disposed.");
@@ -219,7 +265,12 @@ describe("runtime service unit behavior", () => {
         init: async () => undefined,
         dispose: async () => undefined,
         getEmbeddingProviderId: () => "openai",
-        getChatProviderId: () => "ollama"
+        getChatProviderId: () => "ollama",
+        registerEmbeddingProvider: () => undefined,
+        getEmbeddingProvider: () => {
+          throw new Error("Not needed for chat test.");
+        },
+        listEmbeddingProviders: () => []
       }
     });
 

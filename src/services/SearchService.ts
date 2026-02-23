@@ -3,11 +3,13 @@ import type {
   RuntimeBootstrapContext,
   SearchRequest,
   SearchResult,
-  SearchServiceContract
+  SearchServiceContract,
+  VectorStoreRepositoryContract
 } from "../types";
 
 export interface SearchServiceDeps {
   embeddingService: EmbeddingServiceContract;
+  vectorStoreRepository: VectorStoreRepositoryContract;
   getSettings: RuntimeBootstrapContext["getSettings"];
 }
 
@@ -32,13 +34,31 @@ export class SearchService implements SearchServiceContract {
       throw new Error("SearchService is disposed.");
     }
 
-    await this.deps.embeddingService.embed({
+    const embeddingResponse = await this.deps.embeddingService.embed({
       providerId: this.deps.getSettings().embeddingProvider,
       model: this.deps.getSettings().embeddingModel,
       inputs: [request.query]
     });
 
-    return [];
+    const queryVector = embeddingResponse.vectors[0];
+    if (!queryVector) {
+      return [];
+    }
+
+    const matches = await this.deps.vectorStoreRepository.queryNearestNeighbors({
+      vector: queryVector,
+      topK: request.topK,
+      minScore: request.minScore
+    });
+
+    return matches.map((match) => ({
+      chunkId: match.chunkId,
+      score: match.score,
+      notePath: match.notePath,
+      noteTitle: match.noteTitle,
+      heading: match.heading,
+      snippet: match.snippet
+    }));
   }
 
   public async searchSelection(selection: string): Promise<SearchResult[]> {

@@ -10,7 +10,8 @@ import type {
   JobSnapshot,
   JobStatus,
   JobType,
-  RuntimeBootstrapContext
+  RuntimeBootstrapContext,
+  VectorStoreRepositoryContract
 } from "../types";
 import { createRuntimeLogger } from "../logging/runtimeLogger";
 import type { IndexJobStateStore } from "./indexing/IndexJobStateStore";
@@ -19,10 +20,12 @@ import { applyRecoveryActions, runConsistencyPreflight } from "./indexing/indexC
 import { chunkMarkdownNote } from "../utils/chunker";
 import { hashNormalizedMarkdown } from "../utils/hasher";
 import { crawlVaultMarkdownNotes } from "../utils/vaultCrawler";
+import { EmbeddingBatchError } from "./errors/EmbeddingBatchError";
 
 export interface IndexingServiceDeps {
   app: RuntimeBootstrapContext["app"];
   embeddingService: EmbeddingServiceContract;
+  vectorStoreRepository: VectorStoreRepositoryContract;
   getSettings: RuntimeBootstrapContext["getSettings"];
   manifestStore: IndexManifestStore;
   jobStateStore: IndexJobStateStore;
@@ -399,7 +402,8 @@ export class IndexingService implements IndexingServiceContract {
       params.options
     );
 
-    await this.embedChunkContent(chunks);
+    const vectors = await this.embedChunkContent(chunks);
+    await this.deps.vectorStoreRepository.replaceAllFromChunks(chunks, vectors);
 
     await this.emitProgress(
       createSnapshot({
@@ -477,7 +481,8 @@ export class IndexingService implements IndexingServiceContract {
       params.options
     );
 
-    await this.embedChunkContent(chunks);
+    const vectors = await this.embedChunkContent(chunks);
+    await this.deps.vectorStoreRepository.replaceAllFromChunks(chunks, vectors);
 
     await this.emitProgress(
       createSnapshot({
@@ -527,6 +532,7 @@ export class IndexingService implements IndexingServiceContract {
     const currentFingerprints = buildFingerprints(params.noteInputs);
     const diff = computeIncrementalDiff(previousManifest.notes, currentFingerprints);
     const notesToReindex = this.selectChangedNotes(params.noteInputs, diff);
+    const notePathsToDelete = [...new Set([...diff.deleted.map((entry) => entry.notePath), ...notesToReindex.map((entry) => entry.notePath)])];
 
     await this.emitProgress(
       createSnapshot({
@@ -561,7 +567,10 @@ export class IndexingService implements IndexingServiceContract {
       params.options
     );
 
-    await this.embedChunkContent(chunks);
+    await this.deps.vectorStoreRepository.deleteByNotePaths(notePathsToDelete);
+
+    const vectors = await this.embedChunkContent(chunks);
+    await this.deps.vectorStoreRepository.upsertFromChunks(chunks, vectors);
 
     await this.emitProgress(
       createSnapshot({
@@ -611,15 +620,30 @@ export class IndexingService implements IndexingServiceContract {
     return noteInputs.filter((note) => changedPaths.has(note.notePath));
   }
 
-  private async embedChunkContent(chunks: ChunkRecord[]): Promise<void> {
+  private async embedChunkContent(chunks: ChunkRecord[]) {
     const settings = this.deps.getSettings();
     if (chunks.length === 0) {
-      return;
+      return [];
     }
-    await this.deps.embeddingService.embed({
-      providerId: settings.embeddingProvider,
-      model: settings.embeddingModel,
-      inputs: chunks.map((chunk) => chunk.content)
-    });
+
+    try {
+      const response = await this.deps.embeddingService.embed({
+        providerId: settings.embeddingProvider,
+        model: settings.embeddingModel,
+        inputs: chunks.map((chunk) => chunk.content)
+      });
+      return response.vectors;
+    } catch (error: unknown) {
+      if (error instanceof EmbeddingBatchError) {
+        const failedChunkRefs = error.failedInputIndexes
+          .map((index) => chunks[index])
+          .filter((chunk): chunk is ChunkRecord => Boolean(chunk))
+          .map((chunk) => `${chunk.id} (${chunk.source.notePath})`);
+        throw new Error(
+          `Embedding batch failed for ${failedChunkRefs.length} chunks: ${failedChunkRefs.join(", ")}`
+        );
+      }
+      throw error;
+    }
   }
 }
