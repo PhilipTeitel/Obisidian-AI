@@ -1,5 +1,6 @@
 import { ProviderRegistry } from "../providers/ProviderRegistry";
 import { OpenAIChatProvider } from "../providers/chat/OpenAIChatProvider";
+import { OllamaChatProvider } from "../providers/chat/OllamaChatProvider";
 import { OllamaEmbeddingProvider } from "../providers/embeddings/OllamaEmbeddingProvider";
 import { OpenAIEmbeddingProvider } from "../providers/embeddings/OpenAIEmbeddingProvider";
 import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
@@ -112,6 +113,11 @@ export const bootstrapRuntimeServices = async (
     new OpenAIChatProvider({
       getEndpoint: () => context.getSettings().openaiEndpoint,
       getApiKey: () => secretStore.getSecret("openai-api-key")
+    })
+  );
+  providerRegistry.registerChatProvider(
+    new OllamaChatProvider({
+      getEndpoint: () => context.getSettings().ollamaEndpoint
     })
   );
 

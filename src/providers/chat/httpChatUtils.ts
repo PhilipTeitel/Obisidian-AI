@@ -87,3 +87,48 @@ export const streamSseDataLines = async function* (body: ReadableStream<Uint8Arr
     reader.releaseLock();
   }
 };
+
+export const streamNdjsonObjects = async function* (body: ReadableStream<Uint8Array>): AsyncIterable<unknown> {
+  const decoder = new TextDecoder();
+  const reader = body.getReader();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+
+      while (true) {
+        const newLineIndex = buffer.indexOf("\n");
+        if (newLineIndex < 0) {
+          break;
+        }
+        const line = buffer.slice(0, newLineIndex).trim();
+        buffer = buffer.slice(newLineIndex + 1);
+        if (line.length === 0) {
+          continue;
+        }
+        try {
+          yield JSON.parse(line);
+        } catch {
+          throw new Error("Chat stream payload is malformed JSON.");
+        }
+      }
+    }
+
+    buffer += decoder.decode();
+    const trailingLine = buffer.trim();
+    if (trailingLine.length > 0) {
+      try {
+        yield JSON.parse(trailingLine);
+      } catch {
+        throw new Error("Chat stream payload is malformed JSON.");
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+};

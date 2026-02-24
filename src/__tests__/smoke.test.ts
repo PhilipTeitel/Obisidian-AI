@@ -241,7 +241,10 @@ describe("plugin shell smoke test", () => {
     ]);
     expect(singleRuntimeServiceSet.size).toBe(6);
     expect(firstRuntime.services.providerRegistry).not.toBe(secondRuntime.services.providerRegistry);
-    expect(firstRuntime.services.providerRegistry.listChatProviders().map((provider) => provider.id)).toContain("openai");
+    expect(firstRuntime.services.providerRegistry.listChatProviders().map((provider) => provider.id)).toEqual([
+      "ollama",
+      "openai"
+    ]);
 
     await firstRuntime.services.dispose();
     await secondRuntime.services.dispose();
