@@ -295,6 +295,9 @@ export interface ProviderRegistryContract extends RuntimeServiceLifecycle {
   registerEmbeddingProvider(provider: EmbeddingProvider): void;
   getEmbeddingProvider(providerId?: ProviderId): EmbeddingProvider;
   listEmbeddingProviders(): EmbeddingProvider[];
+  registerChatProvider(provider: ChatProvider): void;
+  getChatProvider(providerId?: ProviderId): ChatProvider;
+  listChatProviders(): ChatProvider[];
 }
 
 export interface EmbeddingServiceContract extends RuntimeServiceLifecycle {

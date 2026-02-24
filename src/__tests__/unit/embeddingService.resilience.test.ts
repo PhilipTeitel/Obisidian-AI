@@ -33,7 +33,12 @@ const createRegistry = (provider: EmbeddingProvider): ProviderRegistryContract =
     getChatProviderId: () => "openai",
     registerEmbeddingProvider: () => undefined,
     getEmbeddingProvider: () => provider,
-    listEmbeddingProviders: () => [provider]
+    listEmbeddingProviders: () => [provider],
+    registerChatProvider: () => undefined,
+    getChatProvider: () => {
+      throw new Error("Not needed for embedding tests.");
+    },
+    listChatProviders: () => []
   };
 };
 

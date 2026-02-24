@@ -1,9 +1,10 @@
-import type { EmbeddingProvider, ProviderId, ProviderRegistryContract, RuntimeBootstrapContext } from "../types";
+import type { ChatProvider, EmbeddingProvider, ProviderId, ProviderRegistryContract, RuntimeBootstrapContext } from "../types";
 
 export class ProviderRegistry implements ProviderRegistryContract {
   private disposed = false;
   private readonly getSettings: RuntimeBootstrapContext["getSettings"];
   private readonly embeddingProviders = new Map<ProviderId, EmbeddingProvider>();
+  private readonly chatProviders = new Map<ProviderId, ChatProvider>();
 
   public constructor(context: RuntimeBootstrapContext) {
     this.getSettings = context.getSettings;
@@ -16,6 +17,7 @@ export class ProviderRegistry implements ProviderRegistryContract {
   public async dispose(): Promise<void> {
     this.disposed = true;
     this.embeddingProviders.clear();
+    this.chatProviders.clear();
   }
 
   public getEmbeddingProviderId(): ProviderId {
@@ -40,6 +42,22 @@ export class ProviderRegistry implements ProviderRegistryContract {
 
   public listEmbeddingProviders(): EmbeddingProvider[] {
     return [...this.embeddingProviders.values()].sort((left, right) => String(left.id).localeCompare(String(right.id)));
+  }
+
+  public registerChatProvider(provider: ChatProvider): void {
+    this.chatProviders.set(provider.id, provider);
+  }
+
+  public getChatProvider(providerId: ProviderId = this.getChatProviderId()): ChatProvider {
+    const provider = this.chatProviders.get(providerId);
+    if (!provider) {
+      throw new Error(`Chat provider is not registered: ${providerId}`);
+    }
+    return provider;
+  }
+
+  public listChatProviders(): ChatProvider[] {
+    return [...this.chatProviders.values()].sort((left, right) => String(left.id).localeCompare(String(right.id)));
   }
 
   public isDisposed(): boolean {

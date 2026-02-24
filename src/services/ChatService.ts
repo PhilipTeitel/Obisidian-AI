@@ -34,19 +34,9 @@ export class ChatService implements ChatServiceContract {
       throw new Error("ChatService is disposed.");
     }
 
-    await this.deps.searchService.search({
-      query: request.messages[request.messages.length - 1]?.content ?? "",
-      topK: Math.max(1, request.context.length || 5)
-    });
-
-    yield {
-      type: "error",
-      message: `Chat is not implemented yet for provider: ${this.deps.providerRegistry.getChatProviderId()}`,
-      retryable: false
-    };
-    yield {
-      type: "done",
-      finishReason: "error"
-    };
+    const provider = this.deps.providerRegistry.getChatProvider(request.providerId);
+    for await (const event of provider.complete(request)) {
+      yield event;
+    }
   }
 }

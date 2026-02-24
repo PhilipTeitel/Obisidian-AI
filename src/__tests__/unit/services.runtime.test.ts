@@ -129,7 +129,12 @@ describe("runtime service unit behavior", () => {
         getChatProviderId: () => "openai",
         registerEmbeddingProvider: () => undefined,
         getEmbeddingProvider: () => provider,
-        listEmbeddingProviders: () => [provider]
+        listEmbeddingProviders: () => [provider],
+        registerChatProvider: () => undefined,
+        getChatProvider: () => {
+          throw new Error("Not needed for indexing test.");
+        },
+        listChatProviders: () => []
       },
       getSettings: () => settings
     });
@@ -244,16 +249,12 @@ describe("runtime service unit behavior", () => {
     await expect(service.createNote("notes/fail.md", "a")).rejects.toThrow("AgentService is disposed.");
   });
 
-  it("ChatService searches context and emits error + done stream events", async () => {
-    const searchQueries: string[] = [];
+  it("ChatService delegates to registered chat providers and preserves stream events", async () => {
     const service = new ChatService({
       searchService: {
         init: async () => undefined,
         dispose: async () => undefined,
-        search: async ({ query }) => {
-          searchQueries.push(query);
-          return [];
-        },
+        search: async () => [],
         searchSelection: async () => []
       },
       agentService: {
@@ -271,7 +272,17 @@ describe("runtime service unit behavior", () => {
         getEmbeddingProvider: () => {
           throw new Error("Not needed for chat test.");
         },
-        listEmbeddingProviders: () => []
+        listEmbeddingProviders: () => [],
+        registerChatProvider: () => undefined,
+        getChatProvider: () => ({
+          id: "ollama",
+          name: "Ollama",
+          async *complete(): AsyncIterable<ChatStreamEvent> {
+            yield { type: "token", text: "hello" };
+            yield { type: "done", finishReason: "stop" };
+          }
+        }),
+        listChatProviders: () => []
       }
     });
 
@@ -286,15 +297,13 @@ describe("runtime service unit behavior", () => {
     await service.init();
     const events = await collectEvents(service.chat(request));
 
-    expect(searchQueries).toEqual(["Summarize this note."]);
     expect(events[0]).toEqual({
-      type: "error",
-      message: "Chat is not implemented yet for provider: ollama",
-      retryable: false
+      type: "token",
+      text: "hello"
     });
     expect(events[1]).toEqual({
       type: "done",
-      finishReason: "error"
+      finishReason: "stop"
     });
 
     await service.dispose();
