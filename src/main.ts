@@ -13,6 +13,7 @@ import type {
   RuntimeServices,
   SearchResult
 } from "./types";
+import { ChatPaneModel } from "./ui/ChatPaneModel";
 import { ChatView } from "./ui/ChatView";
 import { SearchPaneModel } from "./ui/SearchPaneModel";
 import { SearchView } from "./ui/SearchView";
@@ -24,6 +25,7 @@ export default class ObsidianAIPlugin extends Plugin {
   private readonly logger = createRuntimeLogger("ObsidianAIPlugin");
   private runtimeServices: RuntimeServices | null = null;
   private searchPaneModel: SearchPaneModel | null = null;
+  private chatPaneModel: ChatPaneModel | null = null;
   private progressSlideout: ProgressSlideout | null = null;
   private progressHideTimeoutId: number | null = null;
 
@@ -83,8 +85,22 @@ export default class ObsidianAIPlugin extends Plugin {
       }
     });
 
+    this.chatPaneModel = new ChatPaneModel({
+      runChat: (request) => this.requireRuntimeServices().chatService.chat(request),
+      runSourceSearch: async (query) => {
+        return this.requireRuntimeServices().searchService.search({
+          query,
+          topK: 5
+        });
+      },
+      getSettings: () => snapshotSettings(this.settings),
+      notify: (message) => {
+        new Notice(message);
+      }
+    });
+
     this.registerView(SEARCH_VIEW_TYPE, (leaf: WorkspaceLeaf) => new SearchView(leaf, this.requireSearchPaneModel()));
-    this.registerView(CHAT_VIEW_TYPE, (leaf: WorkspaceLeaf) => new ChatView(leaf));
+    this.registerView(CHAT_VIEW_TYPE, (leaf: WorkspaceLeaf) => new ChatView(leaf, this.requireChatPaneModel()));
 
     this.progressSlideout = new ProgressSlideout(this.app);
     this.progressSlideout.setStatus(
@@ -126,6 +142,7 @@ export default class ObsidianAIPlugin extends Plugin {
     const servicesToDispose = this.runtimeServices;
     this.runtimeServices = null;
     this.searchPaneModel = null;
+    this.chatPaneModel = null;
     try {
       await servicesToDispose?.dispose();
     } catch (error: unknown) {
@@ -281,6 +298,13 @@ export default class ObsidianAIPlugin extends Plugin {
       throw new Error("Search pane model is unavailable.");
     }
     return this.searchPaneModel;
+  }
+
+  private requireChatPaneModel(): ChatPaneModel {
+    if (!this.chatPaneModel) {
+      throw new Error("Chat pane model is unavailable.");
+    }
+    return this.chatPaneModel;
   }
 
   private async openSearchResult(result: SearchResult): Promise<void> {
