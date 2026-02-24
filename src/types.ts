@@ -175,6 +175,7 @@ export interface SearchResult {
   noteTitle: string;
   heading?: string;
   snippet: string;
+  tags: string[];
 }
 
 export type JobType = "reindex-vault" | "index-changes" | "embed-batch" | "chat-completion";

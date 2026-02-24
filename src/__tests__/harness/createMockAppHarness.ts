@@ -18,6 +18,7 @@ export interface MockWorkspaceLike {
   getLeavesOfType: (viewType: string) => MockWorkspaceLeafLike[];
   getRightLeaf: (_split: boolean) => MockWorkspaceLeafLike | null;
   revealLeaf: (leaf: MockWorkspaceLeafLike) => void;
+  openLinkText: (linktext: string, sourcePath: string, newLeaf?: boolean) => Promise<void>;
   getActiveViewOfType: (viewClass: typeof MarkdownView) => MarkdownView | null;
 }
 
@@ -31,6 +32,7 @@ export interface MockAppHarness {
   getNoticeMessages: () => string[];
   getRevealedLeaves: () => MockWorkspaceLeafLike[];
   getLeavesForType: (viewType: string) => MockWorkspaceLeafLike[];
+  getOpenedLinks: () => Array<{ linktext: string; sourcePath: string; newLeaf?: boolean }>;
 }
 
 export interface MockVaultMarkdownSeed {
@@ -56,6 +58,7 @@ const inferBasename = (path: string): string => {
 export const createMockAppHarness = (): MockAppHarness => {
   const leavesByType = new Map<string, MockWorkspaceLeafLike[]>();
   const revealedLeaves: MockWorkspaceLeafLike[] = [];
+  const openedLinks: Array<{ linktext: string; sourcePath: string; newLeaf?: boolean }> = [];
   const markdownContentByPath = new Map<string, string>();
   let markdownFiles: MockVaultMarkdownFile[] = [];
   let activeSelection = "";
@@ -107,6 +110,9 @@ export const createMockAppHarness = (): MockAppHarness => {
     },
     revealLeaf: (leaf: MockWorkspaceLeafLike): void => {
       revealedLeaves.push(leaf);
+    },
+    openLinkText: async (linktext: string, sourcePath: string, newLeaf?: boolean): Promise<void> => {
+      openedLinks.push({ linktext, sourcePath, newLeaf });
     },
     getActiveViewOfType: (viewClass: typeof MarkdownView): MarkdownView | null => {
       void viewClass;
@@ -165,6 +171,9 @@ export const createMockAppHarness = (): MockAppHarness => {
     },
     getLeavesForType: (viewType: string): MockWorkspaceLeafLike[] => {
       return [...(leavesByType.get(viewType) ?? [])];
+    },
+    getOpenedLinks: (): Array<{ linktext: string; sourcePath: string; newLeaf?: boolean }> => {
+      return [...openedLinks];
     }
   };
 };

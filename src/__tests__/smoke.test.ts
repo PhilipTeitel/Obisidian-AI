@@ -147,7 +147,8 @@ describe("plugin shell smoke test", () => {
       notePath: chunk.source.notePath,
       noteTitle: chunk.source.noteTitle,
       heading: chunk.source.headingTrail[1],
-      snippet: "Example snippet"
+      snippet: "Example snippet",
+      tags: ["ai", "mvp"]
     };
 
     const chatRequest: ChatRequest = {

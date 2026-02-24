@@ -211,6 +211,7 @@ describe("runtime service unit behavior", () => {
     await service.init();
     await service.search({ query: "semantic query", topK: 5 });
     await service.searchSelection("selected paragraph");
+    await service.searchSelection("   ");
 
     expect(embeddingRequests).toHaveLength(2);
     expect(embeddingRequests[0].inputs).toEqual(["semantic query"]);

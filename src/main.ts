@@ -10,16 +10,20 @@ import type {
   JobType,
   ObsidianAISettings,
   ObsidianAIViewType,
-  RuntimeServices
+  RuntimeServices,
+  SearchResult
 } from "./types";
 import { ChatView } from "./ui/ChatView";
+import { SearchPaneModel } from "./ui/SearchPaneModel";
 import { SearchView } from "./ui/SearchView";
 import { ProgressSlideout } from "./ui/ProgressSlideout";
+import { buildSearchResultLink } from "./ui/searchNavigation";
 
 export default class ObsidianAIPlugin extends Plugin {
   public settings: ObsidianAISettings = { ...DEFAULT_SETTINGS };
   private readonly logger = createRuntimeLogger("ObsidianAIPlugin");
   private runtimeServices: RuntimeServices | null = null;
+  private searchPaneModel: SearchPaneModel | null = null;
   private progressSlideout: ProgressSlideout | null = null;
   private progressHideTimeoutId: number | null = null;
 
@@ -69,7 +73,17 @@ export default class ObsidianAIPlugin extends Plugin {
       throw normalized;
     }
 
-    this.registerView(SEARCH_VIEW_TYPE, (leaf: WorkspaceLeaf) => new SearchView(leaf));
+    this.searchPaneModel = new SearchPaneModel({
+      runSearch: (request) => this.requireRuntimeServices().searchService.search(request),
+      openResult: async (result) => {
+        await this.openSearchResult(result);
+      },
+      notify: (message) => {
+        new Notice(message);
+      }
+    });
+
+    this.registerView(SEARCH_VIEW_TYPE, (leaf: WorkspaceLeaf) => new SearchView(leaf, this.requireSearchPaneModel()));
     this.registerView(CHAT_VIEW_TYPE, (leaf: WorkspaceLeaf) => new ChatView(leaf));
 
     this.progressSlideout = new ProgressSlideout(this.app);
@@ -111,6 +125,7 @@ export default class ObsidianAIPlugin extends Plugin {
 
     const servicesToDispose = this.runtimeServices;
     this.runtimeServices = null;
+    this.searchPaneModel = null;
     try {
       await servicesToDispose?.dispose();
     } catch (error: unknown) {
@@ -190,8 +205,7 @@ export default class ObsidianAIPlugin extends Plugin {
         }
 
         await this.activateView(SEARCH_VIEW_TYPE);
-        await this.requireRuntimeServices().searchService.searchSelection(selection);
-        new Notice("Semantic search selection is not implemented in FND-4 yet.");
+        await this.requireSearchPaneModel().searchFromSelection(selection);
       }
     });
   }
@@ -260,6 +274,24 @@ export default class ObsidianAIPlugin extends Plugin {
       throw new Error("Runtime services are unavailable.");
     }
     return this.runtimeServices;
+  }
+
+  private requireSearchPaneModel(): SearchPaneModel {
+    if (!this.searchPaneModel) {
+      throw new Error("Search pane model is unavailable.");
+    }
+    return this.searchPaneModel;
+  }
+
+  private async openSearchResult(result: SearchResult): Promise<void> {
+    const target = buildSearchResultLink(result);
+    const workspace = this.app.workspace as unknown as {
+      openLinkText?: (linktext: string, sourcePath: string, newLeaf?: boolean) => Promise<void> | void;
+    };
+    if (typeof workspace.openLinkText !== "function") {
+      throw new Error(`Workspace navigation is unavailable for search target: ${target}`);
+    }
+    await workspace.openLinkText(target, "", true);
   }
 
   private setProgressStatus(snapshot: JobSnapshot): void {

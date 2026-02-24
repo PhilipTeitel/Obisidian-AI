@@ -329,7 +329,7 @@ Obsidian UI views registered by the plugin:
 
 | Component | Type | Description |
 |-----------|------|-------------|
-| `SearchView` | `ItemView` | Semantic search pane. Text input for query, results list showing matching chunks with note title, heading, snippet, and relevance score. Clicking a result opens the note at the matching location. |
+| `SearchView` | `ItemView` | Semantic search pane. Query input, top-k and min-score controls, and result list showing matching chunks with note title, heading, snippet, and relevance score. Clicking a result opens the note at the matching location (with heading context when available). |
 | `ChatView` | `ItemView` | Chat completions pane. Message input, scrollable conversation history, streaming responses. The chat agent can create/update files when asked. Sources (retrieved chunks) shown alongside responses. |
 | `ProgressSlideout` | Custom slideout | Slideout panel showing progress for long-running operations (indexing, embedding). Displays current task, progress bar/count, and elapsed time. |
 
@@ -339,7 +339,7 @@ Obsidian UI views registered by the plugin:
 |---------|----|-------------|
 | Reindex vault | `obsidian-ai:reindex-vault` | Full reindex — re-chunks and re-embeds all notes in configured folders |
 | Index changes | `obsidian-ai:index-changes` | Incremental index — only processes new/modified/deleted notes |
-| Semantic search selection | `obsidian-ai:search-selection` | Embeds the currently selected text and runs semantic search |
+| Semantic search selection | `obsidian-ai:search-selection` | Uses selected note text as query, opens the search pane, and runs semantic search with active quality controls |
 
 ## API Contract (Internal Service Interfaces)
 
@@ -438,11 +438,11 @@ Deliver semantic search end to end from query entry to note navigation.
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| SRCH-1 | Not Started | Implement search service using query embeddings and vector similarity | M | Return ranked results with metadata and excerpts |
-| SRCH-2 | Not Started | Build Semantic Search pane UI | M | Include query input, loading state, result list, empty/error states |
-| SRCH-3 | Not Started | Implement `Semantic search selection` command | S | Uses selected note text as query input |
-| SRCH-4 | Not Started | Wire result actions to open note at relevant location | S | Preserve heading context when navigating |
-| SRCH-5 | Not Started | Add search quality controls and result limits | S | Include top-k, relevance threshold, and sane defaults |
+| [SRCH-1](docs/features/SRCH-1-implement-search-service-using-query-embeddings-and-vector-similarity.md) | Done | Implement search service using query embeddings and vector similarity | M | Return ranked results with metadata and excerpts |
+| [SRCH-2](docs/features/SRCH-2-build-semantic-search-pane-ui.md) | Done | Build Semantic Search pane UI | M | Include query input, loading state, result list, empty/error states |
+| [SRCH-3](docs/features/SRCH-3-implement-semantic-search-selection-command.md) | Done | Implement `Semantic search selection` command | S | Uses selected note text as query input |
+| [SRCH-4](docs/features/SRCH-4-wire-result-actions-to-open-note-at-relevant-location.md) | Done | Wire result actions to open note at relevant location | S | Preserve heading context when navigating |
+| [SRCH-5](docs/features/SRCH-5-add-search-quality-controls-and-result-limits.md) | Done | Add search quality controls and result limits | S | Include top-k, relevance threshold, and sane defaults |
 
 ### Epic 5: Chat Completions and Agent File Operations
 

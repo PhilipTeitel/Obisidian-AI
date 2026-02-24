@@ -127,7 +127,7 @@ describe("plugin runtime integration", () => {
     await harness.invokeCommand(COMMAND_IDS.SEARCH_SELECTION);
 
     const notices = harness.appHarness.getNoticeMessages();
-    expect(notices).toContain("Semantic search selection is not implemented in FND-4 yet.");
+    expect(notices.some((message) => message.includes("not implemented"))).toBe(false);
     expect(harness.appHarness.getLeavesForType(SEARCH_VIEW_TYPE)).toHaveLength(1);
     expect(harness.appHarness.getRevealedLeaves()).toHaveLength(1);
 
