@@ -451,7 +451,7 @@ Deliver vault-grounded chat and controlled note creation/update workflows.
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
 | [CHAT-1](docs/features/CHAT-1-implement-chat-provider-abstraction-with-streaming-completion-support.md) | Done | Implement chat provider abstraction with streaming completion support | M | Shared contract for OpenAI and Ollama |
-| CHAT-2 | Not Started | Implement OpenAI chat provider integration | M | Configurable model, endpoint, timeout |
+| [CHAT-2](docs/features/CHAT-2-implement-openai-chat-provider-integration.md) | Done | Implement OpenAI chat provider integration | M | Configurable model, endpoint, timeout |
 | CHAT-3 | Not Started | Implement Ollama chat provider integration | M | Configurable model, endpoint, timeout |
 | CHAT-4 | Not Started | Implement retrieval-augmented chat orchestration | L | Chat context must come only from indexed vault content |
 | CHAT-5 | Not Started | Build Chat pane UI with streaming responses and source context display | M | Include conversation history and cancellation controls |
