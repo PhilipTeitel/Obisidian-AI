@@ -250,11 +250,26 @@ describe("runtime service unit behavior", () => {
   });
 
   it("ChatService delegates to registered chat providers and preserves stream events", async () => {
+    const searchQueries: string[] = [];
+    const providerContexts: ChatRequest["context"][] = [];
     const service = new ChatService({
       searchService: {
         init: async () => undefined,
         dispose: async () => undefined,
-        search: async () => [],
+        search: async ({ query }) => {
+          searchQueries.push(query);
+          return [
+            {
+              chunkId: "chunk-1",
+              score: 0.88,
+              notePath: "notes/runtime.md",
+              noteTitle: "runtime",
+              heading: "Summary",
+              snippet: "Indexed context",
+              tags: []
+            }
+          ];
+        },
         searchSelection: async () => []
       },
       agentService: {
@@ -277,7 +292,8 @@ describe("runtime service unit behavior", () => {
         getChatProvider: () => ({
           id: "ollama",
           name: "Ollama",
-          async *complete(): AsyncIterable<ChatStreamEvent> {
+          async *complete(nextRequest: ChatRequest): AsyncIterable<ChatStreamEvent> {
+            providerContexts.push(nextRequest.context);
             yield { type: "token", text: "hello" };
             yield { type: "done", finishReason: "stop" };
           }
@@ -297,6 +313,18 @@ describe("runtime service unit behavior", () => {
     await service.init();
     const events = await collectEvents(service.chat(request));
 
+    expect(searchQueries).toEqual(["Summarize this note."]);
+    expect(providerContexts).toEqual([
+      [
+        {
+          chunkId: "chunk-1",
+          notePath: "notes/runtime.md",
+          heading: "Summary",
+          snippet: "Indexed context",
+          score: 0.88
+        }
+      ]
+    ]);
     expect(events[0]).toEqual({
       type: "token",
       text: "hello"
