@@ -230,12 +230,19 @@ describe("runtime service unit behavior", () => {
   it("AgentService enforces max generated note size and emits notify messages", async () => {
     const settings = createSettings();
     settings.maxGeneratedNoteSize = 5;
+    settings.agentOutputFolders = ["notes"];
     const notifications: string[] = [];
+    const modifiedFiles: string[] = [];
     const service = new AgentService({
       app: {
         vault: {
           create: async () => undefined,
-          getAbstractFileByPath: () => null
+          modify: async (file: { path: string }) => {
+            modifiedFiles.push(file.path);
+          },
+          getAbstractFileByPath: (path: string) => {
+            return path === "notes/allowed.md" ? { path } : null;
+          }
         }
       } as RuntimeBootstrapContext["app"],
       getSettings: () => settings,
@@ -249,7 +256,8 @@ describe("runtime service unit behavior", () => {
     await service.updateNote("notes/allowed.md", "1234");
 
     expect(notifications[0]).toContain("Create note blocked");
-    expect(notifications[1]).toContain("Update note is not implemented yet for path: notes/allowed.md");
+    expect(notifications[1]).toContain("Updated note: notes/allowed.md");
+    expect(modifiedFiles).toEqual(["notes/allowed.md"]);
 
     await service.dispose();
     await expect(service.createNote("notes/fail.md", "a")).rejects.toThrow("AgentService is disposed.");

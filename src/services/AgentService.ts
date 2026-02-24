@@ -8,6 +8,7 @@ export interface AgentServiceDeps {
 
 interface VaultCreateAdapter {
   create: (path: string, content: string) => Promise<unknown>;
+  modify?: (file: unknown, content: string) => Promise<unknown>;
   getAbstractFileByPath?: (path: string) => unknown;
 }
 
@@ -121,12 +122,39 @@ export class AgentService implements AgentServiceContract {
       throw new Error("AgentService is disposed.");
     }
 
-    const maxNoteSize = this.deps.getSettings().maxGeneratedNoteSize;
+    const settings = this.deps.getSettings();
+    const maxNoteSize = settings.maxGeneratedNoteSize;
     if (content.length > maxNoteSize) {
       this.deps.notify(`Update note blocked: content exceeds max size (${maxNoteSize}).`);
       return;
     }
 
-    this.deps.notify(`Update note is not implemented yet for path: ${path}`);
+    const normalizedPath = normalizeVaultPath(path);
+    if (!normalizedPath) {
+      this.deps.notify(`Update note blocked: invalid path "${path}".`);
+      return;
+    }
+
+    if (!isPathAllowed(normalizedPath, settings.agentOutputFolders)) {
+      this.deps.notify(`Update note blocked: path "${normalizedPath}" is outside allowed output folders.`);
+      return;
+    }
+
+    const vault = this.deps.app.vault as unknown as VaultCreateAdapter;
+    if (typeof vault.getAbstractFileByPath !== "function") {
+      throw new Error("Vault lookup API is unavailable.");
+    }
+    if (typeof vault.modify !== "function") {
+      throw new Error("Vault modify API is unavailable.");
+    }
+
+    const existingFile = vault.getAbstractFileByPath(normalizedPath);
+    if (!existingFile) {
+      this.deps.notify(`Update note blocked: file does not exist at "${normalizedPath}".`);
+      return;
+    }
+
+    await vault.modify(existingFile, content);
+    this.deps.notify(`Updated note: ${normalizedPath}`);
   }
 }
