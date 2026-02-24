@@ -131,6 +131,7 @@ export const bootstrapRuntimeServices = async (
     getSettings: context.getSettings
   });
   const agentService = new AgentService({
+    app: context.app,
     getSettings: context.getSettings,
     notify: context.notify
   });

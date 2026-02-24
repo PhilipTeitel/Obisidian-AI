@@ -232,6 +232,12 @@ describe("runtime service unit behavior", () => {
     settings.maxGeneratedNoteSize = 5;
     const notifications: string[] = [];
     const service = new AgentService({
+      app: {
+        vault: {
+          create: async () => undefined,
+          getAbstractFileByPath: () => null
+        }
+      } as RuntimeBootstrapContext["app"],
       getSettings: () => settings,
       notify: (message: string) => {
         notifications.push(message);
