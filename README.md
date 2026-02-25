@@ -498,7 +498,7 @@ Validate performance constraints and readiness for MVP release.
 | [REL-2](docs/features/REL-2-run-scale-validation-for-indexing-and-search-latency.md) | Done | Run scale validation on vaults with hundreds to thousands of notes | M | Verify indexing/search latency remains practical |
 | [REL-3](docs/features/REL-3-add-end-to-end-tests-for-core-user-journeys.md) | Done | Add end-to-end tests for core user journeys | L | Reindex, index changes, semantic search, chat, and agent note writes |
 | [REL-4](docs/features/REL-4-harden-provider-outage-and-partial-indexing-failure-recovery.md) | Done | Harden failure handling for provider outages and partial indexing failures | M | Include retries, user-facing errors, and recovery actions |
-| REL-5 | Not Started | Prepare MVP release checklist and acceptance criteria | S | Ensure success criteria map to measurable verification steps |
+| [REL-5](docs/features/REL-5-prepare-mvp-release-checklist-and-acceptance-criteria.md) | Done | Prepare MVP release checklist and acceptance criteria | S | Ensure success criteria map to measurable verification steps |
 
 ## License
 MIT © Philip Teitel
