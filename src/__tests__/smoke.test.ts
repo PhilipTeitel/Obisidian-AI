@@ -75,12 +75,16 @@ describe("plugin shell smoke test", () => {
     expect(COMMAND_IDS.REINDEX_VAULT).toBe("obsidian-ai:reindex-vault");
     expect(COMMAND_IDS.INDEX_CHANGES).toBe("obsidian-ai:index-changes");
     expect(COMMAND_IDS.SEARCH_SELECTION).toBe("obsidian-ai:search-selection");
+    expect(COMMAND_IDS.OPEN_SEMANTIC_SEARCH_PANE).toBe("obsidian-ai:open-semantic-search-pane");
+    expect(COMMAND_IDS.OPEN_CHAT_PANE).toBe("obsidian-ai:open-chat-pane");
   });
 
   it("exposes expected command display names", () => {
     expect(COMMAND_NAMES.REINDEX_VAULT).toBe("Reindex vault");
     expect(COMMAND_NAMES.INDEX_CHANGES).toBe("Index changes");
     expect(COMMAND_NAMES.SEARCH_SELECTION).toBe("Semantic search selection");
+    expect(COMMAND_NAMES.OPEN_SEMANTIC_SEARCH_PANE).toBe("Open semantic search pane");
+    expect(COMMAND_NAMES.OPEN_CHAT_PANE).toBe("Open chat pane");
   });
 
   it("keeps non-secret default settings and snapshot behavior", () => {

@@ -5,7 +5,9 @@ export type ObsidianAIViewType = "obsidian-ai:search-view" | "obsidian-ai:chat-v
 export type ObsidianAICommandId =
   | "obsidian-ai:reindex-vault"
   | "obsidian-ai:index-changes"
-  | "obsidian-ai:search-selection";
+  | "obsidian-ai:search-selection"
+  | "obsidian-ai:open-semantic-search-pane"
+  | "obsidian-ai:open-chat-pane";
 
 export const MVP_PROVIDER_IDS = ["openai", "ollama"] as const;
 export type MVPProviderId = (typeof MVP_PROVIDER_IDS)[number];
