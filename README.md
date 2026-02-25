@@ -320,6 +320,18 @@ npm run dev
 
 This watches `src/` and rebuilds on changes. Reload Obsidian (Cmd+R / Ctrl+R) to pick up changes, or use the [Hot Reload plugin](https://github.com/pjeby/hot-reload).
 
+### 6. Use command palette actions
+
+Open Obsidian's command palette (Cmd+P on macOS, Ctrl+P on Windows/Linux), then run the commands below by display name.
+
+| Display Name | Command ID | Purpose / Expected Behavior | Typical Usage |
+|--------------|------------|-----------------------------|---------------|
+| Reindex vault | `obsidian-ai:reindex-vault` | Runs a full reindex of configured folders, rebuilding chunks and embeddings from scratch. | Use after major note refactors, model changes, or when index consistency is uncertain. |
+| Index changes | `obsidian-ai:index-changes` | Runs incremental indexing for only new, modified, or deleted content. | Use routinely after normal note edits to keep search/chat context current with minimal cost. |
+| Semantic search selection | `obsidian-ai:search-selection` | Uses selected note text as the semantic query, opens the search pane, and executes search. | Use while reading a note when you want related context from the vault for highlighted text. |
+| Open semantic search pane | `obsidian-ai:open-semantic-search-pane` | Opens or reveals the Semantic Search pane without running a query and reuses an existing pane if present. | Use when you want to prepare/search manually from the pane UI. |
+| Open chat pane | `obsidian-ai:open-chat-pane` | Opens or reveals the Chat pane without sending a prompt and reuses an existing pane if present. | Use when you want to start or continue a vault-grounded chat session. |
+
 ## Available Scripts
 
 | Command | Description |
@@ -359,6 +371,8 @@ Obsidian UI views registered by the plugin:
 | Reindex vault | `obsidian-ai:reindex-vault` | Full reindex — re-chunks and re-embeds all notes in configured folders |
 | Index changes | `obsidian-ai:index-changes` | Incremental index — only processes new/modified/deleted notes |
 | Semantic search selection | `obsidian-ai:search-selection` | Uses selected note text as query, opens the search pane, and runs semantic search with active quality controls |
+| Open semantic search pane | `obsidian-ai:open-semantic-search-pane` | Opens or reveals the semantic search pane and reuses an existing pane when present |
+| Open chat pane | `obsidian-ai:open-chat-pane` | Opens or reveals the chat pane and reuses an existing pane when present |
 
 ## API Contract (Internal Service Interfaces)
 
@@ -501,6 +515,18 @@ Validate performance constraints and readiness for MVP release.
 | [REL-3](docs/features/REL-3-add-end-to-end-tests-for-core-user-journeys.md) | Done | Add end-to-end tests for core user journeys | L | Reindex, index changes, semantic search, chat, and agent note writes |
 | [REL-4](docs/features/REL-4-harden-provider-outage-and-partial-indexing-failure-recovery.md) | Done | Harden failure handling for provider outages and partial indexing failures | M | Include retries, user-facing errors, and recovery actions |
 | [REL-5](docs/features/REL-5-prepare-mvp-release-checklist-and-acceptance-criteria.md) | Done | Prepare MVP release checklist and acceptance criteria | S | Ensure success criteria map to measurable verification steps |
+
+### Epic 8: Command Palette Pane Access and Command UX
+
+Add pane-opening commands and command documentation so users can discover and open core plugin experiences directly from the command palette.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| [CMD-1](docs/features/CMD-1-add-pane-open-command-constants-and-command-id-type-coverage.md) | Not Started | Add pane-open command constants and command ID type coverage | S | Centralize IDs/names and include new IDs in command type unions for compile-time safety |
+| [CMD-2](docs/features/CMD-2-add-open-semantic-search-pane-command-registration-and-reveal-behavior.md) | Not Started | Add `Open semantic search pane` command registration and reveal behavior | S | Reuse existing search leaf when present; open one when missing; do not execute search automatically |
+| [CMD-3](docs/features/CMD-3-add-open-chat-pane-command-registration-and-reveal-behavior.md) | Not Started | Add `Open chat pane` command registration and reveal behavior | S | Reuse existing chat leaf when present; open one when missing; do not trigger completion automatically |
+| [CMD-4](docs/features/CMD-4-update-getting-started-command-reference-aligned-with-registered-command-names.md) | Not Started | Update `Getting Started` command reference aligned with registered command names | S | Document display name, behavior, and usage context for all user-facing plugin commands |
+| [CMD-5](docs/features/CMD-5-add-integration-tests-for-pane-command-discoverability-and-open-reveal-semantics.md) | Not Started | Add integration tests for pane command discoverability and open/reveal semantics | M | Verify commands are registered and reliably reveal existing panes or create missing panes |
 
 ## License
 MIT © Philip Teitel
