@@ -126,6 +126,8 @@ export interface VectorStoreRepositoryContract {
 
 export interface SecretStoreContract {
   getSecret(key: string): Promise<string | null>;
+  setSecret(key: string, value: string): Promise<boolean>;
+  deleteSecret(key: string): Promise<boolean>;
 }
 
 export type ChatRole = "system" | "user" | "assistant" | "tool";

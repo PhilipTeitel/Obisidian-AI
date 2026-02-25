@@ -4,6 +4,11 @@ import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "./
 import { normalizeRuntimeError } from "./errors/normalizeRuntimeError";
 import { createRuntimeLogger } from "./logging/runtimeLogger";
 import { DEFAULT_SETTINGS, ObsidianAISettingTab, snapshotSettings } from "./settings";
+import {
+  migratePersistedSettings,
+  normalizeSettingsSnapshot,
+  serializeSettingsForPersistence
+} from "./settingsSchema";
 import type {
   JobSnapshot,
   JobStatus,
@@ -19,6 +24,12 @@ import { SearchPaneModel } from "./ui/SearchPaneModel";
 import { SearchView } from "./ui/SearchView";
 import { ProgressSlideout } from "./ui/ProgressSlideout";
 import { buildSearchResultLink } from "./ui/searchNavigation";
+
+const SETTINGS_STORAGE_KEY = "settings";
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+};
 
 export default class ObsidianAIPlugin extends Plugin {
   public settings: ObsidianAISettings = { ...DEFAULT_SETTINGS };
@@ -171,15 +182,20 @@ export default class ObsidianAIPlugin extends Plugin {
   }
 
   public async loadSettings(): Promise<void> {
-    const loadedData = (await this.loadData()) as Partial<ObsidianAISettings> | null;
-    this.settings = snapshotSettings({
-      ...DEFAULT_SETTINGS,
-      ...loadedData
-    });
+    const loadedData = await this.loadData();
+    const settingsPayload = isRecord(loadedData) && SETTINGS_STORAGE_KEY in loadedData ? loadedData[SETTINGS_STORAGE_KEY] : loadedData;
+    const migratedSettings = migratePersistedSettings(settingsPayload);
+    this.settings = snapshotSettings(normalizeSettingsSnapshot(migratedSettings, DEFAULT_SETTINGS));
   }
 
   public async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
+    const normalizedSettings = snapshotSettings(normalizeSettingsSnapshot(this.settings, DEFAULT_SETTINGS));
+    this.settings = normalizedSettings;
+
+    const loadedData = await this.loadData();
+    const persistedRoot = isRecord(loadedData) ? { ...loadedData } : {};
+    persistedRoot[SETTINGS_STORAGE_KEY] = serializeSettingsForPersistence(normalizedSettings);
+    await this.saveData(persistedRoot);
   }
 
   private registerCommands(): void {

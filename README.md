@@ -479,12 +479,12 @@ Provide secure, configurable runtime settings for indexing, providers, and chat 
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| CFG-1 | Not Started | Implement settings schema with defaults and runtime validation | M | Include folders, providers, models, endpoints, limits, and timeout |
-| CFG-2 | Not Started | Build settings UI for indexing scope and agent output folder controls | M | Keep indexing scope and write scope independently configurable |
-| CFG-3 | Not Started | Integrate Obsidian secret store for API key management | S | No secrets in plain config files |
-| CFG-4 | Not Started | Implement provider/model selection for embeddings and chat | S | Must support OpenAI and Ollama in MVP |
-| CFG-5 | Not Started | Add configurable chat timeout with 30s default | S | Should support slower local models and remote APIs |
-| CFG-6 | Not Started | Add settings migration/versioning support | S | Preserve compatibility across plugin updates |
+| [CFG-1](docs/features/CFG-1-implement-settings-schema-with-defaults-and-runtime-validation.md) | Done | Implement settings schema with defaults and runtime validation | M | Include folders, providers, models, endpoints, limits, and timeout |
+| [CFG-2](docs/features/CFG-2-build-settings-ui-for-indexing-scope-and-agent-output-folder-controls.md) | Done | Build settings UI for indexing scope and agent output folder controls | M | Keep indexing scope and write scope independently configurable |
+| [CFG-3](docs/features/CFG-3-integrate-obsidian-secret-store-for-api-key-management.md) | Done | Integrate Obsidian secret store for API key management | S | No secrets in plain config files |
+| [CFG-4](docs/features/CFG-4-implement-provider-model-selection-for-embeddings-and-chat.md) | Done | Implement provider/model selection for embeddings and chat | S | Must support OpenAI and Ollama in MVP |
+| [CFG-5](docs/features/CFG-5-add-configurable-chat-timeout-with-30s-default.md) | Done | Add configurable chat timeout with 30s default | S | Should support slower local models and remote APIs |
+| [CFG-6](docs/features/CFG-6-add-settings-migration-versioning-support.md) | Done | Add settings migration/versioning support | S | Preserve compatibility across plugin updates |
 
 ### Epic 7: Performance, Reliability, and MVP Readiness
 

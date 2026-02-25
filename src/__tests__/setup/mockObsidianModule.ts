@@ -264,6 +264,14 @@ export class Plugin {
   public async loadSecret(key: string): Promise<string | null> {
     return this.secrets.get(key) ?? null;
   }
+
+  public async saveSecret(key: string, value: string): Promise<void> {
+    this.secrets.set(key, value);
+  }
+
+  public async deleteSecret(key: string): Promise<void> {
+    this.secrets.delete(key);
+  }
 }
 
 export class PluginSettingTab {
@@ -307,6 +315,18 @@ class TextComponent {
   }
 }
 
+class ButtonComponent {
+  public setButtonText(value: string): this {
+    void value;
+    return this;
+  }
+
+  public onClick(callback: () => void | Promise<void>): this {
+    void callback;
+    return this;
+  }
+}
+
 export class Setting {
   public constructor(containerEl: MockDomElement) {
     if (!containerEl) {
@@ -331,6 +351,11 @@ export class Setting {
 
   public addText(callback: (text: TextComponent) => unknown): this {
     callback(new TextComponent());
+    return this;
+  }
+
+  public addButton(callback: (button: ButtonComponent) => unknown): this {
+    callback(new ButtonComponent());
     return this;
   }
 }

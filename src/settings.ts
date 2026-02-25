@@ -1,4 +1,5 @@
-import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { PluginSecretStore } from "./secrets/PluginSecretStore";
 import { MVP_PROVIDER_IDS, type MVPProviderId, type ObsidianAISettings } from "./types";
 
 type SettingsHostPlugin = Plugin & {
@@ -52,10 +53,12 @@ const toKnownProviderId = (value: string): MVPProviderId => {
 
 export class ObsidianAISettingTab extends PluginSettingTab {
   private readonly plugin: SettingsHostPlugin;
+  private readonly secretStore: PluginSecretStore;
 
   public constructor(app: App, plugin: SettingsHostPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this.secretStore = new PluginSecretStore(plugin);
   }
 
   public display(): void {
@@ -64,12 +67,12 @@ export class ObsidianAISettingTab extends PluginSettingTab {
 
     containerEl.createEl("h2", { text: "Obsidian AI MVP" });
     containerEl.createEl("p", {
-      text: "Runtime shell settings for FND-2. Provider integration and indexing logic are added in later stories."
+      text: "Configure providers, indexing scope, and guardrails for local semantic search and chat."
     });
 
     new Setting(containerEl)
       .setName("Embedding provider")
-      .setDesc("Placeholder provider choice for upcoming embedding service wiring.")
+      .setDesc("Provider used to generate embeddings for indexing and query vectors.")
       .addDropdown((dropdown) => {
         for (const providerId of MVP_PROVIDER_IDS) {
           dropdown.addOption(providerId, PROVIDER_LABELS[providerId]);
@@ -84,8 +87,21 @@ export class ObsidianAISettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Embedding model")
+      .setDesc("Model name used for embedding generation.")
+      .addText((text) => {
+        text
+          .setPlaceholder("text-embedding-3-small")
+          .setValue(this.plugin.settings.embeddingModel)
+          .onChange(async (value) => {
+            this.plugin.settings.embeddingModel = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
       .setName("Chat provider")
-      .setDesc("Placeholder provider choice for upcoming chat service wiring.")
+      .setDesc("Provider used for streamed chat completions.")
       .addDropdown((dropdown) => {
         for (const providerId of MVP_PROVIDER_IDS) {
           dropdown.addOption(providerId, PROVIDER_LABELS[providerId]);
@@ -100,8 +116,47 @@ export class ObsidianAISettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Chat model")
+      .setDesc("Model name used for chat completions.")
+      .addText((text) => {
+        text
+          .setPlaceholder("gpt-4o-mini")
+          .setValue(this.plugin.settings.chatModel)
+          .onChange(async (value) => {
+            this.plugin.settings.chatModel = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("OpenAI endpoint")
+      .setDesc("Base API URL for OpenAI-compatible requests.")
+      .addText((text) => {
+        text
+          .setPlaceholder("https://api.openai.com/v1")
+          .setValue(this.plugin.settings.openaiEndpoint)
+          .onChange(async (value) => {
+            this.plugin.settings.openaiEndpoint = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Ollama endpoint")
+      .setDesc("Base API URL for Ollama requests.")
+      .addText((text) => {
+        text
+          .setPlaceholder("http://localhost:11434")
+          .setValue(this.plugin.settings.ollamaEndpoint)
+          .onChange(async (value) => {
+            this.plugin.settings.ollamaEndpoint = value.trim();
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
       .setName("Indexed folders")
-      .setDesc("Comma-separated vault paths included in indexing.")
+      .setDesc("Comma-separated vault paths included in indexing scope.")
       .addText((text) => {
         text
           .setPlaceholder("/")
@@ -113,8 +168,21 @@ export class ObsidianAISettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Excluded folders")
+      .setDesc("Comma-separated folders excluded from indexing even if included above.")
+      .addText((text) => {
+        text
+          .setPlaceholder("templates, archive")
+          .setValue(formatCsvList(this.plugin.settings.excludedFolders))
+          .onChange(async (value) => {
+            this.plugin.settings.excludedFolders = parseCsvList(value);
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
       .setName("Agent output folders")
-      .setDesc("Comma-separated vault paths where the agent can create or update notes.")
+      .setDesc("Comma-separated vault paths where the chat agent can create or update notes.")
       .addText((text) => {
         text
           .setPlaceholder("projects/notes")
@@ -127,7 +195,7 @@ export class ObsidianAISettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Max generated note size")
-      .setDesc("Maximum characters allowed when creating or updating notes from chat.")
+      .setDesc("Maximum characters allowed when the chat agent creates or updates notes.")
       .addText((text) => {
         text
           .setPlaceholder("5000")
@@ -143,7 +211,7 @@ export class ObsidianAISettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Chat timeout (ms)")
-      .setDesc("Maximum time to wait for chat responses.")
+      .setDesc("Maximum time to wait for chat responses (default 30000ms).")
       .addText((text) => {
         text
           .setPlaceholder("30000")
@@ -157,8 +225,50 @@ export class ObsidianAISettingTab extends PluginSettingTab {
           });
       });
 
-    containerEl.createEl("p", {
-      text: "Secrets are intentionally excluded from plugin settings and should be stored in Obsidian's keychain."
+    let pendingOpenAIApiKey = "";
+    new Setting(containerEl)
+      .setName("OpenAI API key")
+      .setDesc("Stored in Obsidian keychain only. It is never written to plugin settings data.")
+      .addText((text) => {
+        text.setPlaceholder("sk-...").onChange((value) => {
+          pendingOpenAIApiKey = value.trim();
+        });
+      })
+      .addButton((button) => {
+        button.setButtonText("Save").onClick(async () => {
+          if (pendingOpenAIApiKey.length === 0) {
+            new Notice("Enter an OpenAI API key before saving.");
+            return;
+          }
+          const saved = await this.secretStore.setSecret("openai-api-key", pendingOpenAIApiKey);
+          if (!saved) {
+            new Notice("Unable to save API key: Secret storage is unavailable in this environment.");
+            return;
+          }
+          pendingOpenAIApiKey = "";
+          new Notice("OpenAI API key saved to Obsidian keychain.");
+          this.display();
+        });
+      })
+      .addButton((button) => {
+        button.setButtonText("Clear").onClick(async () => {
+          const removed = await this.secretStore.deleteSecret("openai-api-key");
+          if (!removed) {
+            new Notice("Unable to clear API key: Secret storage is unavailable in this environment.");
+            return;
+          }
+          pendingOpenAIApiKey = "";
+          new Notice("OpenAI API key removed from Obsidian keychain.");
+          this.display();
+        });
+      });
+
+    const secretStatusEl = containerEl.createEl("p", {
+      text: "OpenAI API key status: checking keychain..."
+    });
+    void this.secretStore.getSecret("openai-api-key").then((secret) => {
+      const configured = secret !== null && secret.length > 0;
+      secretStatusEl.setText(configured ? "OpenAI API key status: configured in keychain." : "OpenAI API key status: not set.");
     });
   }
 }
