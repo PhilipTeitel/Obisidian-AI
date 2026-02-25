@@ -213,6 +213,14 @@ export default class ObsidianAIPlugin extends Plugin {
         await this.requireSearchPaneModel().searchFromSelection(selection);
       }
     });
+
+    this.addCommand({
+      id: COMMAND_IDS.OPEN_SEMANTIC_SEARCH_PANE,
+      name: COMMAND_NAMES.OPEN_SEMANTIC_SEARCH_PANE,
+      callback: async () => {
+        await this.activateView(SEARCH_VIEW_TYPE);
+      }
+    });
   }
 
   private async runIndexCommand(
