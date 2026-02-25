@@ -1,5 +1,19 @@
 # Obsidian AI Plugin
 
+## Preface
+This project represents 2 things for me.  The first is that I've always wanted AI capabilities in Obsidian.  This isn't even the first time I've built it.  It's become my "Hello World" project where I experiment with various ways of building software.  The second is to practice using Cursor's agentic abilities.  It was built using the following agents:
+- Architect
+  - Build the high-level design document.  It doesn't write the code, only makes sure the project is properly spec'd to be built correctly and cleanly.  A template is used to assure completeness.
+  - Create user stories.  Uses a template to spec everything out sufficiently so that the code meets the requirements.  The critical piece is the acceptance criteria.
+- Implementer -  Writes the actual code.  It must follow the spec EXACTLY.  Generate evidence that the code meets the criteria.  If any ambiguities are found, it is instructed to stop and ask how to proceed.  
+- QA - Runs all tests to verify acceptance criteria are met and no regressions are added
+- Documenter - Updates the documentation with any changes precipitated by the latest work.
+
+Commands were used to execute the various steps and templates were used to maintain consistency. 
+
+The code on this branch was generated using the `GPT-5.3 Codex High` model.
+
+## Purpose
 An Obsidian plugin that adds AI-powered **semantic search** and **chat completions** over your vault. Notes are indexed locally with embeddings stored in wa-SQLite/sqlite-vec. Chat uses only vault content as context and can create or update notes on request. Supports OpenAI and Ollama providers (abstracted for future additions).
 
 Requirements: [docs/prompts/initial.md](docs/prompts/initial.md)
@@ -16,6 +30,7 @@ Requirements: [docs/prompts/initial.md](docs/prompts/initial.md)
 - [API Contract (Internal Service Interfaces)](#api-contract-internal-service-interfaces)
 - [Plugin Settings](#plugin-settings)
 - [Backlog Items](#backlog-items)
+- [License](#license)
 
 ## High-Level Architecture
 
@@ -483,3 +498,5 @@ Validate performance constraints and readiness for MVP release.
 | REL-4 | Not Started | Harden failure handling for provider outages and partial indexing failures | M | Include retries, user-facing errors, and recovery actions |
 | REL-5 | Not Started | Prepare MVP release checklist and acceptance criteria | S | Ensure success criteria map to measurable verification steps |
 
+## License
+MIT © Philip Teitel
