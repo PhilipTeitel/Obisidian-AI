@@ -95,6 +95,25 @@ export default class ObsidianAIPlugin extends Plugin {
     });
   }
 
+  /**
+   * Wraps Obsidian's loadData to tolerate a missing or corrupted data.json
+   * (e.g. empty file after a crash). Returns null so callers use defaults.
+   */
+  public override async loadData(): Promise<unknown> {
+    try {
+      return await super.loadData();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.logger.log({
+        level: "warn",
+        event: "plugin.data.load_failed",
+        message: "Plugin data file is missing or corrupted; using defaults.",
+        context: { error: message }
+      });
+      return null;
+    }
+  }
+
   public async onunload(): Promise<void> {
     this.logger.log({
       level: "info",
