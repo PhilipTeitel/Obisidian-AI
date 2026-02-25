@@ -33,6 +33,7 @@ export interface MockAppHarness {
   getRevealedLeaves: () => MockWorkspaceLeafLike[];
   getLeavesForType: (viewType: string) => MockWorkspaceLeafLike[];
   getOpenedLinks: () => Array<{ linktext: string; sourcePath: string; newLeaf?: boolean }>;
+  getVaultFileContent: (path: string) => string | null;
 }
 
 export interface MockVaultMarkdownSeed {
@@ -124,12 +125,55 @@ export const createMockAppHarness = (): MockAppHarness => {
     }
   };
 
+  const upsertMarkdownFile = (path: string, markdown: string, mtime: number): MockVaultMarkdownFile => {
+    const existingIndex = markdownFiles.findIndex((entry) => entry.path === path);
+    const nextFile: MockVaultMarkdownFile =
+      existingIndex >= 0
+        ? {
+            ...markdownFiles[existingIndex],
+            stat: {
+              mtime
+            }
+          }
+        : {
+            path,
+            basename: inferBasename(path),
+            stat: {
+              mtime
+            }
+          };
+
+    if (existingIndex >= 0) {
+      markdownFiles[existingIndex] = nextFile;
+    } else {
+      markdownFiles = [...markdownFiles, nextFile];
+    }
+    markdownContentByPath.set(path, markdown);
+    return nextFile;
+  };
+
   const vault = {
     getMarkdownFiles: (): MockVaultMarkdownFile[] => {
       return [...markdownFiles];
     },
     cachedRead: async (file: MockVaultMarkdownFile): Promise<string> => {
       return markdownContentByPath.get(file.path) ?? "";
+    },
+    create: async (path: string, markdown: string): Promise<MockVaultMarkdownFile> => {
+      if (markdownContentByPath.has(path)) {
+        throw new Error(`Mock vault create failed: file already exists at ${path}.`);
+      }
+      const created = upsertMarkdownFile(path, markdown, Date.now());
+      return created;
+    },
+    modify: async (file: { path: string }, markdown: string): Promise<void> => {
+      if (!markdownContentByPath.has(file.path)) {
+        throw new Error(`Mock vault modify failed: file not found at ${file.path}.`);
+      }
+      upsertMarkdownFile(file.path, markdown, Date.now());
+    },
+    getAbstractFileByPath: (path: string): MockVaultMarkdownFile | null => {
+      return markdownFiles.find((entry) => entry.path === path) ?? null;
     }
   };
 
@@ -174,6 +218,9 @@ export const createMockAppHarness = (): MockAppHarness => {
     },
     getOpenedLinks: (): Array<{ linktext: string; sourcePath: string; newLeaf?: boolean }> => {
       return [...openedLinks];
+    },
+    getVaultFileContent: (path: string): string | null => {
+      return markdownContentByPath.get(path) ?? null;
     }
   };
 };
