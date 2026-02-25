@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COMMAND_IDS, SEARCH_VIEW_TYPE } from "../../constants";
+import { CHAT_VIEW_TYPE, COMMAND_IDS, SEARCH_VIEW_TYPE } from "../../constants";
 import type { RuntimeLogContext } from "../../types";
 import { createPluginTestHarness } from "../harness/createPluginTestHarness";
 
@@ -29,6 +29,7 @@ describe("plugin runtime integration", () => {
 
     expect(registeredCommandIds).toEqual([
       COMMAND_IDS.INDEX_CHANGES,
+      COMMAND_IDS.OPEN_CHAT_PANE,
       COMMAND_IDS.OPEN_SEMANTIC_SEARCH_PANE,
       COMMAND_IDS.REINDEX_VAULT,
       COMMAND_IDS.SEARCH_SELECTION
@@ -151,6 +152,25 @@ describe("plugin runtime integration", () => {
 
     await harness.invokeCommand(COMMAND_IDS.OPEN_SEMANTIC_SEARCH_PANE);
     expect(harness.appHarness.getLeavesForType(SEARCH_VIEW_TYPE)).toHaveLength(1);
+    expect(harness.appHarness.getRevealedLeaves()).toHaveLength(2);
+    expect(harness.getRuntimeServices()).toBeNull();
+
+    await harness.runOnunload();
+  });
+
+  it("opens chat pane without bootstrapping runtime services", async () => {
+    const harness = createPluginTestHarness();
+    await harness.runOnload();
+
+    expect(harness.getRuntimeServices()).toBeNull();
+
+    await harness.invokeCommand(COMMAND_IDS.OPEN_CHAT_PANE);
+    expect(harness.appHarness.getLeavesForType(CHAT_VIEW_TYPE)).toHaveLength(1);
+    expect(harness.appHarness.getRevealedLeaves()).toHaveLength(1);
+    expect(harness.getRuntimeServices()).toBeNull();
+
+    await harness.invokeCommand(COMMAND_IDS.OPEN_CHAT_PANE);
+    expect(harness.appHarness.getLeavesForType(CHAT_VIEW_TYPE)).toHaveLength(1);
     expect(harness.appHarness.getRevealedLeaves()).toHaveLength(2);
     expect(harness.getRuntimeServices()).toBeNull();
 

@@ -221,6 +221,14 @@ export default class ObsidianAIPlugin extends Plugin {
         await this.activateView(SEARCH_VIEW_TYPE);
       }
     });
+
+    this.addCommand({
+      id: COMMAND_IDS.OPEN_CHAT_PANE,
+      name: COMMAND_NAMES.OPEN_CHAT_PANE,
+      callback: async () => {
+        await this.activateView(CHAT_VIEW_TYPE);
+      }
+    });
   }
 
   private async runIndexCommand(
