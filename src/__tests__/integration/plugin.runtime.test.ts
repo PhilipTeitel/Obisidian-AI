@@ -155,4 +155,21 @@ describe("plugin runtime integration", () => {
 
     await harness.runOnunload();
   });
+
+  it("appends recovery action hints to user notices on indexing failures", async () => {
+    const harness = createPluginTestHarness();
+    await harness.runOnload();
+    const runtimeServices = await harness.ensureRuntimeServices();
+
+    runtimeServices.indexingService.reindexVault = async () => {
+      throw new Error("Provider timeout. Recovery action: Check provider endpoint/API key and retry the indexing command.");
+    };
+
+    await harness.invokeCommand(COMMAND_IDS.REINDEX_VAULT);
+
+    const notices = harness.appHarness.getNoticeMessages();
+    expect(notices.some((message) => message.includes("Recovery action: Check provider endpoint/API key"))).toBe(true);
+
+    await harness.runOnunload();
+  });
 });

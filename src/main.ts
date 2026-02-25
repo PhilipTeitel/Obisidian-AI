@@ -270,8 +270,19 @@ export default class ObsidianAIPlugin extends Plugin {
           errorMessage: normalized.message
         })
       );
-      new Notice(normalized.userMessage);
+      const recoveryHint = this.extractRecoveryHint(normalized.message);
+      new Notice(recoveryHint ? `${normalized.userMessage} ${recoveryHint}` : normalized.userMessage);
     }
+  }
+
+  private extractRecoveryHint(message: string): string | null {
+    const marker = "Recovery action:";
+    const markerIndex = message.indexOf(marker);
+    if (markerIndex < 0) {
+      return null;
+    }
+    const hint = message.slice(markerIndex).trim();
+    return hint.length > 0 ? hint : null;
   }
 
   private async ensureRuntimeServices(): Promise<RuntimeServices> {

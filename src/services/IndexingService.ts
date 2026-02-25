@@ -80,6 +80,34 @@ const appendRecoveryDetail = (detail: string, recoveryMessages: string[]): strin
   return `${detail} Recovery: ${recoveryMessages.join(" ")}`;
 };
 
+const RETRYABLE_PROVIDER_FAILURE_PATTERN = /(timeout|timed out|fetch failed|network|econn|enotfound|429|503|rate.?limit)/i;
+const STORAGE_FAILURE_PATTERN = /(storage|sqlite|disk|readonly|i\/o|filesystem|file|permission)/i;
+const MAX_INDEXING_ATTEMPTS = 2;
+
+const isRetryableProviderFailure = (message: string): boolean => {
+  return RETRYABLE_PROVIDER_FAILURE_PATTERN.test(message);
+};
+
+const toRecoveryAction = (message: string, mode: "full" | "incremental"): string => {
+  if (isRetryableProviderFailure(message)) {
+    return mode === "incremental"
+      ? "Check provider endpoint/API key and retry Index changes. If retries keep failing, run Reindex vault to rebuild a clean baseline."
+      : "Check provider endpoint/API key and retry the indexing command.";
+  }
+
+  if (STORAGE_FAILURE_PATTERN.test(message)) {
+    return "Check local storage permissions/capacity and rerun Reindex vault to recover consistency.";
+  }
+
+  return mode === "incremental"
+    ? "Retry Index changes. If failures persist, run Reindex vault to recover consistency."
+    : "Retry the indexing command and review runtime logs.";
+};
+
+const withRecoveryAction = (message: string, mode: "full" | "incremental"): string => {
+  return `${message} Recovery action: ${toRecoveryAction(message, mode)}`;
+};
+
 export const computeIncrementalDiff = (
   previous: IndexedNoteFingerprint[],
   current: IndexedNoteFingerprint[]
@@ -314,18 +342,9 @@ export class IndexingService implements IndexingServiceContract {
       const shouldFallbackToBaseline =
         params.mode === "incremental" && consistencyReport.requiresFullReindexBaseline;
 
-      const terminalSnapshot = shouldFallbackToBaseline
-        ? await this.runBaselineFromIncremental({
-            commandLabel: params.commandLabel,
-            jobType: params.jobType,
-            jobId,
-            startedAt,
-            noteInputs,
-            options: params.options,
-            recoveryMessages
-          })
-        : params.mode === "full"
-          ? await this.runFullReindex({
+      const runSelectedMode = async () => {
+        return shouldFallbackToBaseline
+          ? this.runBaselineFromIncremental({
               commandLabel: params.commandLabel,
               jobType: params.jobType,
               jobId,
@@ -334,19 +353,63 @@ export class IndexingService implements IndexingServiceContract {
               options: params.options,
               recoveryMessages
             })
-          : await this.runIncrementalIndex({
-              commandLabel: params.commandLabel,
-              jobType: params.jobType,
-              jobId,
+          : params.mode === "full"
+            ? this.runFullReindex({
+                commandLabel: params.commandLabel,
+                jobType: params.jobType,
+                jobId,
+                startedAt,
+                noteInputs,
+                options: params.options,
+                recoveryMessages
+              })
+            : this.runIncrementalIndex({
+                commandLabel: params.commandLabel,
+                jobType: params.jobType,
+                jobId,
+                startedAt,
+                noteInputs,
+                options: params.options,
+                recoveryMessages
+              });
+      };
+
+      let terminalSnapshot: JobSnapshot | null = null;
+      let attempt = 1;
+      while (attempt <= MAX_INDEXING_ATTEMPTS && terminalSnapshot === null) {
+        try {
+          terminalSnapshot = await runSelectedMode();
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (attempt >= MAX_INDEXING_ATTEMPTS || !isRetryableProviderFailure(message)) {
+            throw error;
+          }
+
+          attempt += 1;
+          await this.emitProgress(
+            createSnapshot({
+              id: jobId,
+              type: params.jobType,
+              status: "running",
               startedAt,
-              noteInputs,
-              options: params.options,
-              recoveryMessages
-            });
+              completed: 0,
+              total: 0,
+              label: `${params.commandLabel} · Retry`,
+              detail: `Transient provider failure detected; retrying indexing attempt ${attempt} of ${MAX_INDEXING_ATTEMPTS}.`
+            }),
+            params.options
+          );
+        }
+      }
+      if (!terminalSnapshot) {
+        throw new Error("Indexing command failed before producing a terminal snapshot.");
+      }
 
       await this.emitProgress(terminalSnapshot, params.options);
       return terminalSnapshot;
     } catch (error: unknown) {
+      const originalMessage = error instanceof Error ? error.message : String(error);
+      const errorMessageWithRecovery = withRecoveryAction(originalMessage, params.mode);
       const failedSnapshot = createSnapshot({
         id: jobId,
         type: params.jobType,
@@ -355,11 +418,11 @@ export class IndexingService implements IndexingServiceContract {
         completed: 0,
         total: 0,
         label: params.commandLabel,
-        detail: appendRecoveryDetail("Indexing command failed.", recoveryMessages),
-        errorMessage: error instanceof Error ? error.message : String(error)
+        detail: appendRecoveryDetail("Indexing command failed.", [...recoveryMessages, toRecoveryAction(originalMessage, params.mode)]),
+        errorMessage: errorMessageWithRecovery
       });
       await this.emitProgress(failedSnapshot, params.options);
-      throw error;
+      throw new Error(errorMessageWithRecovery);
     }
   }
 
@@ -567,9 +630,8 @@ export class IndexingService implements IndexingServiceContract {
       params.options
     );
 
-    await this.deps.vectorStoreRepository.deleteByNotePaths(notePathsToDelete);
-
     const vectors = await this.embedChunkContent(chunks);
+    await this.deps.vectorStoreRepository.deleteByNotePaths(notePathsToDelete);
     await this.deps.vectorStoreRepository.upsertFromChunks(chunks, vectors);
 
     await this.emitProgress(

@@ -236,4 +236,93 @@ describe("incremental indexing workflow", () => {
     expect(snapshot.progress.detail).toBe("No changes detected. Created 0, updated 0, deleted 0.");
     expect(embeddingRequests).toHaveLength(0);
   });
+
+  it("does not delete note paths when embedding fails during incremental indexing", async () => {
+    const settings = createSettings();
+    const plugin = createMemoryPlugin();
+    const manifestStore = new IndexManifestStore({
+      plugin: plugin as unknown as RuntimeBootstrapContext["plugin"]
+    });
+    const jobStateStore = new IndexJobStateStore({
+      plugin: plugin as unknown as RuntimeBootstrapContext["plugin"]
+    });
+    await manifestStore.save({
+      version: 1,
+      updatedAt: 1,
+      notes: [createFingerprint("notes/a.md", "# A\n\nOld", 10)]
+    });
+
+    const deletedPaths: string[][] = [];
+    const service = new IndexingService({
+      app: createMockApp([{ path: "notes/a.md", basename: "a", markdown: "# A\n\nUpdated", mtime: 20 }]),
+      embeddingService: {
+        init: async () => undefined,
+        dispose: async () => undefined,
+        embed: async () => {
+          throw new Error("Embedding provider timed out during incremental run.");
+        }
+      },
+      vectorStoreRepository: {
+        ...createVectorStoreRepository(),
+        deleteByNotePaths: async (paths: string[]) => {
+          deletedPaths.push(paths);
+        }
+      },
+      getSettings: () => settings,
+      manifestStore,
+      jobStateStore
+    });
+
+    await service.init();
+    await expect(service.indexChanges()).rejects.toThrow("Recovery action:");
+    expect(deletedPaths).toHaveLength(0);
+  });
+
+  it("retries transient provider failures before marking incremental indexing failed", async () => {
+    const settings = createSettings();
+    const plugin = createMemoryPlugin();
+    const manifestStore = new IndexManifestStore({
+      plugin: plugin as unknown as RuntimeBootstrapContext["plugin"]
+    });
+    const jobStateStore = new IndexJobStateStore({
+      plugin: plugin as unknown as RuntimeBootstrapContext["plugin"]
+    });
+    await manifestStore.save({
+      version: 1,
+      updatedAt: 1,
+      notes: [createFingerprint("notes/a.md", "# A\n\nOld", 10)]
+    });
+
+    let embedCallCount = 0;
+    const progressDetails: string[] = [];
+    const service = new IndexingService({
+      app: createMockApp([{ path: "notes/a.md", basename: "a", markdown: "# A\n\nUpdated", mtime: 20 }]),
+      embeddingService: {
+        init: async () => undefined,
+        dispose: async () => undefined,
+        embed: async (request: EmbeddingRequest): Promise<EmbeddingResponse> => {
+          embedCallCount += 1;
+          if (embedCallCount === 1) {
+            throw new Error("Provider timeout while embedding incremental chunks.");
+          }
+          return createEmbeddingResponse(request);
+        }
+      },
+      vectorStoreRepository: createVectorStoreRepository(),
+      getSettings: () => settings,
+      manifestStore,
+      jobStateStore
+    });
+
+    await service.init();
+    const snapshot = await service.indexChanges({
+      onProgress: (nextSnapshot) => {
+        progressDetails.push(nextSnapshot.progress.detail);
+      }
+    });
+
+    expect(snapshot.status).toBe("succeeded");
+    expect(embedCallCount).toBe(2);
+    expect(progressDetails.some((detail) => detail.includes("retrying indexing attempt 2 of 2"))).toBe(true);
+  });
 });
