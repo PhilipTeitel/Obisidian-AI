@@ -16,7 +16,9 @@ The code on this branch was generated using the `GPT-5.3 Codex High` model.
 ## Purpose
 An Obsidian plugin that adds AI-powered **semantic search** and **chat completions** over your vault. Notes are indexed locally with embeddings stored in wa-SQLite/sqlite-vec. Chat uses only vault content as context and can create or update notes on request. Supports OpenAI and Ollama providers (abstracted for future additions).
 
-Requirements: [docs/prompts/initial.md](docs/prompts/initial.md)
+Requirements: 
+- [docs/prompts/01-initial.md](docs/prompts/01-initial.md)
+- [docs/prompts/02-second.md](docs/prompts/02-second.md)
 
 ## Table of Contents
 
