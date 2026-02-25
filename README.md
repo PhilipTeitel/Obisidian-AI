@@ -323,6 +323,7 @@ This watches `src/` and rebuilds on changes. Reload Obsidian (Cmd+R / Ctrl+R) to
 ### 6. Use command palette actions
 
 Open Obsidian's command palette (Cmd+P on macOS, Ctrl+P on Windows/Linux), then run the commands below by display name.
+The display names and command IDs in this table match the values registered by the plugin command constants.
 
 | Display Name | Command ID | Purpose / Expected Behavior | Typical Usage |
 |--------------|------------|-----------------------------|---------------|
@@ -525,7 +526,7 @@ Add pane-opening commands and command documentation so users can discover and op
 | [CMD-1](docs/features/CMD-1-add-pane-open-command-constants-and-command-id-type-coverage.md) | Done | Add pane-open command constants and command ID type coverage | S | Centralize IDs/names and include new IDs in command type unions for compile-time safety |
 | [CMD-2](docs/features/CMD-2-add-open-semantic-search-pane-command-registration-and-reveal-behavior.md) | Done | Add `Open semantic search pane` command registration and reveal behavior | S | Reuse existing search leaf when present; open one when missing; do not execute search automatically |
 | [CMD-3](docs/features/CMD-3-add-open-chat-pane-command-registration-and-reveal-behavior.md) | Done | Add `Open chat pane` command registration and reveal behavior | S | Reuse existing chat leaf when present; open one when missing; do not trigger completion automatically |
-| [CMD-4](docs/features/CMD-4-update-getting-started-command-reference-aligned-with-registered-command-names.md) | Not Started | Update `Getting Started` command reference aligned with registered command names | S | Document display name, behavior, and usage context for all user-facing plugin commands |
+| [CMD-4](docs/features/CMD-4-update-getting-started-command-reference-aligned-with-registered-command-names.md) | Done | Update `Getting Started` command reference aligned with registered command names | S | Document display name, behavior, and usage context for all user-facing plugin commands |
 | [CMD-5](docs/features/CMD-5-add-integration-tests-for-pane-command-discoverability-and-open-reveal-semantics.md) | Not Started | Add integration tests for pane command discoverability and open/reveal semantics | M | Verify commands are registered and reliably reveal existing panes or create missing panes |
 
 ## License
