@@ -35,6 +35,7 @@ export default class ObsidianAIPlugin extends Plugin {
   public settings: ObsidianAISettings = { ...DEFAULT_SETTINGS };
   private readonly logger = createRuntimeLogger("ObsidianAIPlugin");
   private runtimeServices: RuntimeServices | null = null;
+  private runtimeServicesBootstrapPromise: Promise<RuntimeServices> | null = null;
   private searchPaneModel: SearchPaneModel | null = null;
   private chatPaneModel: ChatPaneModel | null = null;
   private progressSlideout: ProgressSlideout | null = null;
@@ -48,46 +49,8 @@ export default class ObsidianAIPlugin extends Plugin {
       message: "Plugin onload started."
     });
 
-    try {
-      const bootstrapResult = await bootstrapRuntimeServices({
-        app: this.app,
-        plugin: this,
-        getSettings: () => snapshotSettings(this.settings),
-        notify: (message) => {
-          new Notice(message);
-        }
-      });
-      this.runtimeServices = bootstrapResult.services;
-      this.logger.log({
-        level: "info",
-        event: "plugin.onload.bootstrap_succeeded",
-        message: "Runtime services bootstrapped.",
-        context: {
-          initializedServices: bootstrapResult.initializationOrder.length
-        }
-      });
-    } catch (error: unknown) {
-      const normalized = normalizeRuntimeError(error, {
-        operation: "plugin.onload",
-        phase: "bootstrap"
-      });
-      this.logger.log({
-        level: "error",
-        event: "plugin.onload.bootstrap_failed",
-        message: "Failed to bootstrap runtime services.",
-        domain: normalized.domain,
-        context: {
-          operation: "plugin.onload",
-          phase: "bootstrap"
-        },
-        error: normalized
-      });
-      new Notice(normalized.userMessage);
-      throw normalized;
-    }
-
     this.searchPaneModel = new SearchPaneModel({
-      runSearch: (request) => this.requireRuntimeServices().searchService.search(request),
+      runSearch: async (request) => (await this.ensureRuntimeServices()).searchService.search(request),
       openResult: async (result) => {
         await this.openSearchResult(result);
       },
@@ -97,9 +60,9 @@ export default class ObsidianAIPlugin extends Plugin {
     });
 
     this.chatPaneModel = new ChatPaneModel({
-      runChat: (request) => this.requireRuntimeServices().chatService.chat(request),
+      runChat: (request) => this.runChatWithLazyRuntime(request),
       runSourceSearch: async (query) => {
-        return this.requireRuntimeServices().searchService.search({
+        return (await this.ensureRuntimeServices()).searchService.search({
           query,
           topK: 5
         });
@@ -128,7 +91,7 @@ export default class ObsidianAIPlugin extends Plugin {
     this.logger.log({
       level: "info",
       event: "plugin.onload.succeeded",
-      message: "Plugin onload completed."
+      message: "Plugin onload completed with lazy runtime bootstrap."
     });
   }
 
@@ -150,10 +113,19 @@ export default class ObsidianAIPlugin extends Plugin {
     this.progressSlideout?.dispose();
     this.progressSlideout = null;
 
-    const servicesToDispose = this.runtimeServices;
+    const pendingBootstrap = this.runtimeServicesBootstrapPromise;
+    let servicesToDispose = this.runtimeServices;
     this.runtimeServices = null;
+    this.runtimeServicesBootstrapPromise = null;
     this.searchPaneModel = null;
     this.chatPaneModel = null;
+    if (!servicesToDispose && pendingBootstrap) {
+      try {
+        servicesToDispose = await pendingBootstrap;
+      } catch {
+        servicesToDispose = null;
+      }
+    }
     try {
       await servicesToDispose?.dispose();
     } catch (error: unknown) {
@@ -204,7 +176,7 @@ export default class ObsidianAIPlugin extends Plugin {
       name: COMMAND_NAMES.REINDEX_VAULT,
       callback: async () => {
         await this.runIndexCommand(COMMAND_NAMES.REINDEX_VAULT, "reindex-vault", async () => {
-          return this.requireRuntimeServices().indexingService.reindexVault({
+          return (await this.ensureRuntimeServices()).indexingService.reindexVault({
             onProgress: (snapshot) => {
               this.setProgressStatus(snapshot);
             }
@@ -218,7 +190,7 @@ export default class ObsidianAIPlugin extends Plugin {
       name: COMMAND_NAMES.INDEX_CHANGES,
       callback: async () => {
         await this.runIndexCommand(COMMAND_NAMES.INDEX_CHANGES, "index-changes", async () => {
-          return this.requireRuntimeServices().indexingService.indexChanges({
+          return (await this.ensureRuntimeServices()).indexingService.indexChanges({
             onProgress: (snapshot) => {
               this.setProgressStatus(snapshot);
             }
@@ -302,11 +274,73 @@ export default class ObsidianAIPlugin extends Plugin {
     }
   }
 
-  private requireRuntimeServices(): RuntimeServices {
-    if (!this.runtimeServices) {
-      throw new Error("Runtime services are unavailable.");
+  private async ensureRuntimeServices(): Promise<RuntimeServices> {
+    if (this.runtimeServices) {
+      return this.runtimeServices;
     }
-    return this.runtimeServices;
+    if (this.runtimeServicesBootstrapPromise) {
+      return this.runtimeServicesBootstrapPromise;
+    }
+
+    this.logger.log({
+      level: "info",
+      event: "plugin.runtime.bootstrap_start",
+      message: "Initializing runtime services on first use."
+    });
+
+    const bootstrapStart = Date.now();
+    this.runtimeServicesBootstrapPromise = (async () => {
+      try {
+        const bootstrapResult = await bootstrapRuntimeServices({
+          app: this.app,
+          plugin: this,
+          getSettings: () => snapshotSettings(this.settings),
+          notify: (message) => {
+            new Notice(message);
+          }
+        });
+        this.runtimeServices = bootstrapResult.services;
+        this.logger.log({
+          level: "info",
+          event: "plugin.runtime.bootstrap_succeeded",
+          message: "Runtime services bootstrapped on demand.",
+          context: {
+            initializedServices: bootstrapResult.initializationOrder.length,
+            elapsedMs: Date.now() - bootstrapStart
+          }
+        });
+        return bootstrapResult.services;
+      } catch (error: unknown) {
+        const normalized = normalizeRuntimeError(error, {
+          operation: "plugin.runtime.ensure",
+          phase: "bootstrap"
+        });
+        this.logger.log({
+          level: "error",
+          event: "plugin.runtime.bootstrap_failed",
+          message: "Failed to initialize runtime services on demand.",
+          domain: normalized.domain,
+          context: {
+            operation: "plugin.runtime.ensure",
+            phase: "bootstrap"
+          },
+          error: normalized
+        });
+        new Notice(normalized.userMessage);
+        throw normalized;
+      } finally {
+        this.runtimeServicesBootstrapPromise = null;
+      }
+    })();
+
+    return this.runtimeServicesBootstrapPromise;
+  }
+
+  private async *runChatWithLazyRuntime(request: Parameters<RuntimeServices["chatService"]["chat"]>[0]) {
+    const runtimeServices = await this.ensureRuntimeServices();
+    for await (const event of runtimeServices.chatService.chat(request)) {
+      yield event;
+    }
   }
 
   private requireSearchPaneModel(): SearchPaneModel {

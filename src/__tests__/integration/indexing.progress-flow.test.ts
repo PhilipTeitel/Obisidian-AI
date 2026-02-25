@@ -23,10 +23,7 @@ describe("indexing progress integration", () => {
     seedVault(harness);
     await harness.runOnload();
 
-    const runtime = harness.getRuntimeServices();
-    if (!runtime) {
-      throw new Error("Expected runtime services after onload.");
-    }
+    const runtime = await harness.ensureRuntimeServices();
 
     const progressSnapshots: JobSnapshot[] = [];
     await runtime.indexingService.reindexVault({
@@ -40,7 +37,7 @@ describe("indexing progress integration", () => {
     expect(progressSnapshots[1]?.progress.label).toContain("Chunk");
     expect(progressSnapshots[2]?.progress.label).toContain("Embed");
     expect(progressSnapshots[3]?.progress.label).toContain("Finalize");
-    expect(progressSnapshots.at(-1)?.status).toBe("succeeded");
+    expect(progressSnapshots[progressSnapshots.length - 1]?.status).toBe("succeeded");
 
     await harness.runOnunload();
   });
@@ -50,10 +47,7 @@ describe("indexing progress integration", () => {
     seedVault(harness);
     await harness.runOnload();
 
-    const runtime = harness.getRuntimeServices();
-    if (!runtime) {
-      throw new Error("Expected runtime services after onload.");
-    }
+    const runtime = await harness.ensureRuntimeServices();
 
     let duplicateReindexError: Error | null = null;
     let duplicateIncrementalError: Error | null = null;
@@ -92,8 +86,16 @@ describe("indexing progress integration", () => {
     });
     await duplicateIncrementalPromise;
 
-    expect(duplicateReindexError?.message).toContain("already running");
-    expect(duplicateIncrementalError?.message).toContain("already running");
+    expect(duplicateReindexError).toBeInstanceOf(Error);
+    if (!duplicateReindexError) {
+      throw new Error("Expected duplicate reindex error.");
+    }
+    expect(duplicateReindexError.message).toContain("already running");
+    expect(duplicateIncrementalError).toBeInstanceOf(Error);
+    if (!duplicateIncrementalError) {
+      throw new Error("Expected duplicate incremental error.");
+    }
+    expect(duplicateIncrementalError.message).toContain("already running");
 
     await harness.runOnunload();
   });

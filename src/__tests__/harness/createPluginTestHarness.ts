@@ -12,6 +12,10 @@ interface RuntimeServicesHolder {
   runtimeServices: RuntimeServices | null;
 }
 
+interface RuntimeBootstrapInvoker {
+  ensureRuntimeServices?: () => Promise<RuntimeServices>;
+}
+
 const createManifest = (): PluginManifest => {
   return {
     id: "obsidian-ai-mvp",
@@ -30,6 +34,7 @@ export interface PluginTestHarness {
   appHarness: MockAppHarness;
   runOnload: () => Promise<void>;
   runOnunload: () => Promise<void>;
+  ensureRuntimeServices: () => Promise<RuntimeServices>;
   invokeCommand: (commandId: ObsidianAICommandId) => Promise<void>;
   getRegisteredCommands: () => MockRegisteredCommand[];
   getRegisteredViews: () => MockRegisteredView[];
@@ -50,6 +55,19 @@ export const createPluginTestHarness = (): PluginTestHarness => {
     return plugin as unknown as RuntimeServicesHolder;
   };
 
+  const ensureRuntimeServices = async (): Promise<RuntimeServices> => {
+    const invoker = plugin as unknown as RuntimeBootstrapInvoker;
+    if (typeof invoker.ensureRuntimeServices === "function") {
+      return invoker.ensureRuntimeServices();
+    }
+
+    const runtimeServices = getRuntimeHolder().runtimeServices;
+    if (!runtimeServices) {
+      throw new Error("Runtime services are unavailable.");
+    }
+    return runtimeServices;
+  };
+
   const invokeCommand = async (commandId: ObsidianAICommandId): Promise<void> => {
     const command = getRegistrationState().__commands.find((entry) => entry.id === commandId);
     if (!command) {
@@ -67,6 +85,7 @@ export const createPluginTestHarness = (): PluginTestHarness => {
     runOnunload: async (): Promise<void> => {
       await plugin.onunload();
     },
+    ensureRuntimeServices,
     invokeCommand,
     getRegisteredCommands: (): MockRegisteredCommand[] => {
       return [...getRegistrationState().__commands];

@@ -492,7 +492,7 @@ Validate performance constraints and readiness for MVP release.
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| REL-1 | Not Started | Implement lazy initialization strategy to keep plugin startup under 2 seconds | M | Defer DB/provider-heavy work until first use/background task |
+| [REL-1](docs/features/REL-1-implement-lazy-runtime-initialization-for-fast-plugin-startup.md) | Done | Implement lazy initialization strategy to keep plugin startup under 2 seconds | M | Defer DB/provider-heavy work until first use/background task |
 | REL-2 | Not Started | Run scale validation on vaults with hundreds to thousands of notes | M | Verify indexing/search latency remains practical |
 | REL-3 | Not Started | Add end-to-end tests for core user journeys | L | Reindex, index changes, semantic search, chat, and agent note writes |
 | REL-4 | Not Started | Harden failure handling for provider outages and partial indexing failures | M | Include retries, user-facing errors, and recovery actions |

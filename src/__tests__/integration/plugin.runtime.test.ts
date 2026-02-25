@@ -18,7 +18,7 @@ interface PluginProgressState {
 }
 
 describe("plugin runtime integration", () => {
-  it("loads runtime shell surfaces and disposes runtime services on unload", async () => {
+  it("loads runtime shell surfaces, lazily bootstraps runtime services, and disposes on unload", async () => {
     const harness = createPluginTestHarness();
     await harness.runOnload();
 
@@ -38,10 +38,13 @@ describe("plugin runtime integration", () => {
       "obsidian-ai:search-view"
     ]);
     expect(harness.getSettingTabCount()).toBe(1);
+    expect(harness.getRuntimeServices()).toBeNull();
+
+    await harness.invokeCommand(COMMAND_IDS.REINDEX_VAULT);
 
     const runtimeServices = harness.getRuntimeServices();
     if (!runtimeServices) {
-      throw new Error("Expected runtime services after onload.");
+      throw new Error("Expected runtime services after first runtime command.");
     }
 
     await harness.runOnunload();
@@ -137,8 +140,11 @@ describe("plugin runtime integration", () => {
   it("normalizes command failure path and marks progress snapshot as failed", async () => {
     const harness = createPluginTestHarness();
     await harness.runOnload();
+    const runtimeServices = await harness.ensureRuntimeServices();
 
-    harness.setRuntimeServices(null);
+    runtimeServices.indexingService.reindexVault = async () => {
+      throw new Error("forced runtime command failure");
+    };
     await harness.invokeCommand(COMMAND_IDS.REINDEX_VAULT);
 
     const notices = harness.appHarness.getNoticeMessages();

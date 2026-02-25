@@ -19,12 +19,10 @@ const getSearchPaneModel = (harness: ReturnType<typeof createPluginTestHarness>)
 const patchSearch = (
   harness: ReturnType<typeof createPluginTestHarness>,
   impl: (request: SearchRequest) => Promise<SearchResult[]>
-): void => {
-  const runtimeServices = harness.getRuntimeServices();
-  if (!runtimeServices) {
-    throw new Error("Expected runtime services after onload.");
-  }
-  runtimeServices.searchService.search = impl;
+): Promise<void> => {
+  return harness.ensureRuntimeServices().then((runtimeServices) => {
+    runtimeServices.searchService.search = impl;
+  });
 };
 
 describe("semantic search selection command integration", () => {
@@ -61,7 +59,7 @@ describe("semantic search selection command integration", () => {
     await harness.runOnload();
 
     const requests: SearchRequest[] = [];
-    patchSearch(harness, async (request) => {
+    await patchSearch(harness, async (request) => {
       requests.push(request);
       return [];
     });
@@ -78,7 +76,7 @@ describe("semantic search selection command integration", () => {
     const harness = createPluginTestHarness();
     await harness.runOnload();
 
-    patchSearch(harness, async () => {
+    await patchSearch(harness, async () => {
       throw new Error("forced search failure");
     });
 
@@ -96,7 +94,7 @@ describe("semantic search selection command integration", () => {
     await harness.runOnload();
 
     const requests: SearchRequest[] = [];
-    patchSearch(harness, async (request) => {
+    await patchSearch(harness, async (request) => {
       requests.push(request);
       return [];
     });
@@ -121,7 +119,7 @@ describe("semantic search selection command integration", () => {
     const harness = createPluginTestHarness();
     await harness.runOnload();
 
-    patchSearch(harness, async () => [
+    await patchSearch(harness, async () => [
       {
         chunkId: "chunk-nav",
         score: 0.88,
