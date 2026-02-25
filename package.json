@@ -8,7 +8,8 @@
     "build": "node esbuild.config.mjs --production",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint \"src/**/*.ts\" \"vitest.config.ts\"",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:scale": "vitest run src/__tests__/integration/scaleValidation.integration.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.4.0",
