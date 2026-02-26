@@ -1,3 +1,38 @@
+import { createRuntimeLogger } from "../../logging/runtimeLogger";
+
+const logger = createRuntimeLogger("httpChatUtils");
+
+const toHeaderRecord = (headers: HeadersInit | undefined): Record<string, string> => {
+  if (!headers) {
+    return {};
+  }
+  if (headers instanceof Headers) {
+    const record: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      record[key] = value;
+    });
+    return record;
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => [key, String(value)])
+  );
+};
+
+const redactSensitiveHeaders = (headers: Record<string, string>): Record<string, string> => {
+  return Object.fromEntries(
+    Object.entries(headers).map(([key, value]) => {
+      const normalizedKey = key.toLowerCase();
+      if (normalizedKey === "authorization" || normalizedKey === "cookie" || normalizedKey.includes("api-key")) {
+        return [key, "[REDACTED]"];
+      }
+      return [key, value];
+    })
+  );
+};
+
 const normalizeSseBlock = (rawBlock: string): string[] => {
   return rawBlock
     .replace(/\r\n/g, "\n")
@@ -24,6 +59,20 @@ export const normalizeChatEndpoint = (endpoint: string): string => {
 };
 
 export const fetchStreamWithTimeout = async (url: string, init: RequestInit, timeoutMs: number): Promise<Response> => {
+  const operationLogger = logger.withOperation();
+  const requestStartedAt = Date.now();
+  const method = init.method ?? "GET";
+  operationLogger.info({
+    event: "provider.http.stream.start",
+    message: "Chat HTTP stream request started.",
+    context: {
+      method,
+      url,
+      timeoutMs,
+      headers: JSON.stringify(redactSensitiveHeaders(toHeaderRecord(init.headers)))
+    }
+  });
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     controller.abort();
@@ -35,16 +84,65 @@ export const fetchStreamWithTimeout = async (url: string, init: RequestInit, tim
       signal: controller.signal
     });
     if (!response.ok) {
+      operationLogger.error({
+        event: "provider.http.stream.failed_status",
+        message: "Chat HTTP stream request returned non-success status.",
+        context: {
+          method,
+          url,
+          status: response.status,
+          elapsedMs: Date.now() - requestStartedAt
+        }
+      });
       throw new Error(`Chat request failed with status ${response.status}.`);
     }
     if (!response.body) {
+      operationLogger.error({
+        event: "provider.http.stream.empty_body",
+        message: "Chat HTTP stream response body was empty.",
+        context: {
+          method,
+          url,
+          status: response.status,
+          elapsedMs: Date.now() - requestStartedAt
+        }
+      });
       throw new Error("Chat request succeeded but response stream body was empty.");
     }
+    operationLogger.info({
+      event: "provider.http.stream.connected",
+      message: "Chat HTTP stream connected successfully.",
+      context: {
+        method,
+        url,
+        status: response.status,
+        elapsedMs: Date.now() - requestStartedAt
+      }
+    });
     return response;
   } catch (error: unknown) {
     if (error instanceof Error && error.name === "AbortError") {
+      operationLogger.error({
+        event: "provider.http.stream.timeout",
+        message: "Chat HTTP stream request timed out.",
+        context: {
+          method,
+          url,
+          timeoutMs,
+          elapsedMs: Date.now() - requestStartedAt
+        }
+      });
       throw new Error(`Chat request timed out after ${timeoutMs}ms.`);
     }
+    operationLogger.error({
+      event: "provider.http.stream.error",
+      message: "Chat HTTP stream request failed.",
+      context: {
+        method,
+        url,
+        elapsedMs: Date.now() - requestStartedAt
+      }
+    });
     throw error;
   } finally {
     clearTimeout(timeoutId);
