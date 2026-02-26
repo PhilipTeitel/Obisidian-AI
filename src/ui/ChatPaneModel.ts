@@ -1,4 +1,5 @@
 import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
+import { createRuntimeLogger } from "../logging/runtimeLogger";
 import type {
   ChatContextChunk,
   ChatMessage,
@@ -39,6 +40,7 @@ interface ChatPaneModelDeps {
 type ChatPaneListener = (state: ChatPaneState) => void;
 
 const SOURCE_TOP_K = 5;
+const logger = createRuntimeLogger("ChatPaneModel");
 
 const mapSources = (results: SearchResult[]): ChatContextChunk[] => {
   return results.map((result) => ({
@@ -94,12 +96,21 @@ export class ChatPaneModel {
   }
 
   public async send(draftInput?: string): Promise<boolean> {
+    const operationLogger = logger.withOperation();
     if (this.state.status === "streaming") {
+      operationLogger.warn({
+        event: "chat.pane.send.skipped_streaming",
+        message: "Chat send skipped because a stream is already active."
+      });
       return false;
     }
 
     const draft = (draftInput ?? this.state.draft).trim();
     if (draft.length === 0) {
+      operationLogger.info({
+        event: "chat.pane.send.skipped_empty",
+        message: "Chat send skipped because draft is empty."
+      });
       this.updateState({
         draft: "",
         errorMessage: undefined
@@ -115,9 +126,27 @@ export class ChatPaneModel {
       sources: [],
       status: "streaming"
     };
+    const sendStartedAt = Date.now();
+    operationLogger.info({
+      event: "chat.pane.send.start",
+      message: "Chat pane send started.",
+      context: {
+        turnId,
+        draftLength: draft.length,
+        priorTurnCount: this.state.turns.length
+      }
+    });
 
     const sourceResults = await this.safeRunSourceSearch(draft);
     turn.sources = mapSources(sourceResults);
+    operationLogger.info({
+      event: "chat.pane.send.sources_resolved",
+      message: "Chat pane source retrieval completed.",
+      context: {
+        turnId,
+        sourceCount: sourceResults.length
+      }
+    });
 
     this.activeTurnId = turnId;
     this.cancelRequested = false;
@@ -142,9 +171,17 @@ export class ChatPaneModel {
     try {
       const stream = this.deps.runChat(request);
       this.activeIterator = stream[Symbol.asyncIterator]();
+      let tokenEventCount = 0;
       while (true) {
         if (this.cancelRequested) {
           this.updateTurn(turnId, { status: "cancelled" });
+          operationLogger.warn({
+            event: "chat.pane.send.cancelled",
+            message: "Chat pane stream cancelled.",
+            context: {
+              turnId
+            }
+          });
           break;
         }
 
@@ -153,6 +190,7 @@ export class ChatPaneModel {
           break;
         }
         if (nextEvent.value.type === "token") {
+          tokenEventCount += 1;
           const currentAssistantMessage = this.findTurn(turnId)?.assistantMessage ?? "";
           this.updateTurn(turnId, {
             assistantMessage: `${currentAssistantMessage}${nextEvent.value.text}`
@@ -160,6 +198,14 @@ export class ChatPaneModel {
           continue;
         }
         if (nextEvent.value.type === "error") {
+          operationLogger.error({
+            event: "chat.pane.send.stream_error_event",
+            message: "Chat pane received stream error event.",
+            context: {
+              turnId,
+              retryable: nextEvent.value.retryable
+            }
+          });
           this.updateTurn(turnId, {
             status: "error",
             errorMessage: nextEvent.value.message
@@ -172,6 +218,14 @@ export class ChatPaneModel {
           break;
         }
         if (nextEvent.value.type === "done") {
+          operationLogger.info({
+            event: "chat.pane.send.stream_done_event",
+            message: "Chat pane received stream done event.",
+            context: {
+              turnId,
+              finishReason: nextEvent.value.finishReason
+            }
+          });
           if (nextEvent.value.finishReason === "error") {
             this.updateTurn(turnId, {
               status: "error",
@@ -194,12 +248,29 @@ export class ChatPaneModel {
           this.updateTurn(turnId, { status: "complete" });
         }
       }
+      operationLogger.info({
+        event: "chat.pane.send.completed",
+        message: "Chat pane send completed.",
+        context: {
+          turnId,
+          tokenEventCount,
+          finalStatus: this.findTurn(turnId)?.status,
+          elapsedMs: Date.now() - sendStartedAt
+        }
+      });
       return true;
     } catch (error: unknown) {
       const normalized = normalizeRuntimeError(error, {
         operation: "ChatPaneModel.send",
         turnId,
         draftLength: draft.length
+      });
+      operationLogger.error({
+        event: "chat.pane.send.failed",
+        message: "Chat pane send failed.",
+        domain: normalized.domain,
+        context: normalized.context,
+        error: normalized
       });
       this.updateTurn(turnId, {
         status: "error",
@@ -224,7 +295,12 @@ export class ChatPaneModel {
   }
 
   public cancelStreaming(): boolean {
+    const operationLogger = logger.withOperation();
     if (this.state.status !== "streaming") {
+      operationLogger.info({
+        event: "chat.pane.cancel.skipped_not_streaming",
+        message: "Cancel stream ignored because no active stream exists."
+      });
       return false;
     }
     this.cancelRequested = true;
@@ -235,6 +311,13 @@ export class ChatPaneModel {
     if (this.activeTurnId) {
       this.updateTurn(this.activeTurnId, { status: "cancelled" });
     }
+    operationLogger.info({
+      event: "chat.pane.cancel.requested",
+      message: "Cancel requested for active chat stream.",
+      context: {
+        turnId: this.activeTurnId
+      }
+    });
     return true;
   }
 
@@ -268,13 +351,32 @@ export class ChatPaneModel {
   }
 
   private async safeRunSourceSearch(query: string): Promise<SearchResult[]> {
+    const operationLogger = logger.withOperation();
+    const startedAt = Date.now();
     try {
-      return await this.deps.runSourceSearch(query);
+      const results = await this.deps.runSourceSearch(query);
+      operationLogger.info({
+        event: "chat.pane.source_search.completed",
+        message: "Chat pane source search completed.",
+        context: {
+          queryLength: query.length,
+          resultCount: results.length,
+          elapsedMs: Date.now() - startedAt
+        }
+      });
+      return results;
     } catch (error: unknown) {
       const normalized = normalizeRuntimeError(error, {
         operation: "ChatPaneModel.sourceSearch",
         queryLength: query.length,
         topK: SOURCE_TOP_K
+      });
+      operationLogger.error({
+        event: "chat.pane.source_search.failed",
+        message: "Chat pane source search failed.",
+        domain: normalized.domain,
+        context: normalized.context,
+        error: normalized
       });
       this.deps.notify(normalized.userMessage);
       return [];
