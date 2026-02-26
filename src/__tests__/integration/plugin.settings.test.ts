@@ -44,6 +44,7 @@ describe("plugin settings integration", () => {
 
     harness.plugin.settings.chatTimeout = 42000;
     harness.plugin.settings.excludedFolders = ["archive"];
+    harness.plugin.settings.logLevel = "debug";
     await harness.plugin.saveSettings();
 
     const persisted = await harness.plugin.loadData();
@@ -64,6 +65,7 @@ describe("plugin settings integration", () => {
     expect(persistedSettings.settingsVersion).toBe(SETTINGS_SCHEMA_VERSION);
     expect(persistedSettings.chatTimeout).toBe(42000);
     expect(persistedSettings.excludedFolders).toEqual(["archive"]);
+    expect(persistedSettings.logLevel).toBe("debug");
 
     await harness.runOnunload();
   });

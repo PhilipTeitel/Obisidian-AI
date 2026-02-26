@@ -1,4 +1,5 @@
 import { createRuntimeLogger } from "../../logging/runtimeLogger";
+import { redactSensitiveContext } from "../../logging/redactSensitiveContext";
 
 const logger = createRuntimeLogger("httpChatUtils");
 
@@ -18,18 +19,6 @@ const toHeaderRecord = (headers: HeadersInit | undefined): Record<string, string
   }
   return Object.fromEntries(
     Object.entries(headers).map(([key, value]) => [key, String(value)])
-  );
-};
-
-const redactSensitiveHeaders = (headers: Record<string, string>): Record<string, string> => {
-  return Object.fromEntries(
-    Object.entries(headers).map(([key, value]) => {
-      const normalizedKey = key.toLowerCase();
-      if (normalizedKey === "authorization" || normalizedKey === "cookie" || normalizedKey.includes("api-key")) {
-        return [key, "[REDACTED]"];
-      }
-      return [key, value];
-    })
   );
 };
 
@@ -69,7 +58,7 @@ export const fetchStreamWithTimeout = async (url: string, init: RequestInit, tim
       method,
       url,
       timeoutMs,
-      headers: JSON.stringify(redactSensitiveHeaders(toHeaderRecord(init.headers)))
+      headers: JSON.stringify(redactSensitiveContext(toHeaderRecord(init.headers)))
     }
   });
 

@@ -1,6 +1,6 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { PluginSecretStore } from "./secrets/PluginSecretStore";
-import { MVP_PROVIDER_IDS, type MVPProviderId, type ObsidianAISettings } from "./types";
+import { MVP_PROVIDER_IDS, type MVPProviderId, type ObsidianAISettings, type RuntimeLogLevel } from "./types";
 
 type SettingsHostPlugin = Plugin & {
   settings: ObsidianAISettings;
@@ -43,6 +43,20 @@ const formatCsvList = (values: string[]): string => values.join(", ");
 const PROVIDER_LABELS: Record<MVPProviderId, string> = {
   openai: "OpenAI",
   ollama: "Ollama"
+};
+
+const LOG_LEVEL_OPTIONS: Record<RuntimeLogLevel, string> = {
+  debug: "Debug",
+  info: "Info",
+  warn: "Warn",
+  error: "Error"
+};
+
+const toKnownLogLevel = (value: string): RuntimeLogLevel => {
+  if (value === "debug" || value === "info" || value === "warn" || value === "error") {
+    return value;
+  }
+  return "info";
 };
 
 const toKnownProviderId = (value: string): MVPProviderId => {
@@ -224,6 +238,19 @@ export class ObsidianAISettingTab extends PluginSettingTab {
               await this.plugin.saveSettings();
             }
           });
+      });
+
+    new Setting(containerEl)
+      .setName("Log level")
+      .setDesc("Minimum log severity emitted to the runtime console.")
+      .addDropdown((dropdown) => {
+        for (const [level, label] of Object.entries(LOG_LEVEL_OPTIONS) as Array<[RuntimeLogLevel, string]>) {
+          dropdown.addOption(level, label);
+        }
+        dropdown.setValue(toKnownLogLevel(this.plugin.settings.logLevel)).onChange(async (value) => {
+          this.plugin.settings.logLevel = toKnownLogLevel(value);
+          await this.plugin.saveSettings();
+        });
       });
 
     let pendingOpenAIApiKey = "";
