@@ -9,10 +9,12 @@ import type {
   VectorStoreRow,
   VectorStoreSchemaMetadata
 } from "../types";
+import { createRuntimeLogger } from "../logging/runtimeLogger";
 import { resolveLocalVectorStorePaths } from "./vectorStorePaths";
 import { VECTOR_STORE_MIGRATIONS } from "./vectorStoreSchema";
 
 const VECTOR_STORE_STORAGE_KEY = "vectorStore";
+const logger = createRuntimeLogger("LocalVectorStoreRepository");
 
 interface PersistedVectorStoreState {
   schemaVersion: number;
@@ -191,7 +193,18 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
   }
 
   public async getSchemaMetadata(): Promise<VectorStoreSchemaMetadata> {
+    const operationLogger = logger.withOperation();
+    const startedAt = Date.now();
     const state = await this.ensureLoaded();
+    operationLogger.info({
+      event: "storage.vector_store.get_schema_metadata.completed",
+      message: "Retrieved vector store schema metadata.",
+      context: {
+        schemaVersion: state.schemaVersion,
+        appliedMigrationCount: state.appliedMigrationIds.length,
+        elapsedMs: Date.now() - startedAt
+      }
+    });
     return {
       schemaVersion: state.schemaVersion,
       appliedMigrationIds: [...state.appliedMigrationIds],
@@ -200,6 +213,8 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
   }
 
   public async replaceAllFromChunks(chunks: ChunkRecord[], vectors: EmbeddingVector[]): Promise<void> {
+    const operationLogger = logger.withOperation();
+    const startedAt = Date.now();
     const state = await this.ensureLoaded();
     const rows = this.createRowsFromChunks(chunks, vectors);
     this.cache = {
@@ -207,9 +222,20 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
       rows
     };
     await this.persist();
+    operationLogger.info({
+      event: "storage.vector_store.replace_all.completed",
+      message: "Replaced vector store rows from chunks.",
+      context: {
+        chunkCount: chunks.length,
+        rowCount: rows.length,
+        elapsedMs: Date.now() - startedAt
+      }
+    });
   }
 
   public async upsertFromChunks(chunks: ChunkRecord[], vectors: EmbeddingVector[]): Promise<void> {
+    const operationLogger = logger.withOperation();
+    const startedAt = Date.now();
     const state = await this.ensureLoaded();
     const upsertRows = this.createRowsFromChunks(chunks, vectors);
     const rowsByChunkId = new Map<string, VectorStoreRow>(state.rows.map((row) => [row.chunkId, row]));
@@ -222,12 +248,27 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
       rows: normalizeRows([...rowsByChunkId.values()])
     };
     await this.persist();
+    operationLogger.info({
+      event: "storage.vector_store.upsert.completed",
+      message: "Upserted vector store rows from chunks.",
+      context: {
+        upsertCount: upsertRows.length,
+        totalRowCount: this.cache.rows.length,
+        elapsedMs: Date.now() - startedAt
+      }
+    });
   }
 
   public async deleteByNotePaths(notePaths: string[]): Promise<void> {
+    const operationLogger = logger.withOperation();
     if (notePaths.length === 0) {
+      operationLogger.info({
+        event: "storage.vector_store.delete.skipped_empty",
+        message: "Skipped vector store delete because note path list is empty."
+      });
       return;
     }
+    const startedAt = Date.now();
     const notePathSet = new Set(notePaths);
     const state = await this.ensureLoaded();
     this.cache = {
@@ -235,11 +276,29 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
       rows: state.rows.filter((row) => !notePathSet.has(row.notePath))
     };
     await this.persist();
+    operationLogger.info({
+      event: "storage.vector_store.delete.completed",
+      message: "Deleted vector store rows by note path.",
+      context: {
+        requestedNotePathCount: notePaths.length,
+        remainingRowCount: this.cache.rows.length,
+        elapsedMs: Date.now() - startedAt
+      }
+    });
   }
 
   public async queryNearestNeighbors(query: VectorStoreQuery): Promise<VectorStoreMatch[]> {
+    const operationLogger = logger.withOperation();
+    const startedAt = Date.now();
     const state = await this.ensureLoaded();
     if (query.topK <= 0) {
+      operationLogger.info({
+        event: "storage.vector_store.query.skipped",
+        message: "Skipped vector store query because topK is non-positive.",
+        context: {
+          topK: query.topK
+        }
+      });
       return [];
     }
 
@@ -263,7 +322,19 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
       return left.chunkId.localeCompare(right.chunkId);
     });
 
-    return matches.slice(0, query.topK);
+    const results = matches.slice(0, query.topK);
+    operationLogger.info({
+      event: "storage.vector_store.query.completed",
+      message: "Completed vector store nearest-neighbor query.",
+      context: {
+        topK: query.topK,
+        minScore: query.minScore,
+        candidateCount: state.rows.length,
+        resultCount: results.length,
+        elapsedMs: Date.now() - startedAt
+      }
+    });
+    return results;
   }
 
   private createRowsFromChunks(chunks: ChunkRecord[], vectors: EmbeddingVector[]): VectorStoreRow[] {
@@ -289,9 +360,14 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
 
   private async ensureLoaded(): Promise<PersistedVectorStoreState> {
     if (this.cache) {
+      logger.debug({
+        event: "storage.vector_store.load.cache_hit",
+        message: "Vector store loaded from in-memory cache."
+      });
       return this.cache;
     }
 
+    const startedAt = Date.now();
     const rawRoot = await this.plugin.loadData();
     const parsed = parsePersistedState(rawRoot, this.paths);
     this.cache = parsed ?? createBaselineState(this.paths);
@@ -300,6 +376,16 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
       await this.persist();
     }
 
+    logger.info({
+      event: "storage.vector_store.load.completed",
+      message: "Vector store loaded from plugin data.",
+      context: {
+        usedBaseline: !parsed,
+        rowCount: this.cache.rows.length,
+        elapsedMs: Date.now() - startedAt
+      }
+    });
+
     return this.cache;
   }
 
@@ -307,6 +393,7 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
     if (!this.cache) {
       return;
     }
+    const startedAt = Date.now();
 
     const rawRoot = await this.plugin.loadData();
     const persistedRoot = isRecord(rawRoot) ? { ...rawRoot } : {};
@@ -317,5 +404,13 @@ export class LocalVectorStoreRepository implements VectorStoreRepositoryContract
       rows: normalizeRows(this.cache.rows)
     };
     await this.plugin.saveData(persistedRoot);
+    logger.info({
+      event: "storage.vector_store.persist.completed",
+      message: "Persisted vector store state to plugin data.",
+      context: {
+        rowCount: this.cache.rows.length,
+        elapsedMs: Date.now() - startedAt
+      }
+    });
   }
 }

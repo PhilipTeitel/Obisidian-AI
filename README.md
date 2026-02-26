@@ -584,7 +584,7 @@ Instrument all service, provider, storage, and UI layers with structured logging
 | [LOG-2](docs/features/LOG-2-instrument-searchservice-and-searchpanemodel-with-structured-logging.md) | Done | Instrument SearchService and SearchPaneModel with structured logging | M | Log query lifecycle: start, embedding timing, vector search timing, result count, completion/failure |
 | [LOG-3](docs/features/LOG-3-instrument-chatservice-and-chatpanemodel-with-structured-logging.md) | Done | Instrument ChatService and ChatPaneModel with structured logging | M | Log turn lifecycle: start, context retrieval, provider call timing, stream events, completion/failure |
 | [LOG-4](docs/features/LOG-4-instrument-embeddingservice-and-provider-http-layer-with-structured-logging.md) | Done | Instrument EmbeddingService and provider HTTP layer with structured logging | M | Log batch processing, HTTP request/response timing, retries; redact Authorization headers |
-| LOG-5 | Not Started | Instrument storage layer and AgentService with structured logging | S | Log VectorStore load/persist/query timing and AgentService create/update lifecycle |
+| [LOG-5](docs/features/LOG-5-instrument-storage-layer-and-agentservice-with-structured-logging.md) | Done | Instrument storage layer and AgentService with structured logging | S | Log VectorStore load/persist/query timing and AgentService create/update lifecycle |
 | LOG-6 | Not Started | Add log-level setting UI and sensitive data redaction tests | S | Add `logLevel` dropdown to settings, `redactSensitiveContext` utility, and unit tests |
 
 ## License
