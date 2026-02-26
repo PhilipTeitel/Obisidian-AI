@@ -224,6 +224,50 @@ CREATE TABLE metadata (
 );
 ```
 
+### 8. Logging and Observability
+
+The plugin uses a lightweight structured logging system tailored for an Obsidian plugin running in Electron's renderer process.
+
+**Logger:** `createRuntimeLogger(scope)` in `src/logging/runtimeLogger.ts` is a scoped wrapper over the browser console API (`console.debug`, `console.info`, `console.warn`, `console.error`). No external logging library (Pino, Winston, etc.) is needed since all runtime output flows through DevTools.
+
+**Format:** Structured `RuntimeLogPayload` objects emitted via `console.{level}()`. Each payload contains:
+
+| Field | Description |
+|-------|-------------|
+| `scope` | Module or class name (e.g. `"ChatService"`, `"SearchPaneModel"`) |
+| `timestamp` | ISO-8601 timestamp |
+| `level` | `debug` / `info` / `warn` / `error` |
+| `event` | Dotted hierarchical event name (e.g. `chat.turn.started`, `search.query.completed`) |
+| `message` | Human-readable description |
+| `domain` | Optional `RuntimeErrorDomain` for error events |
+| `context` | Optional typed key-value map with operation metadata |
+| `error` | Optional `NormalizedRuntimeError` for failure events |
+
+DevTools renders these natively with expandable object views.
+
+**Operation IDs:** Each user-initiated action (chat turn, search query, index command) generates a unique `operationId` via a utility function. The ID flows through service layers as a `context` field, enabling end-to-end correlation of all log entries for a single user action.
+
+**Log Levels:**
+
+| Level | Convention |
+|-------|-----------|
+| `debug` | Internal state detail: batch progress, vector dimensions, chunk counts, cache hits |
+| `info` | Operation lifecycle milestones: search started/completed, chat turn started/completed, indexing phase transitions |
+| `warn` | Non-fatal degradations: timeout retry, partial batch failure, stale cache fallback, consistency preflight issues |
+| `error` | Unrecoverable failures that prevent the operation from completing |
+
+**Log Level Filtering:** A `logLevel` plugin setting (default: `"info"`) gates which events are emitted. The runtime logger checks the configured threshold before calling console methods, suppressing events below the active level.
+
+**Event Naming Convention:** Dotted hierarchical names scoped by module and lifecycle phase: `{module}.{operation}.{phase}`. Examples:
+
+- `search.query.started`, `search.query.completed`, `search.query.failed`
+- `chat.turn.started`, `chat.turn.streaming`, `chat.turn.completed`
+- `embedding.batch.started`, `embedding.batch.retry`, `embedding.batch.completed`
+- `provider.http.request_sent`, `provider.http.response_received`
+- `storage.persist.completed`, `agent.create_note.blocked`
+
+**Sensitive Data Policy:** API keys, bearer tokens, and raw user message content must never appear in logs. Only derived metadata is logged: message character count, provider ID, model name, endpoint hostname (not full URL with credentials), chunk counts, result counts, and timing data. A `redactSensitiveContext` utility strips known sensitive keys from log context before emission.
+
 ### Project Structure
 
 ```
@@ -418,6 +462,7 @@ Settings stored via `Plugin.loadData()` / `Plugin.saveData()` in `.obsidian/plug
 | `agentOutputFolders` | `string[]` | `[]` | Folders the agent is allowed to create/update files in |
 | `maxGeneratedNoteSize` | `number` | `5000` | Max characters for agent-generated notes |
 | `chatTimeout` | `number` | `30000` | Chat completion timeout in milliseconds |
+| `logLevel` | `string` | `"info"` | Minimum log level emitted to console (`debug`, `info`, `warn`, `error`) |
 
 Secrets (stored in SecretStorage, not in `data.json`):
 
@@ -528,6 +573,19 @@ Add pane-opening commands and command documentation so users can discover and op
 | [CMD-3](docs/features/CMD-3-add-open-chat-pane-command-registration-and-reveal-behavior.md) | Done | Add `Open chat pane` command registration and reveal behavior | S | Reuse existing chat leaf when present; open one when missing; do not trigger completion automatically |
 | [CMD-4](docs/features/CMD-4-update-getting-started-command-reference-aligned-with-registered-command-names.md) | Done | Update `Getting Started` command reference aligned with registered command names | S | Document display name, behavior, and usage context for all user-facing plugin commands |
 | [CMD-5](docs/features/CMD-5-add-integration-tests-for-pane-command-discoverability-and-open-reveal-semantics.md) | Done | Add integration tests for pane command discoverability and open/reveal semantics | M | Verify commands are registered and reliably reveal existing panes or create missing panes |
+
+### Epic 9: Logging and Observability Instrumentation
+
+Instrument all service, provider, storage, and UI layers with structured logging, operation IDs, and log-level controls to make the application maintainable and debuggable.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| LOG-1 | Not Started | Enhance runtime logger with operation ID support and log-level filtering | S | Add `operationId` generator, `logLevel` threshold check, convenience methods, and `logLevel` setting |
+| LOG-2 | Not Started | Instrument SearchService and SearchPaneModel with structured logging | M | Log query lifecycle: start, embedding timing, vector search timing, result count, completion/failure |
+| LOG-3 | Not Started | Instrument ChatService and ChatPaneModel with structured logging | M | Log turn lifecycle: start, context retrieval, provider call timing, stream events, completion/failure |
+| LOG-4 | Not Started | Instrument EmbeddingService and provider HTTP layer with structured logging | M | Log batch processing, HTTP request/response timing, retries; redact Authorization headers |
+| LOG-5 | Not Started | Instrument storage layer and AgentService with structured logging | S | Log VectorStore load/persist/query timing and AgentService create/update lifecycle |
+| LOG-6 | Not Started | Add log-level setting UI and sensitive data redaction tests | S | Add `logLevel` dropdown to settings, `redactSensitiveContext` utility, and unit tests |
 
 ## License
 MIT © Philip Teitel
