@@ -256,6 +256,7 @@ export interface ObsidianAISettings {
   agentOutputFolders: string[];
   maxGeneratedNoteSize: number;
   chatTimeout: number;
+  logLevel: RuntimeLogLevel;
 }
 
 export type RuntimeLogContextValue = string | number | boolean | null | undefined;
@@ -282,10 +283,18 @@ export interface RuntimeLogEvent {
   domain?: RuntimeErrorDomain;
   context?: RuntimeLogContext;
   error?: NormalizedRuntimeError;
+  operationId?: string;
 }
+
+export type RuntimeLogInput = Omit<RuntimeLogEvent, "level">;
 
 export interface RuntimeLoggerContract {
   log(event: RuntimeLogEvent): void;
+  debug(event: RuntimeLogInput): void;
+  info(event: RuntimeLogInput): void;
+  warn(event: RuntimeLogInput): void;
+  error(event: RuntimeLogInput): void;
+  withOperation(operationId?: string): RuntimeLoggerContract;
 }
 
 export interface RuntimeServiceLifecycle {

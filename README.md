@@ -580,7 +580,7 @@ Instrument all service, provider, storage, and UI layers with structured logging
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| LOG-1 | Not Started | Enhance runtime logger with operation ID support and log-level filtering | S | Add `operationId` generator, `logLevel` threshold check, convenience methods, and `logLevel` setting |
+| [LOG-1](docs/features/LOG-1-enhance-runtime-logger-with-operation-id-support-and-log-level-filtering.md) | Done | Enhance runtime logger with operation ID support and log-level filtering | S | Add `operationId` generator, `logLevel` threshold check, convenience methods, and `logLevel` setting |
 | LOG-2 | Not Started | Instrument SearchService and SearchPaneModel with structured logging | M | Log query lifecycle: start, embedding timing, vector search timing, result count, completion/failure |
 | LOG-3 | Not Started | Instrument ChatService and ChatPaneModel with structured logging | M | Log turn lifecycle: start, context retrieval, provider call timing, stream events, completion/failure |
 | LOG-4 | Not Started | Instrument EmbeddingService and provider HTTP layer with structured logging | M | Log batch processing, HTTP request/response timing, retries; redact Authorization headers |

@@ -2,7 +2,7 @@ import { MarkdownView, Notice, Plugin, type WorkspaceLeaf } from "obsidian";
 import { bootstrapRuntimeServices } from "./bootstrap/bootstrapRuntimeServices";
 import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "./constants";
 import { normalizeRuntimeError } from "./errors/normalizeRuntimeError";
-import { createRuntimeLogger } from "./logging/runtimeLogger";
+import { createRuntimeLogger, setRuntimeLogLevel } from "./logging/runtimeLogger";
 import { DEFAULT_SETTINGS, ObsidianAISettingTab, snapshotSettings } from "./settings";
 import {
   migratePersistedSettings,
@@ -177,11 +177,13 @@ export default class ObsidianAIPlugin extends Plugin {
     const settingsPayload = isRecord(loadedData) && SETTINGS_STORAGE_KEY in loadedData ? loadedData[SETTINGS_STORAGE_KEY] : loadedData;
     const migratedSettings = migratePersistedSettings(settingsPayload);
     this.settings = snapshotSettings(normalizeSettingsSnapshot(migratedSettings, DEFAULT_SETTINGS));
+    setRuntimeLogLevel(this.settings.logLevel);
   }
 
   public async saveSettings(): Promise<void> {
     const normalizedSettings = snapshotSettings(normalizeSettingsSnapshot(this.settings, DEFAULT_SETTINGS));
     this.settings = normalizedSettings;
+    setRuntimeLogLevel(normalizedSettings.logLevel);
 
     const loadedData = await this.loadData();
     const persistedRoot = isRecord(loadedData) ? { ...loadedData } : {};

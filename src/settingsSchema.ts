@@ -45,6 +45,17 @@ const normalizeProviderId = (value: unknown, fallback: ObsidianAISettings["embed
   return fallback;
 };
 
+const isLogLevel = (value: unknown): value is ObsidianAISettings["logLevel"] => {
+  return value === "debug" || value === "info" || value === "warn" || value === "error";
+};
+
+const normalizeLogLevel = (
+  value: unknown,
+  fallback: ObsidianAISettings["logLevel"]
+): ObsidianAISettings["logLevel"] => {
+  return isLogLevel(value) ? value : fallback;
+};
+
 const uniqueStrings = (values: string[]): string[] => {
   const seen = new Set<string>();
   const normalized: string[] = [];
@@ -123,7 +134,8 @@ export const normalizeSettingsSnapshot = (
     excludedFolders: normalizeFolders(source.excludedFolders, defaults.excludedFolders),
     agentOutputFolders: normalizeFolders(source.agentOutputFolders, defaults.agentOutputFolders),
     maxGeneratedNoteSize: toPositiveInteger(source.maxGeneratedNoteSize, defaults.maxGeneratedNoteSize),
-    chatTimeout: toPositiveInteger(source.chatTimeout, defaults.chatTimeout, 1000)
+    chatTimeout: toPositiveInteger(source.chatTimeout, defaults.chatTimeout, 1000),
+    logLevel: normalizeLogLevel(source.logLevel, defaults.logLevel)
   };
 };
 

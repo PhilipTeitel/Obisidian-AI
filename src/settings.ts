@@ -18,7 +18,8 @@ export const DEFAULT_SETTINGS: ObsidianAISettings = {
   excludedFolders: [],
   agentOutputFolders: [],
   maxGeneratedNoteSize: 5000,
-  chatTimeout: 30000
+  chatTimeout: 30000,
+  logLevel: "info"
 };
 
 export const snapshotSettings = (settings: ObsidianAISettings): ObsidianAISettings => {

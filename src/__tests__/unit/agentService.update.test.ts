@@ -14,7 +14,8 @@ const createSettings = (): ObsidianAISettings => {
     excludedFolders: [],
     agentOutputFolders: ["projects/notes"],
     maxGeneratedNoteSize: 5000,
-    chatTimeout: 30000
+    chatTimeout: 30000,
+    logLevel: "info"
   };
 };
 

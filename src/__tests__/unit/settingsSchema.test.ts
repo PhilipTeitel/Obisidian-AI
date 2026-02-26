@@ -21,7 +21,8 @@ describe("settingsSchema", () => {
         excludedFolders: ["archive", "archive", " "],
         agentOutputFolders: [],
         maxGeneratedNoteSize: -1,
-        chatTimeout: 0
+        chatTimeout: 0,
+        logLevel: "trace" as unknown as "debug"
       },
       DEFAULT_SETTINGS
     );
@@ -37,6 +38,7 @@ describe("settingsSchema", () => {
     expect(normalized.agentOutputFolders).toEqual(DEFAULT_SETTINGS.agentOutputFolders);
     expect(normalized.maxGeneratedNoteSize).toBe(DEFAULT_SETTINGS.maxGeneratedNoteSize);
     expect(normalized.chatTimeout).toBe(DEFAULT_SETTINGS.chatTimeout);
+    expect(normalized.logLevel).toBe(DEFAULT_SETTINGS.logLevel);
   });
 
   it("migrates legacy top-level settings keys to current shape", () => {
@@ -58,5 +60,19 @@ describe("settingsSchema", () => {
     expect(serialized.settingsVersion).toBe(SETTINGS_SCHEMA_VERSION);
     expect(serialized.embeddingProvider).toBe("openai");
     expect(serialized.chatTimeout).toBe(30000);
+    expect(serialized.logLevel).toBe("info");
+  });
+
+  it("A3_log_level_normalization_and_persistence", () => {
+    const normalized = normalizeSettingsSnapshot(
+      {
+        logLevel: "debug"
+      },
+      DEFAULT_SETTINGS
+    );
+    expect(normalized.logLevel).toBe("debug");
+
+    const persisted = serializeSettingsForPersistence(normalized);
+    expect(persisted.logLevel).toBe("debug");
   });
 });

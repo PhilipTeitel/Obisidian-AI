@@ -35,7 +35,8 @@ const createSettingsSnapshot = (): ObsidianAISettings => {
     excludedFolders: [],
     agentOutputFolders: [],
     maxGeneratedNoteSize: 5000,
-    chatTimeout: 30000
+    chatTimeout: 30000,
+    logLevel: "info"
   };
 };
 
