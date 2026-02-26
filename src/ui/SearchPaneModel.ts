@@ -1,4 +1,5 @@
 import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
+import { createRuntimeLogger } from "../logging/runtimeLogger";
 import type { SearchRequest, SearchResult } from "../types";
 
 export const SEARCH_TOP_K_DEFAULT = 8;
@@ -48,6 +49,8 @@ const normalizeMinScore = (value: number | undefined): number | undefined => {
   }
   return Math.max(SEARCH_MIN_SCORE_MIN, Math.min(SEARCH_MIN_SCORE_MAX, value));
 };
+
+const logger = createRuntimeLogger("SearchPaneModel");
 
 export class SearchPaneModel {
   private state: SearchPaneState;
@@ -109,8 +112,13 @@ export class SearchPaneModel {
   }
 
   public async search(queryInput?: string): Promise<SearchResult[]> {
+    const operationLogger = logger.withOperation();
     const normalizedQuery = (queryInput ?? this.state.query).trim();
     if (normalizedQuery.length === 0) {
+      operationLogger.info({
+        event: "search.pane.query.skipped",
+        message: "Search pane query skipped because input is empty."
+      });
       this.updateState({
         query: normalizedQuery,
         status: "idle",
@@ -125,14 +133,34 @@ export class SearchPaneModel {
       status: "loading",
       errorMessage: undefined
     });
+    const searchStartedAt = Date.now();
+    operationLogger.info({
+      event: "search.pane.query.start",
+      message: "Search pane query started.",
+      context: {
+        queryLength: normalizedQuery.length,
+        topK: this.state.controls.topK,
+        minScore: this.state.controls.minScore
+      }
+    });
 
     try {
       const request = this.buildSearchRequest(normalizedQuery);
       const results = await this.deps.runSearch(request);
+      const status = results.length === 0 ? "empty" : "success";
       this.updateState({
-        status: results.length === 0 ? "empty" : "success",
+        status,
         results,
         errorMessage: undefined
+      });
+      operationLogger.info({
+        event: "search.pane.query.completed",
+        message: "Search pane query completed.",
+        context: {
+          resultCount: results.length,
+          status,
+          elapsedMs: Date.now() - searchStartedAt
+        }
       });
       return results;
     } catch (error: unknown) {
@@ -145,6 +173,13 @@ export class SearchPaneModel {
       this.updateState({
         status: "error",
         errorMessage: normalized.userMessage
+      });
+      operationLogger.error({
+        event: "search.pane.query.failed",
+        message: "Search pane query failed.",
+        domain: normalized.domain,
+        context: normalized.context,
+        error: normalized
       });
       this.deps.notify(normalized.userMessage);
       return [];
@@ -166,13 +201,37 @@ export class SearchPaneModel {
   }
 
   public async openResult(result: SearchResult): Promise<void> {
+    const operationLogger = logger.withOperation();
+    operationLogger.info({
+      event: "search.pane.open_result.start",
+      message: "Opening search result from pane.",
+      context: {
+        notePath: result.notePath,
+        heading: result.heading
+      }
+    });
     try {
       await this.deps.openResult(result);
+      operationLogger.info({
+        event: "search.pane.open_result.completed",
+        message: "Opened search result from pane.",
+        context: {
+          notePath: result.notePath,
+          heading: result.heading
+        }
+      });
     } catch (error: unknown) {
       const normalized = normalizeRuntimeError(error, {
         operation: "SearchPaneModel.openResult",
         notePath: result.notePath,
         heading: result.heading
+      });
+      operationLogger.error({
+        event: "search.pane.open_result.failed",
+        message: "Failed to open search result from pane.",
+        domain: normalized.domain,
+        context: normalized.context,
+        error: normalized
       });
       this.deps.notify(normalized.userMessage);
     }
