@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { WorkspaceLeaf } from "obsidian";
 import type { ObsidianAISettings } from "../../types";
 import { ChatPaneModel } from "../../ui/ChatPaneModel";
@@ -204,5 +204,60 @@ describe("ChatView", () => {
     expect(sourceItem?.textContent).toContain("notes/source.md");
 
     await view.onClose();
+  });
+
+  it("A1_copy_button_in_assistant_bubble", async () => {
+    const model = createModelWithResponse();
+    const view = new ChatView(new WorkspaceLeaf(), model);
+
+    await view.onOpen();
+    await model.send("Copy test");
+
+    const assistantEl = view.contentEl.querySelector(".obsidian-ai-chat-turn__assistant");
+    expect(assistantEl).not.toBeNull();
+    const copyBtn = assistantEl?.querySelector(".obsidian-ai-chat-turn__copy-btn");
+    expect(copyBtn).not.toBeNull();
+    expect(copyBtn?.tagName.toLowerCase()).toBe("button");
+
+    await view.onClose();
+  });
+
+  it("A2_copy_button_writes_to_clipboard", async () => {
+    const clipboardTexts: string[] = [];
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: vi.fn(async (text: string) => {
+          clipboardTexts.push(text);
+        })
+      },
+      writable: true,
+      configurable: true
+    });
+
+    try {
+      const model = createModelWithResponse();
+      const view = new ChatView(new WorkspaceLeaf(), model);
+
+      await view.onOpen();
+      await model.send("Clipboard test");
+
+      const copyBtn = view.contentEl.querySelector(".obsidian-ai-chat-turn__copy-btn") as unknown as {
+        addEventListener?: (event: string, callback: () => void) => void;
+        _clickHandler?: () => void;
+      };
+      expect(copyBtn).not.toBeNull();
+
+      const assistantEl = view.contentEl.querySelector(".obsidian-ai-chat-turn__assistant");
+      expect(assistantEl?.textContent).toContain("Answer");
+
+      await view.onClose();
+    } finally {
+      Object.defineProperty(navigator, "clipboard", {
+        value: originalClipboard,
+        writable: true,
+        configurable: true
+      });
+    }
   });
 });

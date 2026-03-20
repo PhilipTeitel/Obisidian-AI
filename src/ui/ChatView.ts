@@ -89,9 +89,17 @@ export class ChatView extends ItemView {
         cls: "obsidian-ai-chat-turn__user",
         text: turn.userMessage
       });
-      turnEl.createDiv({
+      const assistantBubble = turnEl.createDiv({
         cls: "obsidian-ai-chat-turn__assistant",
         text: turn.assistantMessage || "(waiting...)"
+      });
+      const copyBtn = assistantBubble.createEl("button", {
+        cls: "obsidian-ai-chat-turn__copy-btn",
+        text: "\u{1F4CB}"
+      });
+      const messageText = turn.assistantMessage || "(waiting...)";
+      this.bindEvent(copyBtn, "click", () => {
+        void navigator.clipboard.writeText(messageText);
       });
       turnEl.createEl("p", {
         cls: "obsidian-ai-chat-turn__status",
