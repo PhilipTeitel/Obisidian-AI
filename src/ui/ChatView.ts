@@ -28,16 +28,23 @@ export class ChatView extends ItemView {
   public async onOpen(): Promise<void> {
     this.contentEl.empty();
     const root = this.contentEl.createDiv({ cls: "obsidian-ai-chat-view" });
-    root.createEl("h2", { text: "Vault Chat" });
+
+    const header = root.createDiv({ cls: "obsidian-ai-chat-header" });
+    header.createEl("h2", { text: "Vault Chat" });
+
+    this.statusEl = root.createEl("p", { cls: "obsidian-ai-chat-status" });
+    this.historyEl = root.createDiv({ cls: "obsidian-ai-chat-history" });
 
     const controls = root.createDiv({ cls: "obsidian-ai-chat-controls" });
-    this.draftInputEl = controls.createEl("input", { cls: "obsidian-ai-chat-input" });
+    this.draftInputEl = controls.createEl("textarea", { cls: "obsidian-ai-chat-input" });
     this.setInputPlaceholder(this.draftInputEl, "Ask a question grounded in your vault");
     this.bindEvent(this.draftInputEl, "input", () => {
       this.model.setDraft(this.readInputValue(this.draftInputEl));
     });
 
-    this.sendButtonEl = controls.createEl("button", {
+    const buttonRow = controls.createDiv({ cls: "obsidian-ai-chat-button-row" });
+
+    this.sendButtonEl = buttonRow.createEl("button", {
       cls: "obsidian-ai-chat-send",
       text: "Send"
     });
@@ -45,16 +52,13 @@ export class ChatView extends ItemView {
       await this.model.send(this.readInputValue(this.draftInputEl));
     });
 
-    this.cancelButtonEl = controls.createEl("button", {
+    this.cancelButtonEl = buttonRow.createEl("button", {
       cls: "obsidian-ai-chat-cancel",
       text: "Cancel"
     });
     this.bindEvent(this.cancelButtonEl, "click", () => {
       this.model.cancelStreaming();
     });
-
-    this.statusEl = root.createEl("p", { cls: "obsidian-ai-chat-status" });
-    this.historyEl = root.createDiv({ cls: "obsidian-ai-chat-history" });
 
     this.unsubscribe = this.model.subscribe((state) => {
       this.renderState(state);
@@ -81,13 +85,13 @@ export class ChatView extends ItemView {
 
     for (const turn of state.turns) {
       const turnEl = this.historyEl.createDiv({ cls: "obsidian-ai-chat-turn" });
-      turnEl.createEl("p", {
+      turnEl.createDiv({
         cls: "obsidian-ai-chat-turn__user",
-        text: `You: ${turn.userMessage}`
+        text: turn.userMessage
       });
-      turnEl.createEl("p", {
+      turnEl.createDiv({
         cls: "obsidian-ai-chat-turn__assistant",
-        text: `Assistant: ${turn.assistantMessage || "(waiting...)"}`
+        text: turn.assistantMessage || "(waiting...)"
       });
       turnEl.createEl("p", {
         cls: "obsidian-ai-chat-turn__status",
@@ -101,16 +105,17 @@ export class ChatView extends ItemView {
       }
       if (turn.sources.length > 0) {
         const sourcesEl = turnEl.createDiv({ cls: "obsidian-ai-chat-turn__sources" });
-        sourcesEl.createEl("p", { text: "Sources:" });
         for (const source of turn.sources) {
-          const heading = source.heading ? ` - ${source.heading}` : "";
-          sourcesEl.createEl("p", {
+          const heading = source.heading ? ` — ${source.heading}` : "";
+          sourcesEl.createEl("span", {
             cls: "obsidian-ai-chat-turn__source-item",
-            text: `${source.notePath}${heading}: ${source.snippet}`
+            text: `${source.notePath}${heading}`
           });
         }
       }
     }
+
+    this.historyEl.scrollTop = this.historyEl.scrollHeight;
   }
 
   private renderStatusText(state: ChatPaneState): string {
