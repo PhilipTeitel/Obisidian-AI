@@ -322,6 +322,25 @@ export class ChatPaneModel {
     return true;
   }
 
+  public clearConversation(): void {
+    const operationLogger = logger.withOperation();
+    if (this.state.status === "streaming") {
+      this.cancelStreaming();
+    }
+    this.updateState({
+      draft: "",
+      status: "idle",
+      turns: [],
+      errorMessage: undefined,
+      canSend: true,
+      canCancel: false
+    });
+    operationLogger.info({
+      event: "chat.pane.clear_conversation",
+      message: "Chat conversation cleared."
+    });
+  }
+
   public async openSource(source: ChatContextChunk): Promise<void> {
     const operationLogger = logger.withOperation();
     operationLogger.info({

@@ -211,6 +211,31 @@ describe("ChatView", () => {
     await view.onClose();
   });
 
+  it("B1_new_conversation_button_in_header", async () => {
+    const model = new ChatPaneModel({
+      runChat: () =>
+        (async function* () {
+          yield { type: "done", finishReason: "stop" } as const;
+        })(),
+      runSourceSearch: async () => [],
+      openSource: async () => undefined,
+      getSettings: () => createSettings(),
+      notify: () => undefined
+    });
+    const view = new ChatView(new WorkspaceLeaf(), model);
+
+    await view.onOpen();
+
+    const headerEl = view.contentEl.querySelector(".obsidian-ai-chat-header");
+    expect(headerEl).not.toBeNull();
+    const newConvBtn = headerEl?.querySelector(".obsidian-ai-chat-new-conversation");
+    expect(newConvBtn).not.toBeNull();
+    expect(newConvBtn?.tagName.toLowerCase()).toBe("button");
+    expect(newConvBtn?.textContent).toBe("New Conversation");
+
+    await view.onClose();
+  });
+
   it("B1_source_pills_are_clickable", async () => {
     const openedSources: Array<{ notePath: string; heading?: string }> = [];
     const model = createModelWithResponse({

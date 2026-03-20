@@ -172,6 +172,32 @@ describe("ChatPaneModel", () => {
     expect(notices).toHaveLength(1);
   });
 
+  it("A1_clearConversation_resets_state", async () => {
+    const model = new ChatPaneModel({
+      runChat: () =>
+        (async function* () {
+          yield { type: "token", text: "Hello" } as ChatStreamEvent;
+          yield { type: "done", finishReason: "stop" } as ChatStreamEvent;
+        })(),
+      runSourceSearch: async () => [createResult()],
+      openSource: async () => undefined,
+      getSettings: () => createSettings(),
+      notify: () => undefined
+    });
+
+    await model.send("first question");
+    expect(model.getState().turns).toHaveLength(1);
+
+    model.clearConversation();
+    const state = model.getState();
+    expect(state.turns).toHaveLength(0);
+    expect(state.draft).toBe("");
+    expect(state.status).toBe("idle");
+    expect(state.canSend).toBe(true);
+    expect(state.canCancel).toBe(false);
+    expect(state.errorMessage).toBeUndefined();
+  });
+
   it("A1_openSource_delegates_to_deps", async () => {
     const openedSources: Array<{ notePath: string; heading?: string }> = [];
     const model = new ChatPaneModel({

@@ -31,6 +31,13 @@ export class ChatView extends ItemView {
 
     const header = root.createDiv({ cls: "obsidian-ai-chat-header" });
     header.createEl("h2", { text: "Vault Chat" });
+    const newConversationBtn = header.createEl("button", {
+      cls: "obsidian-ai-chat-new-conversation",
+      text: "New Conversation"
+    });
+    this.bindEvent(newConversationBtn, "click", () => {
+      this.model.clearConversation();
+    });
 
     this.statusEl = root.createEl("p", { cls: "obsidian-ai-chat-status" });
     this.historyEl = root.createDiv({ cls: "obsidian-ai-chat-history" });
