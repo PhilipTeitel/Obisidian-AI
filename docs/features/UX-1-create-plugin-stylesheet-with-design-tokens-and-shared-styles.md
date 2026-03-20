@@ -3,7 +3,7 @@
 **Story**: Deliver the foundational `styles.css` file with CSS custom properties and shared styles that all subsequent UX stories depend on.
 **Epic**: Epic 10 — Search and Chat Pane UX Polish
 **Size**: Small
-**Status**: Open
+**Status**: Done
 
 ---
 
@@ -108,42 +108,42 @@ None. No TypeScript, manifest, or build config changes are needed. Obsidian auto
 
 ### Phase A: File Existence and Design Tokens
 
-- [ ] **A1** — `styles.css` exists at the project root
+- [x] **A1** — `styles.css` exists at the project root
   - The file is present at the same level as `main.js` and `manifest.json`.
   - The file is not empty and contains valid CSS.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::A1_styles_css_exists_at_project_root(vitest)`
 
-- [ ] **A2** — Design tokens are defined as CSS custom properties on `body`
+- [x] **A2** — Design tokens are defined as CSS custom properties on `body`
   - The following custom properties are defined: `--obsidian-ai-bg-primary`, `--obsidian-ai-bg-card`, `--obsidian-ai-bg-user-bubble`, `--obsidian-ai-bg-assistant-bubble`, `--obsidian-ai-border-radius`, `--obsidian-ai-border-radius-lg`, `--obsidian-ai-spacing-sm`, `--obsidian-ai-spacing-md`, `--obsidian-ai-spacing-lg`.
   - All color tokens reference Obsidian CSS variables (e.g., `var(--background-primary)`), not hardcoded hex/rgb values.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::A2_design_tokens_reference_obsidian_variables(vitest)`
 
 ### Phase B: Search Pane Styles
 
-- [ ] **B1** — Search result cards have visual separation
+- [x] **B1** — Search result cards have visual separation
   - `.obsidian-ai-search-result` has background color, border-radius, padding, and margin-bottom producing visible card separation.
   - Background uses `var(--obsidian-ai-bg-card)`.
   - Border-radius uses `var(--obsidian-ai-border-radius)`.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::B1_search_result_card_styles_defined(vitest)`
 
-- [ ] **B2** — Search result title is styled as a clickable link
+- [x] **B2** — Search result title is styled as a clickable link
   - `.obsidian-ai-search-result__action` has accent color text, no default button chrome (background transparent, no border), and cursor pointer.
   - Hover state adds underline or other visual feedback.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::B2_search_result_action_link_styled(vitest)`
 
-- [ ] **B3** — Search result path is muted and small
+- [x] **B3** — Search result path is muted and small
   - `.obsidian-ai-search-result__path` uses `var(--text-muted)` color and a reduced font size (e.g., `0.85em`).
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::B3_search_result_path_muted(vitest)`
 
-- [ ] **B4** — Search result snippet text is selectable
+- [x] **B4** — Search result snippet text is selectable
   - `.obsidian-ai-search-result__snippet` has `user-select: text` and `cursor: text`.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::B4_search_result_snippet_selectable(vitest)`
 
-- [ ] **B5** — Search result score is displayed as a pill badge
+- [x] **B5** — Search result score is displayed as a pill badge
   - `.obsidian-ai-search-result__score` has a subtle background, small border-radius, small font size, and is right-aligned or inline-end positioned.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::B5_search_result_score_pill_badge(vitest)`
 
-- [ ] **B6** — Search controls have rounded corners and flex layout
+- [x] **B6** — Search controls have rounded corners and flex layout
   - `.obsidian-ai-search-controls__query` uses flex layout with gap.
   - `.obsidian-ai-search-input` and `.obsidian-ai-search-submit` have `border-radius` applied.
   - `.obsidian-ai-search-controls__quality` uses flex layout with gap and vertical centering.
@@ -151,35 +151,35 @@ None. No TypeScript, manifest, or build config changes are needed. Obsidian auto
 
 ### Phase C: Chat Pane Styles
 
-- [ ] **C1** — Chat view uses flex column layout with full height
+- [x] **C1** — Chat view uses flex column layout with full height
   - `.obsidian-ai-chat-view` has `display: flex`, `flex-direction: column`, and `height: 100%`.
   - Background uses `var(--obsidian-ai-bg-primary)` to contrast with bubble colors.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::C1_chat_view_flex_column(vitest)`
 
-- [ ] **C2** — Chat history area is scrollable and fills available space
+- [x] **C2** — Chat history area is scrollable and fills available space
   - `.obsidian-ai-chat-history` has `flex: 1`, `overflow-y: auto`, and padding.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::C2_chat_history_scrollable(vitest)`
 
-- [ ] **C3** — User message bubbles are right-aligned
+- [x] **C3** — User message bubbles are right-aligned
   - `.obsidian-ai-chat-turn__user` has `margin-left: auto`, `max-width` constraint (e.g., 85%), rounded corners, padding, and background using `var(--obsidian-ai-bg-user-bubble)`.
   - Text color contrasts with the accent background.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::C3_user_bubble_right_aligned(vitest)`
 
-- [ ] **C4** — Assistant message bubbles are left-aligned with selectable text
+- [x] **C4** — Assistant message bubbles are left-aligned with selectable text
   - `.obsidian-ai-chat-turn__assistant` has `margin-right: auto`, `max-width` constraint, rounded corners, padding, background using `var(--obsidian-ai-bg-assistant-bubble)`, and `position: relative` (for copy button positioning).
   - `user-select: text` is set to ensure selectability.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::C4_assistant_bubble_left_aligned_selectable(vitest)`
 
-- [ ] **C5** — Copy button is positioned in the upper-right corner of assistant bubbles
+- [x] **C5** — Copy button is positioned in the upper-right corner of assistant bubbles
   - `.obsidian-ai-chat-turn__copy-btn` has `position: absolute`, `top` and `right` offsets, small size, and cursor pointer.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::C5_copy_button_positioned(vitest)`
 
-- [ ] **C6** — Source items are styled as pill buttons
+- [x] **C6** — Source items are styled as pill buttons
   - `.obsidian-ai-chat-turn__sources` uses `display: flex`, `flex-wrap: wrap`, and `gap`.
   - `.obsidian-ai-chat-turn__source-item` has pill border-radius, padding, background, accent color text, and cursor pointer.
   - Evidence: `src/__tests__/unit/stylesExistence.test.ts::C6_source_pill_buttons(vitest)`
 
-- [ ] **C7** — Chat controls are pinned to the bottom with rounded elements
+- [x] **C7** — Chat controls are pinned to the bottom with rounded elements
   - `.obsidian-ai-chat-controls` has padding and border-top for visual separation from the history area.
   - `.obsidian-ai-chat-input` (textarea) has `width: 100%`, `border-radius`, and `resize: vertical`.
   - `.obsidian-ai-chat-send` and `.obsidian-ai-chat-cancel` have `border-radius`.
@@ -188,17 +188,17 @@ None. No TypeScript, manifest, or build config changes are needed. Obsidian auto
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
   - Evidence: `package.json::Z1_build(npm run build)`
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
   - Evidence: `package.json::Z2_lint(npm run lint)`
-- [ ] **Z3** — No `any` types in any new or modified file
+- [x] **Z3** — No `any` types in any new or modified file
   - Not applicable — this story creates only a CSS file and tests.
   - Evidence: `styles.css::Z3_no_any_types(n/a — CSS only)`
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
   - Not applicable — no new TypeScript imports are introduced.
   - Evidence: `styles.css::Z4_import_path_consistency(n/a — CSS only)`
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
   - Not applicable — CSS files do not include logging.
   - Evidence: `styles.css::Z5_logging(n/a — CSS only)`
 

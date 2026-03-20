@@ -19,6 +19,7 @@ An Obsidian plugin that adds AI-powered **semantic search** and **chat completio
 Requirements: 
 - [docs/prompts/01-initial.md](docs/prompts/01-initial.md)
 - [docs/prompts/02-second.md](docs/prompts/02-second.md)
+- [docs/prompts/03-search-chat-ux.md](docs/prompts/03-search-chat-ux.md)
 
 ## Table of Contents
 
@@ -586,6 +587,19 @@ Instrument all service, provider, storage, and UI layers with structured logging
 | [LOG-4](docs/features/LOG-4-instrument-embeddingservice-and-provider-http-layer-with-structured-logging.md) | Done | Instrument EmbeddingService and provider HTTP layer with structured logging | M | Log batch processing, HTTP request/response timing, retries; redact Authorization headers |
 | [LOG-5](docs/features/LOG-5-instrument-storage-layer-and-agentservice-with-structured-logging.md) | Done | Instrument storage layer and AgentService with structured logging | S | Log VectorStore load/persist/query timing and AgentService create/update lifecycle |
 | [LOG-6](docs/features/LOG-6-add-log-level-setting-ui-and-sensitive-data-redaction-tests.md) | Done | Add log-level setting UI and sensitive data redaction tests | S | Add `logLevel` dropdown to settings, `redactSensitiveContext` utility, and unit tests |
+
+### Epic 10: Search and Chat Pane UX Polish
+
+Improve visual formatting, text selectability, and interaction patterns for the Semantic Search and Chat panes.
+
+| ID | Status | Story | Size | Notes |
+| ----- | -------- | ----- | ---- | ----- |
+| [UX-1](docs/features/UX-1-create-plugin-stylesheet-with-design-tokens-and-shared-styles.md) | Done | Create plugin stylesheet with design tokens and shared styles | S | Create `styles.css` at project root using Obsidian CSS variables for theme compatibility; define tokens for spacing, border-radius, and colors |
+| [UX-2](docs/features/UX-2-redesign-semantic-search-result-cards-with-visual-hierarchy-and-text-selectability.md) | Done | Redesign Semantic Search result cards with visual hierarchy and text selectability | M | Style each result as a card with distinct note title (clickable link), file path (muted), selectable snippet, and score badge; ensure all text is selectable |
+| UX-3 | Not Started | Redesign Chat pane layout with bubble alignment and bottom input area | M | Restructure ChatView: right-aligned user bubbles, left-aligned assistant bubbles, multi-line textarea at bottom, scrollable history area, auto-scroll to newest |
+| UX-4 | Not Started | Add copy-to-clipboard button on assistant response bubbles | S | Add a copy icon button in the upper-right corner of each assistant bubble; copies full response text via `navigator.clipboard.writeText` |
+| UX-5 | Not Started | Add source pill buttons to chat responses with note navigation | M | Render sources as clickable pill buttons below assistant bubbles; wire `openSource` callback through ChatPaneModel to open notes using existing search navigation |
+| UX-6 | Not Started | Add New Conversation button and clear conversation support | S | Add `clearConversation()` to ChatPaneModel; render "New Conversation" button in chat header that resets turns and status |
 
 ## License
 MIT © Philip Teitel

@@ -91,8 +91,8 @@ export class SearchView extends ItemView {
 
     for (const result of state.results) {
       const row = this.resultsEl.createDiv({ cls: "obsidian-ai-search-result" });
-      const title = result.heading ? `${result.noteTitle} - ${result.heading}` : result.noteTitle;
-      const action = row.createEl("button", {
+      const title = result.heading ? `${result.noteTitle} \u2014 ${result.heading}` : result.noteTitle;
+      const action = row.createEl("span", {
         cls: "obsidian-ai-search-result__action",
         text: title
       });
@@ -107,7 +107,8 @@ export class SearchView extends ItemView {
         cls: "obsidian-ai-search-result__snippet",
         text: result.snippet
       });
-      row.createEl("p", {
+      const scoreRow = row.createDiv();
+      scoreRow.createEl("span", {
         cls: "obsidian-ai-search-result__score",
         text: `Score: ${result.score.toFixed(3)}`
       });
