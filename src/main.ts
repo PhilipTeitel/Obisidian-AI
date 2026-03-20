@@ -67,6 +67,9 @@ export default class ObsidianAIPlugin extends Plugin {
           topK: 5
         });
       },
+      openSource: async (source) => {
+        await this.openSearchResult({ notePath: source.notePath, heading: source.heading });
+      },
       getSettings: () => snapshotSettings(this.settings),
       notify: (message) => {
         new Notice(message);

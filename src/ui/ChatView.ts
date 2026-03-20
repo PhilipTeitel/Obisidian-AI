@@ -115,9 +115,12 @@ export class ChatView extends ItemView {
         const sourcesEl = turnEl.createDiv({ cls: "obsidian-ai-chat-turn__sources" });
         for (const source of turn.sources) {
           const heading = source.heading ? ` — ${source.heading}` : "";
-          sourcesEl.createEl("span", {
+          const pill = sourcesEl.createEl("span", {
             cls: "obsidian-ai-chat-turn__source-item",
             text: `${source.notePath}${heading}`
+          });
+          this.bindEvent(pill, "click", async () => {
+            await this.model.openSource(source);
           });
         }
       }

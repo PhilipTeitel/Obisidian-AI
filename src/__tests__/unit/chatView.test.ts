@@ -21,7 +21,7 @@ const createSettings = (): ObsidianAISettings => {
   };
 };
 
-const createModelWithResponse = () =>
+const createModelWithResponse = (overrides?: { openSource?: (source: unknown) => Promise<void> }) =>
   new ChatPaneModel({
     runChat: () =>
       (async function* () {
@@ -39,6 +39,7 @@ const createModelWithResponse = () =>
         tags: []
       }
     ],
+    openSource: overrides?.openSource ?? (async () => undefined),
     getSettings: () => createSettings(),
     notify: () => undefined
   });
@@ -51,6 +52,7 @@ describe("ChatView", () => {
           yield { type: "done", finishReason: "stop" } as const;
         })(),
       runSourceSearch: async () => [],
+      openSource: async () => undefined,
       getSettings: () => createSettings(),
       notify: () => undefined
     });
@@ -76,6 +78,7 @@ describe("ChatView", () => {
           yield { type: "done", finishReason: "stop" } as const;
         })(),
       runSourceSearch: async () => [],
+      openSource: async () => undefined,
       getSettings: () => createSettings(),
       notify: () => undefined
     });
@@ -105,6 +108,7 @@ describe("ChatView", () => {
           yield { type: "done", finishReason: "stop" } as const;
         })(),
       runSourceSearch: async () => [],
+      openSource: async () => undefined,
       getSettings: () => createSettings(),
       notify: () => undefined
     });
@@ -158,6 +162,7 @@ describe("ChatView", () => {
           yield { type: "done", finishReason: "stop" } as const;
         })(),
       runSourceSearch: async () => [],
+      openSource: async () => undefined,
       getSettings: () => createSettings(),
       notify: () => undefined
     });
@@ -198,6 +203,27 @@ describe("ChatView", () => {
 
     expect(view.contentEl.querySelector(".obsidian-ai-chat-turn__user")?.textContent).toBe("Question?");
     expect(view.contentEl.querySelector(".obsidian-ai-chat-turn__assistant")?.textContent).toContain("Answer");
+    const sourceItem = view.contentEl.querySelector(".obsidian-ai-chat-turn__source-item");
+    expect(sourceItem).not.toBeNull();
+    expect(sourceItem?.tagName.toLowerCase()).toBe("span");
+    expect(sourceItem?.textContent).toContain("notes/source.md");
+
+    await view.onClose();
+  });
+
+  it("B1_source_pills_are_clickable", async () => {
+    const openedSources: Array<{ notePath: string; heading?: string }> = [];
+    const model = createModelWithResponse({
+      openSource: async (source) => {
+        const s = source as { notePath: string; heading?: string };
+        openedSources.push({ notePath: s.notePath, heading: s.heading });
+      }
+    });
+    const view = new ChatView(new WorkspaceLeaf(), model);
+
+    await view.onOpen();
+    await model.send("Source test");
+
     const sourceItem = view.contentEl.querySelector(".obsidian-ai-chat-turn__source-item");
     expect(sourceItem).not.toBeNull();
     expect(sourceItem?.tagName.toLowerCase()).toBe("span");

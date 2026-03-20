@@ -33,6 +33,7 @@ export interface ChatPaneState {
 interface ChatPaneModelDeps {
   runChat: (request: ChatRequest) => AsyncIterable<ChatStreamEvent>;
   runSourceSearch: (query: string) => Promise<SearchResult[]>;
+  openSource: (source: ChatContextChunk) => Promise<void>;
   getSettings: () => ObsidianAISettings;
   notify: (message: string) => void;
 }
@@ -319,6 +320,43 @@ export class ChatPaneModel {
       }
     });
     return true;
+  }
+
+  public async openSource(source: ChatContextChunk): Promise<void> {
+    const operationLogger = logger.withOperation();
+    operationLogger.info({
+      event: "chat.pane.open_source.start",
+      message: "Opening chat source from pane.",
+      context: {
+        notePath: source.notePath,
+        heading: source.heading
+      }
+    });
+    try {
+      await this.deps.openSource(source);
+      operationLogger.info({
+        event: "chat.pane.open_source.completed",
+        message: "Opened chat source from pane.",
+        context: {
+          notePath: source.notePath,
+          heading: source.heading
+        }
+      });
+    } catch (error: unknown) {
+      const normalized = normalizeRuntimeError(error, {
+        operation: "ChatPaneModel.openSource",
+        notePath: source.notePath,
+        heading: source.heading
+      });
+      operationLogger.error({
+        event: "chat.pane.open_source.failed",
+        message: "Failed to open chat source from pane.",
+        domain: normalized.domain,
+        context: normalized.context,
+        error: normalized
+      });
+      this.deps.notify(normalized.userMessage);
+    }
   }
 
   private buildMessagesForNextRequest(nextUserMessage: string): ChatMessage[] {

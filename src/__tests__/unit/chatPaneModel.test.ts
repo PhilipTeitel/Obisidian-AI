@@ -42,6 +42,7 @@ describe("ChatPaneModel", () => {
         })();
       },
       runSourceSearch: async () => [],
+      openSource: async () => undefined,
       getSettings: () => createSettings(),
       notify: () => undefined
     });
@@ -71,6 +72,7 @@ describe("ChatPaneModel", () => {
           yield { type: "done", finishReason: "stop" } as ChatStreamEvent;
         })(),
       runSourceSearch: async () => [],
+      openSource: async () => undefined,
       getSettings: () => createSettings(),
       notify: () => undefined
     });
@@ -88,6 +90,7 @@ describe("ChatPaneModel", () => {
           yield { type: "done", finishReason: "stop" } as ChatStreamEvent;
         })(),
       runSourceSearch: async () => [createResult()],
+      openSource: async () => undefined,
       getSettings: () => createSettings(),
       notify: () => undefined
     });
@@ -118,6 +121,7 @@ describe("ChatPaneModel", () => {
           yield { type: "done", finishReason: "stop" } as ChatStreamEvent;
         })(),
       runSourceSearch: async () => [],
+      openSource: async () => undefined,
       getSettings: () => createSettings(),
       notify: () => undefined
     });
@@ -152,6 +156,7 @@ describe("ChatPaneModel", () => {
           yield { type: "done", finishReason: "error" } as ChatStreamEvent;
         })(),
       runSourceSearch: async () => [createResult()],
+      openSource: async () => undefined,
       getSettings: () => createSettings(),
       notify: (message) => {
         notices.push(message);
@@ -165,5 +170,30 @@ describe("ChatPaneModel", () => {
     expect(state.turns[0]?.status).toBe("error");
     expect(state.turns[0]?.errorMessage).toBeTruthy();
     expect(notices).toHaveLength(1);
+  });
+
+  it("A1_openSource_delegates_to_deps", async () => {
+    const openedSources: Array<{ notePath: string; heading?: string }> = [];
+    const model = new ChatPaneModel({
+      runChat: () =>
+        (async function* () {
+          yield { type: "done", finishReason: "stop" } as ChatStreamEvent;
+        })(),
+      runSourceSearch: async () => [],
+      openSource: async (source) => {
+        openedSources.push({ notePath: source.notePath, heading: source.heading });
+      },
+      getSettings: () => createSettings(),
+      notify: () => undefined
+    });
+
+    await model.openSource({
+      chunkId: "chunk-1",
+      notePath: "notes/test.md",
+      heading: "Section A",
+      snippet: "test snippet"
+    });
+
+    expect(openedSources).toEqual([{ notePath: "notes/test.md", heading: "Section A" }]);
   });
 });
