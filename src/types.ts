@@ -152,6 +152,7 @@ export interface ChatRequest {
   model: string;
   messages: ChatMessage[];
   context: ChatContextChunk[];
+  hierarchicalContext?: HierarchicalContextBlock[];
   timeoutMs: number;
 }
 

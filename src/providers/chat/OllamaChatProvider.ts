@@ -1,4 +1,5 @@
 import type { ChatContextChunk, ChatProvider, ChatRequest, ChatStreamEvent } from "../../types";
+import { formatHierarchicalContext } from "../../utils/contextFormatter";
 import { fetchStreamWithTimeout, normalizeChatEndpoint, streamNdjsonObjects } from "./httpChatUtils";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -53,7 +54,10 @@ export class OllamaChatProvider implements ChatProvider {
   public async *complete(request: ChatRequest): AsyncIterable<ChatStreamEvent> {
     const endpoint = normalizeChatEndpoint(this.getEndpoint());
     const timeoutMs = request.timeoutMs > 0 ? request.timeoutMs : this.defaultTimeoutMs;
-    const contextMessage = formatContext(request.context);
+    const contextMessage =
+      request.hierarchicalContext && request.hierarchicalContext.length > 0
+        ? formatHierarchicalContext(request.hierarchicalContext)
+        : formatContext(request.context);
     const payloadMessages =
       contextMessage.length === 0
         ? request.messages
