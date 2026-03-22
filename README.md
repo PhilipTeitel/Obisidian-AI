@@ -630,6 +630,7 @@ The display names and command IDs in this table match the values registered by t
 | `src/__tests__/unit/summaryService.progress.test.ts` | Summary generation progress callback invocation, error swallowing, stage label |
 | `src/__tests__/unit/hierarchicalSearch.test.ts` | Phase 1 and Phase 2 hierarchical search in SearchService |
 | `src/__tests__/unit/contextAssemblyService.test.ts` | Phase 3 context assembly with per-tier token budgets |
+| `src/__tests__/unit/contextFormatter.test.ts` | Hierarchical context formatting with heading trails, summaries, and sibling content |
 | `src/__tests__/unit/bootstrapHierarchicalStore.test.ts` | Bootstrap wiring of SqliteVecRepository into ServiceContainer |
 | `src/__tests__/integration/**/*.test.ts` | Plugin lifecycle/command integration tests with Obsidian-compatible mocks |
 | `src/__tests__/integration/scaleValidation.integration.test.ts` | REL-2 scale validation for reindex/search/index-changes latency budgets |
@@ -892,7 +893,7 @@ Replace flat top-K search with the three-phase hierarchical retrieval strategy. 
 | [RET-1](docs/features/RET-1-implement-phase-1-summary-search-in-searchservice.md) | Done | Implement Phase 1 summary search in SearchService | M | Search summary embeddings only. Return top-K candidate topic/subtopic nodes (default K=10). Include structured logging (retrieval.phase1.completed). Depends on STOR-2 (searchSummaryEmbeddings). |
 | [RET-2](docs/features/RET-2-implement-phase-2-drill-down-search-in-searchservice.md) | Done | Implement Phase 2 drill-down search in SearchService | M | For each Phase 1 candidate, search children's content embeddings recursively. Collect high-similarity leaf nodes. Deduplicate across ancestor paths. Include structured logging (retrieval.phase2.completed). Depends on RET-1, STOR-2 (searchContentEmbeddings). |
 | [RET-3](docs/features/RET-3-implement-contextassemblyservice-phase-3.md) | Done | Implement ContextAssemblyService (Phase 3) | L | New file: `src/services/ContextAssemblyService.ts`. Walk up tree for heading trails, siblings, parent summaries. Apply per-tier token budgets (matched: ~2000, sibling: ~1000, parent summaries: ~1000). Track actual usage per tier. Include structured logging (retrieval.phase3.completed, context.assembly.budget_usage). Depends on RET-2, HIER-4 (token estimator), STOR-2 (getAncestorChain, getSiblings). |
-| RET-4 | Not Started | Implement shared hierarchical context formatter | M | New file: `src/utils/contextFormatter.ts`. Format assembled context preserving document structure (headings, summaries, bullets, paragraphs). Used by both chat providers. Depends on RET-3, HIER-1 (node types). |
+| [RET-4](docs/features/RET-4-implement-shared-hierarchical-context-formatter.md) | Done | Implement shared hierarchical context formatter | M | New file: `src/utils/contextFormatter.ts`. Format assembled context preserving document structure (headings, summaries, bullets, paragraphs). Used by both chat providers. Depends on RET-3, HIER-1 (node types). |
 | RET-5 | Not Started | Update ChatService and chat providers for hierarchical context | M | Replace `ChatContextChunk` with `HierarchicalContextBlock`. Update `OpenAIChatProvider` and `OllamaChatProvider` to use `formatHierarchicalContext()`. Depends on RET-4. |
 
 ### Epic 15: Hierarchical Indexing Pipeline Integration
