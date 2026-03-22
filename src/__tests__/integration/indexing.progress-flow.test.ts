@@ -32,11 +32,13 @@ describe("indexing progress integration", () => {
       }
     });
 
-    expect(progressSnapshots.length).toBeGreaterThanOrEqual(5);
+    expect(progressSnapshots.length).toBeGreaterThanOrEqual(7);
     expect(progressSnapshots[0]?.progress.label).toContain("Crawl");
     expect(progressSnapshots[1]?.progress.label).toContain("Chunk");
-    expect(progressSnapshots[2]?.progress.label).toContain("Embed");
-    expect(progressSnapshots[3]?.progress.label).toContain("Finalize");
+    expect(progressSnapshots[2]?.progress.label).toContain("Store");
+    expect(progressSnapshots[3]?.progress.label).toContain("Summarize");
+    expect(progressSnapshots[4]?.progress.label).toContain("Embed");
+    expect(progressSnapshots[5]?.progress.label).toContain("Finalize");
     expect(progressSnapshots[progressSnapshots.length - 1]?.status).toBe("succeeded");
 
     await harness.runOnunload();

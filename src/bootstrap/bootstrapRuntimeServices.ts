@@ -167,7 +167,9 @@ export const bootstrapRuntimeServices = async (
     }),
     jobStateStore: new IndexJobStateStore({
       plugin: context.plugin
-    })
+    }),
+    summaryService,
+    hierarchicalStore
   });
 
   const servicesByName: Record<RuntimeServiceName, RuntimeServiceLifecycle> = {

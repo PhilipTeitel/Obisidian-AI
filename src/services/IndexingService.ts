@@ -2,6 +2,12 @@ import type {
   EmbeddingServiceContract,
   ChunkRecord,
   ChunkerInput,
+  CrossReference,
+  DocumentNode,
+  DocumentTree,
+  EmbeddingType,
+  EmbeddingVector,
+  HierarchicalStoreContract,
   IncrementalDiffResult,
   IndexConsistencyReport,
   IndexedNoteFingerprint,
@@ -11,13 +17,15 @@ import type {
   JobStatus,
   JobType,
   RuntimeBootstrapContext,
+  SummaryServiceContract,
   VectorStoreRepositoryContract
 } from "../types";
 import { createRuntimeLogger } from "../logging/runtimeLogger";
 import type { IndexJobStateStore } from "./indexing/IndexJobStateStore";
 import type { IndexManifestStore } from "./indexing/IndexManifestStore";
 import { applyRecoveryActions, runConsistencyPreflight } from "./indexing/indexConsistency";
-import { chunkMarkdownNote } from "../utils/chunker";
+import { buildDocumentTree, chunkMarkdownNote } from "../utils/chunker";
+import type { HierarchicalChunkerResult } from "../utils/chunker";
 import { hashNormalizedMarkdown } from "../utils/hasher";
 import { crawlVaultMarkdownNotes } from "../utils/vaultCrawler";
 import { EmbeddingBatchError } from "./errors/EmbeddingBatchError";
@@ -29,6 +37,8 @@ export interface IndexingServiceDeps {
   getSettings: RuntimeBootstrapContext["getSettings"];
   manifestStore: IndexManifestStore;
   jobStateStore: IndexJobStateStore;
+  summaryService: SummaryServiceContract;
+  hierarchicalStore: HierarchicalStoreContract;
 }
 
 const createSnapshot = (params: {
@@ -451,6 +461,8 @@ export class IndexingService implements IndexingServiceContract {
 
     const chunks = params.noteInputs.flatMap((input) => this.chunkNoteForIndexing(input));
 
+    const hierarchicalResults = params.noteInputs.map((input) => buildDocumentTree(input));
+
     await this.emitProgress(
       createSnapshot({
         id: params.jobId,
@@ -458,15 +470,51 @@ export class IndexingService implements IndexingServiceContract {
         status: "running",
         startedAt: params.startedAt,
         completed: 0,
-        total: chunks.length,
+        total: hierarchicalResults.length,
+        label: `${params.commandLabel} · Store`,
+        detail: `Storing ${hierarchicalResults.length} document trees.`
+      }),
+      params.options
+    );
+
+    await this.storeHierarchicalTrees(hierarchicalResults);
+
+    await this.emitProgress(
+      createSnapshot({
+        id: params.jobId,
+        type: params.jobType,
+        status: "running",
+        startedAt: params.startedAt,
+        completed: 0,
+        total: hierarchicalResults.length,
+        label: `${params.commandLabel} · Summarize`,
+        detail: `Generating summaries for ${hierarchicalResults.length} trees.`
+      }),
+      params.options
+    );
+
+    await this.generateTreeSummaries(hierarchicalResults);
+
+    const embeddableNodes = await this.collectEmbeddableNodes(hierarchicalResults);
+
+    await this.emitProgress(
+      createSnapshot({
+        id: params.jobId,
+        type: params.jobType,
+        status: "running",
+        startedAt: params.startedAt,
+        completed: 0,
+        total: embeddableNodes.length,
         label: `${params.commandLabel} · Embed`,
-        detail: `Embedding ${chunks.length} chunks.`
+        detail: `Embedding ${embeddableNodes.length} nodes and ${chunks.length} flat chunks.`
       }),
       params.options
     );
 
     const vectors = await this.embedChunkContent(chunks);
     await this.deps.vectorStoreRepository.replaceAllFromChunks(chunks, vectors);
+
+    await this.embedHierarchicalNodes(embeddableNodes);
 
     await this.emitProgress(
       createSnapshot({
@@ -708,4 +756,90 @@ export class IndexingService implements IndexingServiceContract {
       throw error;
     }
   }
+
+  private async storeHierarchicalTrees(results: HierarchicalChunkerResult[]): Promise<void> {
+    for (const result of results) {
+      await this.deps.hierarchicalStore.upsertNodeTree(result.tree);
+      await this.deps.hierarchicalStore.upsertCrossReferences(result.crossReferences);
+      for (const node of result.tree.nodes.values()) {
+        if (node.tags.length > 0) {
+          await this.deps.hierarchicalStore.upsertTags(node.nodeId, node.tags);
+        }
+      }
+    }
+  }
+
+  private async generateTreeSummaries(results: HierarchicalChunkerResult[]): Promise<void> {
+    for (const result of results) {
+      try {
+        await this.deps.summaryService.generateSummaries(result.tree);
+      } catch (error: unknown) {
+        this.logger.log({
+          level: "warn",
+          event: "indexing.hierarchical.summary_failed",
+          message: `Summary generation failed for tree "${result.tree.root.noteTitle}"; continuing with remaining trees.`,
+          context: {
+            operation: "IndexingService.generateTreeSummaries",
+            notePath: result.tree.root.notePath,
+            error: error instanceof Error ? error.message : String(error)
+          }
+        });
+      }
+    }
+  }
+
+  private async collectEmbeddableNodes(
+    results: HierarchicalChunkerResult[]
+  ): Promise<EmbeddableNode[]> {
+    const LEAF_TYPES: Set<string> = new Set(["paragraph", "bullet"]);
+    const embeddable: EmbeddableNode[] = [];
+
+    for (const result of results) {
+      for (const node of result.tree.nodes.values()) {
+        if (LEAF_TYPES.has(node.nodeType)) {
+          embeddable.push({ node, text: node.content, embeddingType: "content" });
+        } else {
+          const summaryRecord = await this.deps.hierarchicalStore.getSummary(node.nodeId);
+          if (summaryRecord) {
+            embeddable.push({ node, text: summaryRecord.summary, embeddingType: "summary" });
+          }
+        }
+      }
+    }
+
+    return embeddable;
+  }
+
+  private async embedHierarchicalNodes(embeddable: EmbeddableNode[]): Promise<void> {
+    if (embeddable.length === 0) {
+      return;
+    }
+
+    const settings = this.deps.getSettings();
+
+    try {
+      const response = await this.deps.embeddingService.embed({
+        providerId: settings.embeddingProvider,
+        model: settings.embeddingModel,
+        inputs: embeddable.map((entry) => entry.text)
+      });
+
+      for (let i = 0; i < embeddable.length; i++) {
+        const entry = embeddable[i];
+        const vector = response.vectors[i];
+        await this.deps.hierarchicalStore.upsertEmbedding(entry.node.nodeId, entry.embeddingType, vector);
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        withRecoveryAction(`Hierarchical embedding failed: ${message}`, "full")
+      );
+    }
+  }
+}
+
+interface EmbeddableNode {
+  node: DocumentNode;
+  text: string;
+  embeddingType: EmbeddingType;
 }
