@@ -3,7 +3,7 @@
 **Story**: Implement a wikilink parser utility that extracts `[[target]]` and `[[target|display]]` cross-references from node content, producing `CrossReference` records for storage in the hierarchical index.
 **Epic**: Epic 11 — Hierarchical Document Model and Tree Chunker
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -102,69 +102,69 @@ None. This is a standalone utility with no modifications to existing files.
 
 ### Phase A: Core Wikilink Extraction
 
-- [ ] **A1** — Simple `[[target]]` wikilinks are extracted
+- [x] **A1** — Simple `[[target]]` wikilinks are extracted
   - Input `"See [[My Note]] for details."` returns one `CrossReference` with `targetPath: "My Note"` and `targetDisplay: null`.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::A1_simple_wikilink_extracted(vitest)`
 
-- [ ] **A2** — Aliased `[[target|display]]` wikilinks are extracted
+- [x] **A2** — Aliased `[[target|display]]` wikilinks are extracted
   - Input `"Refer to [[projects/roadmap|the roadmap]]."` returns one `CrossReference` with `targetPath: "projects/roadmap"` and `targetDisplay: "the roadmap"`.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::A2_aliased_wikilink_extracted(vitest)`
 
-- [ ] **A3** — Multiple wikilinks on the same line are all extracted
+- [x] **A3** — Multiple wikilinks on the same line are all extracted
   - Input `"Compare [[Note A]] with [[Note B|B]]."` returns two `CrossReference` records.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::A3_multiple_wikilinks_same_line(vitest)`
 
-- [ ] **A4** — Multiple wikilinks across multiple lines are all extracted
+- [x] **A4** — Multiple wikilinks across multiple lines are all extracted
   - Input spanning several lines with wikilinks on different lines returns all cross-references.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::A4_multiple_wikilinks_across_lines(vitest)`
 
 ### Phase B: Special Cases
 
-- [ ] **B1** — Wikilinks with heading anchors are extracted with full target
+- [x] **B1** — Wikilinks with heading anchors are extracted with full target
   - Input `"See [[My Note#Section One]]."` returns `targetPath: "My Note#Section One"` (the anchor is part of the target path).
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::B1_heading_anchor_preserved(vitest)`
 
-- [ ] **B2** — Wikilinks inside code fences are ignored
+- [x] **B2** — Wikilinks inside code fences are ignored
   - Wikilinks within `` ``` `` fenced code blocks are not extracted.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::B2_code_fence_wikilinks_ignored(vitest)`
 
-- [ ] **B3** — Wikilinks inside inline code are ignored
+- [x] **B3** — Wikilinks inside inline code are ignored
   - Wikilinks within single backtick `` `[[target]]` `` inline code are not extracted.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::B3_inline_code_wikilinks_ignored(vitest)`
 
-- [ ] **B4** — Duplicate wikilinks to the same target are deduplicated
+- [x] **B4** — Duplicate wikilinks to the same target are deduplicated
   - If the same `[[target]]` appears multiple times, only one `CrossReference` is returned per unique `targetPath`.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::B4_duplicates_deduplicated(vitest)`
 
 ### Phase C: Edge Cases
 
-- [ ] **C1** — Empty or whitespace-only content returns empty array
+- [x] **C1** — Empty or whitespace-only content returns empty array
   - `extractWikilinks("", "node-1")` and `extractWikilinks("   ", "node-1")` both return `[]`.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::C1_empty_content_returns_empty(vitest)`
 
-- [ ] **C2** — Content with no wikilinks returns empty array
+- [x] **C2** — Content with no wikilinks returns empty array
   - Plain text without any `[[...]]` patterns returns `[]`.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::C2_no_wikilinks_returns_empty(vitest)`
 
-- [ ] **C3** — Malformed wikilinks are ignored
+- [x] **C3** — Malformed wikilinks are ignored
   - Unclosed `[[target` or empty `[[]]` patterns are not extracted.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::C3_malformed_wikilinks_ignored(vitest)`
 
-- [ ] **C4** — `sourceNodeId` is correctly set on all returned records
+- [x] **C4** — `sourceNodeId` is correctly set on all returned records
   - Every `CrossReference` in the output has `sourceNodeId` matching the input parameter.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::C4_source_node_id_set(vitest)`
 
-- [ ] **C5** — Function is deterministic
+- [x] **C5** — Function is deterministic
   - Given identical input, repeated calls produce identical output.
   - Evidence: `src/__tests__/unit/wikilinkParser.test.ts::C5_deterministic_output(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

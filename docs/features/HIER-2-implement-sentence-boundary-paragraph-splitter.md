@@ -3,7 +3,7 @@
 **Story**: Implement a sentence-boundary splitter utility that splits long paragraphs at sentence boundaries instead of arbitrary word boundaries, producing ordered chunks with `sequenceIndex` for reassembly.
 **Epic**: Epic 11 — Hierarchical Document Model and Tree Chunker
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -96,66 +96,66 @@ None. This is a standalone utility with no modifications to existing files.
 
 ### Phase A: Core Sentence Splitting
 
-- [ ] **A1** — `splitBySentence` splits at sentence-ending punctuation
+- [x] **A1** — `splitBySentence` splits at sentence-ending punctuation
   - Sentences ending with `.`, `!`, or `?` followed by whitespace are treated as boundaries.
   - Input `"First sentence. Second sentence. Third sentence."` with `maxChunkChars` large enough returns a single chunk.
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::A1_splits_at_sentence_boundaries(vitest)`
 
-- [ ] **A2** — Chunks respect `maxChunkChars` limit
+- [x] **A2** — Chunks respect `maxChunkChars` limit
   - When accumulated sentences exceed `maxChunkChars`, a new chunk is started at the next sentence boundary.
   - No chunk exceeds `maxChunkChars` unless a single sentence is longer than the limit (in which case it becomes its own chunk).
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::A2_respects_max_chunk_chars(vitest)`
 
-- [ ] **A3** — Each chunk carries a sequential `sequenceIndex`
+- [x] **A3** — Each chunk carries a sequential `sequenceIndex`
   - The first chunk has `sequenceIndex: 0`, second has `1`, etc.
   - Reassembling chunks by `sequenceIndex` order reproduces the original content (modulo whitespace normalization).
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::A3_sequential_index_ordering(vitest)`
 
 ### Phase B: Abbreviation and Special Case Handling
 
-- [ ] **B1** — Common abbreviations do not trigger false splits
+- [x] **B1** — Common abbreviations do not trigger false splits
   - Abbreviations `Mr.`, `Mrs.`, `Dr.`, `Prof.`, `e.g.`, `i.e.`, `etc.`, `vs.`, `approx.`, `Jr.`, `Sr.`, `St.`, `Mt.`, `Dept.`, `Corp.`, `Inc.`, `Ltd.` are not treated as sentence boundaries.
   - Input `"Dr. Smith met Mr. Jones at 3 p.m. today."` remains a single sentence.
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::B1_abbreviations_not_split(vitest)`
 
-- [ ] **B2** — Decimal numbers do not trigger false splits
+- [x] **B2** — Decimal numbers do not trigger false splits
   - Numbers like `3.14`, `$1.50`, `0.001`, and `v2.0` are not treated as sentence boundaries.
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::B2_decimals_not_split(vitest)`
 
-- [ ] **B3** — URLs do not trigger false splits
+- [x] **B3** — URLs do not trigger false splits
   - URLs like `https://example.com/path.html` and `ftp://files.server.org` are not split at internal periods.
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::B3_urls_not_split(vitest)`
 
-- [ ] **B4** — Ellipses are handled correctly
+- [x] **B4** — Ellipses are handled correctly
   - `...` (three dots) is not treated as three sentence boundaries.
   - Text like `"He paused... then continued."` is treated as one or two sentences, not four.
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::B4_ellipses_handled(vitest)`
 
 ### Phase C: Edge Cases
 
-- [ ] **C1** — Empty or whitespace-only input returns empty array
+- [x] **C1** — Empty or whitespace-only input returns empty array
   - `splitBySentence("", 500)` and `splitBySentence("   \n  ", 500)` both return `[]`.
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::C1_empty_input_returns_empty(vitest)`
 
-- [ ] **C2** — Content shorter than `maxChunkChars` returns single chunk
+- [x] **C2** — Content shorter than `maxChunkChars` returns single chunk
   - A short paragraph that fits within the limit returns exactly one `SentenceSplit` with `sequenceIndex: 0`.
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::C2_short_content_single_chunk(vitest)`
 
-- [ ] **C3** — Single sentence longer than `maxChunkChars` is not split mid-sentence
+- [x] **C3** — Single sentence longer than `maxChunkChars` is not split mid-sentence
   - A single very long sentence exceeding the limit is returned as one chunk (the sentence boundary takes priority over the size limit).
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::C3_long_sentence_not_split(vitest)`
 
-- [ ] **C4** — Function is deterministic
+- [x] **C4** — Function is deterministic
   - Given identical input, repeated calls produce identical output.
   - Evidence: `src/__tests__/unit/sentenceSplitter.test.ts::C4_deterministic_output(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

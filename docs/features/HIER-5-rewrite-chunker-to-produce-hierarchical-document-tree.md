@@ -3,7 +3,7 @@
 **Story**: Completely rewrite the markdown chunker to produce a hierarchical `DocumentTree` of typed nodes (note → topic → subtopic → paragraph/bullet_group → bullet) with sentence-boundary splitting, bullet grouping, scoped tag tracking, and cross-reference extraction.
 **Epic**: Epic 11 — Hierarchical Document Model and Tree Chunker
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -134,30 +134,30 @@ No frontend work is required for this story.
 
 ### Phase A: Tree Structure and Node Types
 
-- [ ] **A1** — `buildDocumentTree` returns a `DocumentTree` with a root note node
+- [x] **A1** — `buildDocumentTree` returns a `DocumentTree` with a root note node
   - The root node has `nodeType: "note"`, `depth: 0`, `parentId: null`, and `content` equal to the full note title.
   - The `DocumentTree.nodes` Map contains the root and all descendants.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::A1_root_note_node(vitest)`
 
-- [ ] **A2** — `#` headings produce `topic` nodes at depth 1
+- [x] **A2** — `#` headings produce `topic` nodes at depth 1
   - A `# Heading` line creates a `DocumentNode` with `nodeType: "topic"`, `depth: 1`, `headingTrail: ["Heading"]`, and `parentId` pointing to the note root.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::A2_topic_nodes_from_h1(vitest)`
 
-- [ ] **A3** — `##` through `######` headings produce `subtopic` nodes at appropriate depths
+- [x] **A3** — `##` through `######` headings produce `subtopic` nodes at appropriate depths
   - A `## Sub` under `# Main` creates a subtopic with `depth: 2`, `headingTrail: ["Main", "Sub"]`, and `parentId` pointing to the topic node.
   - Deeper headings (`###`, `####`, etc.) nest correctly with incrementing depth.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::A3_subtopic_nodes_from_h2_through_h6(vitest)`
 
-- [ ] **A4** — Content before the first heading is attached to the note root
+- [x] **A4** — Content before the first heading is attached to the note root
   - Paragraphs and bullets before any heading become children of the root note node.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::A4_content_before_first_heading(vitest)`
 
-- [ ] **A5** — All nodes have stable, deterministic `nodeId` values
+- [x] **A5** — All nodes have stable, deterministic `nodeId` values
   - The `nodeId` is computed as FNV-1a hash of `notePath|headingTrail|nodeType|sequenceIndex|contentPrefix`.
   - Given identical input, repeated calls produce identical `nodeId` values for all nodes.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::A5_stable_deterministic_node_ids(vitest)`
 
-- [ ] **A6** — Parent-child relationships are bidirectional and consistent
+- [x] **A6** — Parent-child relationships are bidirectional and consistent
   - Every node's `parentId` points to a valid node in the tree (except root which is `null`).
   - Every node's `childIds` array contains IDs of nodes whose `parentId` matches.
   - The `nodes` Map contains every node referenced by any `parentId` or `childIds`.
@@ -165,116 +165,116 @@ No frontend work is required for this story.
 
 ### Phase B: Paragraph Handling (R3)
 
-- [ ] **B1** — Contiguous non-blank, non-heading, non-bullet lines form paragraph nodes
+- [x] **B1** — Contiguous non-blank, non-heading, non-bullet lines form paragraph nodes
   - A block of plain text lines (separated by blank lines from other content) becomes a single `paragraph` node.
   - The paragraph's `content` is the full text (not truncated).
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::B1_paragraph_node_from_text_block(vitest)`
 
-- [ ] **B2** — Long paragraphs are split at sentence boundaries
+- [x] **B2** — Long paragraphs are split at sentence boundaries
   - When a paragraph exceeds `maxParagraphChars`, it is split using `splitBySentence` from HIER-2.
   - Each split produces a separate `paragraph` node with the same `parentId` and incrementing `sequenceIndex`.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::B2_long_paragraph_sentence_split(vitest)`
 
-- [ ] **B3** — Split paragraph nodes can be reassembled by `sequenceIndex`
+- [x] **B3** — Split paragraph nodes can be reassembled by `sequenceIndex`
   - Collecting all paragraph nodes with the same `parentId` and sorting by `sequenceIndex` reproduces the original paragraph content (modulo whitespace normalization).
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::B3_split_paragraph_reassembly(vitest)`
 
 ### Phase C: Bullet List Grouping (R4)
 
-- [ ] **C1** — Consecutive bullets with no blank line form a `bullet_group` node
+- [x] **C1** — Consecutive bullets with no blank line form a `bullet_group` node
   - A sequence of `- item` lines without blank lines between them creates a `bullet_group` parent with individual `bullet` children.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::C1_bullet_group_from_consecutive_bullets(vitest)`
 
-- [ ] **C2** — Blank lines between bullets create separate `bullet_group` nodes
+- [x] **C2** — Blank lines between bullets create separate `bullet_group` nodes
   - Two bullet sequences separated by a blank line produce two distinct `bullet_group` nodes.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::C2_blank_line_separates_bullet_groups(vitest)`
 
-- [ ] **C3** — Sub-bullets (indented) become children of their parent bullet
+- [x] **C3** — Sub-bullets (indented) become children of their parent bullet
   - Indented bullets (tab or 2+ spaces) under a top-level bullet become children of that bullet node, forming a nested tree.
   - The parent bullet's `childIds` contains the sub-bullet IDs.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::C3_sub_bullets_nested(vitest)`
 
-- [ ] **C4** — Bullet markers `- `, `* `, `+ `, and `1. ` are all recognized
+- [x] **C4** — Bullet markers `- `, `* `, `+ `, and `1. ` are all recognized
   - All standard markdown bullet markers produce bullet nodes.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::C4_all_bullet_markers_recognized(vitest)`
 
-- [ ] **C5** — `bullet_group` content is the concatenation of all child bullet content
+- [x] **C5** — `bullet_group` content is the concatenation of all child bullet content
   - The `bullet_group` node's `content` field contains the full text of all its bullets (for summary generation).
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::C5_bullet_group_content_concatenation(vitest)`
 
 ### Phase D: Scoped Tag Tracking (R8)
 
-- [ ] **D1** — Frontmatter tags are inherited by all nodes in the tree
+- [x] **D1** — Frontmatter tags are inherited by all nodes in the tree
   - Tags from YAML frontmatter appear in the `tags` array of every node in the tree.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::D1_frontmatter_tags_inherited(vitest)`
 
-- [ ] **D2** — Inline tags are scoped to the node where they appear
+- [x] **D2** — Inline tags are scoped to the node where they appear
   - An inline `#tag` within a paragraph or bullet is added to that node's `tags` array (in addition to inherited frontmatter tags).
   - Sibling nodes without that inline tag do not include it.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::D2_inline_tags_scoped(vitest)`
 
-- [ ] **D3** — Tags are normalized, deduplicated, and sorted
+- [x] **D3** — Tags are normalized, deduplicated, and sorted
   - Tags are lowercased, trimmed, deduplicated, and sorted alphabetically — matching the existing chunker's tag normalization behavior.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::D3_tags_normalized_deduped_sorted(vitest)`
 
 ### Phase E: Cross-Reference Extraction (R9)
 
-- [ ] **E1** — Wikilinks in node content are extracted as `CrossReference` records
+- [x] **E1** — Wikilinks in node content are extracted as `CrossReference` records
   - The chunker calls `extractWikilinks` from HIER-3 for each node's content.
   - Cross-references are collected and available for storage by the caller.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::E1_wikilinks_extracted(vitest)`
 
 ### Phase F: Content Hash and Metadata
 
-- [ ] **F1** — Each node has a `contentHash` for change detection
+- [x] **F1** — Each node has a `contentHash` for change detection
   - The `contentHash` is computed from the node's `content` using the FNV-1a hash.
   - Changed content produces a different hash; identical content produces the same hash.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::F1_content_hash_change_detection(vitest)`
 
-- [ ] **F2** — Each node has `sequenceIndex` for sibling ordering
+- [x] **F2** — Each node has `sequenceIndex` for sibling ordering
   - Children of the same parent are assigned `sequenceIndex` values (0, 1, 2, ...) in document order.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::F2_sequence_index_ordering(vitest)`
 
-- [ ] **F3** — Each node has `updatedAt` from the input
+- [x] **F3** — Each node has `updatedAt` from the input
   - All nodes in the tree carry the `updatedAt` timestamp from the `ChunkerInput`.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::F3_updated_at_propagated(vitest)`
 
 ### Phase G: Backward Compatibility
 
-- [ ] **G1** — Existing `chunkMarkdownNote` function remains exported and functional
+- [x] **G1** — Existing `chunkMarkdownNote` function remains exported and functional
   - The existing flat chunker function continues to work identically.
   - All existing `chunker.test.ts` tests continue to pass without modification.
   - Evidence: `src/__tests__/unit/chunker.test.ts::all_existing_tests_pass(vitest)`
 
-- [ ] **G2** — Existing `extractTagsFromMarkdown` function remains exported and functional
+- [x] **G2** — Existing `extractTagsFromMarkdown` function remains exported and functional
   - The tag extraction utility continues to work identically.
   - Evidence: `src/__tests__/unit/chunker.test.ts::all_existing_tests_pass(vitest)`
 
 ### Phase H: Edge Cases
 
-- [ ] **H1** — Empty markdown produces a tree with only a root note node
+- [x] **H1** — Empty markdown produces a tree with only a root note node
   - Empty or whitespace-only markdown returns a `DocumentTree` where the root has no children.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::H1_empty_markdown_root_only(vitest)`
 
-- [ ] **H2** — Markdown with no headings produces flat children under root
+- [x] **H2** — Markdown with no headings produces flat children under root
   - All paragraphs and bullet groups become direct children of the note root.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::H2_no_headings_flat_under_root(vitest)`
 
-- [ ] **H3** — Code fences are treated as paragraph content, not parsed for structure
+- [x] **H3** — Code fences are treated as paragraph content, not parsed for structure
   - Content inside `` ``` `` fences is not parsed for headings, bullets, or tags.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::H3_code_fences_as_paragraph(vitest)`
 
-- [ ] **H4** — Mixed content (headings, paragraphs, bullets) produces correct tree
+- [x] **H4** — Mixed content (headings, paragraphs, bullets) produces correct tree
   - A complex note with interleaved headings, paragraphs, and bullet lists produces the expected tree structure with correct parent-child relationships.
   - Evidence: `src/__tests__/unit/hierarchicalChunker.test.ts::H4_mixed_content_correct_tree(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

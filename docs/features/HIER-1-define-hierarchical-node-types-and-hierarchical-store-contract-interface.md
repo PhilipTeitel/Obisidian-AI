@@ -3,7 +3,7 @@
 **Story**: Define all hierarchical document-tree types (`DocumentNode`, `NodeType`, `DocumentTree`, summary/embedding records) and the `HierarchicalStoreContract` interface that downstream stories depend on.
 **Epic**: Epic 11 — Hierarchical Document Model and Tree Chunker
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -239,80 +239,80 @@ No frontend work is required for this story. All types are consumed by service-l
 
 ### Phase A: Core Node Types
 
-- [ ] **A1** — `NodeType` union type is defined with all six values
+- [x] **A1** — `NodeType` union type is defined with all six values
   - The type `NodeType` must be a string literal union: `"note" | "topic" | "subtopic" | "paragraph" | "bullet_group" | "bullet"`.
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::A1_node_type_union_values(vitest)`
 
-- [ ] **A2** — `DocumentNode` interface has all required fields
+- [x] **A2** — `DocumentNode` interface has all required fields
   - Must include: `nodeId`, `parentId` (nullable), `childIds` (string array), `notePath`, `noteTitle`, `headingTrail` (string array), `depth` (number), `nodeType` (NodeType), `content` (string), `sequenceIndex` (number), `tags` (string array), `contentHash` (string), `updatedAt` (number).
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::A2_document_node_fields(vitest)`
 
-- [ ] **A3** — `DocumentTree` interface contains `root` and `nodes` Map
+- [x] **A3** — `DocumentTree` interface contains `root` and `nodes` Map
   - `root` must be a `DocumentNode`. `nodes` must be `Map<string, DocumentNode>` for O(1) lookup by `nodeId`.
   - A `DocumentTree` can be constructed with a root node and its descendants in the map.
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::A3_document_tree_construction(vitest)`
 
 ### Phase B: Summary, Embedding, and Cross-Reference Types
 
-- [ ] **B1** — `SummaryRecord` interface includes provenance fields
+- [x] **B1** — `SummaryRecord` interface includes provenance fields
   - Must include: `nodeId`, `summary`, `modelUsed`, `promptVersion`, `generatedAt` (number/timestamp).
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::B1_summary_record_fields(vitest)`
 
-- [ ] **B2** — `EmbeddingType` and `NodeMatch` types are defined
+- [x] **B2** — `EmbeddingType` and `NodeMatch` types are defined
   - `EmbeddingType` must be `"content" | "summary"`. `NodeMatch` must include `nodeId`, `score`, and `embeddingType`.
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::B2_embedding_type_and_node_match(vitest)`
 
-- [ ] **B3** — `CrossReference` interface is defined
+- [x] **B3** — `CrossReference` interface is defined
   - Must include `sourceNodeId`, `targetPath`, and `targetDisplay` (nullable string).
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::B3_cross_reference_fields(vitest)`
 
 ### Phase C: Retrieval and Context Assembly Types
 
-- [ ] **C1** — `LeafMatch` interface carries node, score, and ancestor chain
+- [x] **C1** — `LeafMatch` interface carries node, score, and ancestor chain
   - Must include `node` (DocumentNode), `score` (number), and `ancestorChain` (DocumentNode array).
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::C1_leaf_match_fields(vitest)`
 
-- [ ] **C2** — `HierarchicalContextBlock` and `AssembledContext` types are defined
+- [x] **C2** — `HierarchicalContextBlock` and `AssembledContext` types are defined
   - `HierarchicalContextBlock` must include `notePath`, `noteTitle`, `headingTrail`, `matchedContent`, `siblingContent`, `parentSummary`, and `score`.
   - `AssembledContext` must include `blocks` (array of `HierarchicalContextBlock`) and `tierUsage` (`ContextTierUsage` with `matchedContentTokens`, `siblingContextTokens`, `parentSummaryTokens`).
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::C2_assembled_context_types(vitest)`
 
-- [ ] **C3** — `HierarchicalSearchResult` type is defined
+- [x] **C3** — `HierarchicalSearchResult` type is defined
   - Must include `nodeId`, `score`, `notePath`, `noteTitle`, `headingTrail`, `matchedContent`, `parentSummary`, `siblingSnippet`, and `tags`.
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::C3_hierarchical_search_result_fields(vitest)`
 
 ### Phase D: HierarchicalStoreContract Interface
 
-- [ ] **D1** — `HierarchicalStoreContract` interface declares all required methods
+- [x] **D1** — `HierarchicalStoreContract` interface declares all required methods
   - Must declare: `upsertNodeTree`, `deleteByNotePath`, `getNode`, `getChildren`, `getAncestorChain`, `getSiblings`, `getNodesByNotePath`, `searchSummaryEmbeddings`, `searchContentEmbeddings`, `upsertSummary`, `getSummary`, `upsertEmbedding`, `upsertTags`, `upsertCrossReferences`, `getCrossReferences`.
   - Each method must have correct parameter types and return types as specified in Section 2.
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::D1_store_contract_method_signatures(vitest)`
 
-- [ ] **D2** — `searchContentEmbeddings` accepts optional `parentId` for scoped search
+- [x] **D2** — `searchContentEmbeddings` accepts optional `parentId` for scoped search
   - The `parentId` parameter must be optional (used by Phase 2 drill-down to scope search to a parent node's children).
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::D2_scoped_content_search_signature(vitest)`
 
 ### Phase E: Integration with Existing Types
 
-- [ ] **E1** — `IndexingStage` union includes `"summarize"` stage
+- [x] **E1** — `IndexingStage` union includes `"summarize"` stage
   - The updated type must be: `"queued" | "crawl" | "chunk" | "summarize" | "embed" | "finalize"`.
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::E1_indexing_stage_includes_summarize(vitest)`
 
-- [ ] **E2** — `RuntimeServices` includes optional `hierarchicalStore` field
+- [x] **E2** — `RuntimeServices` includes optional `hierarchicalStore` field
   - The `hierarchicalStore` field must be typed as `HierarchicalStoreContract | undefined` (optional) so existing bootstrap continues to work without it.
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::E2_runtime_services_hierarchical_store(vitest)`
 
-- [ ] **E3** — Existing flat types remain unchanged and compile
+- [x] **E3** — Existing flat types remain unchanged and compile
   - `ChunkRecord`, `ChunkReference`, `VectorStoreRepositoryContract`, `VectorStoreRow`, `VectorStoreMatch`, `ChatContextChunk`, `SearchResult` must all remain present and unchanged.
   - Evidence: `src/__tests__/unit/hierarchicalTypes.test.ts::E3_existing_flat_types_unchanged(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

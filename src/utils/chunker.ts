@@ -1,4 +1,8 @@
-import type { ChunkContextKind, ChunkRecord, ChunkerInput, ChunkerOptions } from "../types";
+import type { ChunkContextKind, ChunkRecord, ChunkerInput, ChunkerOptions, CrossReference, DocumentNode, DocumentTree, NodeType } from "../types";
+import { createRuntimeLogger } from "../logging/runtimeLogger";
+import { splitBySentence } from "./sentenceSplitter";
+import { extractWikilinks } from "./wikilinkParser";
+const logger = createRuntimeLogger("hierarchicalChunker");
 
 interface FrontmatterParseResult {
   body: string;
@@ -272,4 +276,353 @@ export const chunkMarkdownNote = (input: ChunkerInput, options: ChunkerOptions =
 
   flushParagraph();
   return chunks;
+};
+
+// ── Hierarchical Chunker ────────────────────────────────────────────────
+
+export interface HierarchicalChunkerOptions {
+  maxParagraphChars?: number;
+}
+
+export interface HierarchicalChunkerResult {
+  tree: DocumentTree;
+  crossReferences: CrossReference[];
+}
+
+interface PendingBullet {
+  indent: number;
+  content: string;
+}
+
+const computeNodeId = (
+  notePath: string,
+  headingTrail: string[],
+  nodeType: NodeType,
+  sequenceIndex: number,
+  content: string,
+): string => {
+  const contentPrefix = content.slice(0, 50);
+  return stableHash(`node|${notePath}|${headingTrail.join(">")}|${nodeType}|${sequenceIndex}|${contentPrefix}`);
+};
+
+const computeContentHash = (content: string): string => {
+  return stableHash(`hash|${content}`);
+};
+
+const extractInlineTagsFromContent = (content: string): string[] => {
+  const tagSet = new Set<string>();
+  const lines = content.replace(/\r\n?/g, "\n").split("\n");
+  let inCodeFence = false;
+
+  for (const line of lines) {
+    if (line.trim().startsWith("```")) {
+      inCodeFence = !inCodeFence;
+      continue;
+    }
+    if (inCodeFence) {
+      continue;
+    }
+    for (const match of line.matchAll(INLINE_TAG_PATTERN)) {
+      const normalized = normalizeTag(match[2]);
+      if (normalized) {
+        tagSet.add(normalized);
+      }
+    }
+  }
+
+  return [...tagSet].sort();
+};
+
+const buildNodeTags = (frontmatterTags: string[], inlineTags: string[]): string[] => {
+  const tagSet = new Set<string>();
+  for (const tag of frontmatterTags) {
+    tagSet.add(tag);
+  }
+  for (const tag of inlineTags) {
+    tagSet.add(tag);
+  }
+  return [...tagSet].sort();
+};
+
+const createDocumentNode = (
+  notePath: string,
+  noteTitle: string,
+  headingTrail: string[],
+  depth: number,
+  nodeType: NodeType,
+  content: string,
+  sequenceIndex: number,
+  parentId: string | null,
+  frontmatterTags: string[],
+  updatedAt: number,
+): DocumentNode => {
+  const inlineTags = extractInlineTagsFromContent(content);
+  const tags = buildNodeTags(frontmatterTags, inlineTags);
+  const nodeId = computeNodeId(notePath, headingTrail, nodeType, sequenceIndex, content);
+
+  return {
+    nodeId,
+    parentId,
+    childIds: [],
+    notePath,
+    noteTitle,
+    headingTrail: [...headingTrail],
+    depth,
+    nodeType,
+    content,
+    sequenceIndex,
+    tags,
+    contentHash: computeContentHash(content),
+    updatedAt,
+  };
+};
+
+const addChild = (parent: DocumentNode, child: DocumentNode): void => {
+  parent.childIds.push(child.nodeId);
+};
+
+export const buildDocumentTree = (
+  input: ChunkerInput,
+  options: HierarchicalChunkerOptions = {},
+): HierarchicalChunkerResult => {
+  const startTime = Date.now();
+  const { notePath, noteTitle, markdown, updatedAt } = input;
+  const { maxParagraphChars } = options;
+
+  const frontmatter = parseFrontmatter(markdown);
+  const fmTags = frontmatter.tags;
+
+  const allNodes = new Map<string, DocumentNode>();
+  const allCrossRefs: CrossReference[] = [];
+
+  const registerNode = (node: DocumentNode): void => {
+    allNodes.set(node.nodeId, node);
+  };
+
+  const collectCrossRefs = (node: DocumentNode): void => {
+    const refs = extractWikilinks(node.content, node.nodeId);
+    for (const ref of refs) {
+      allCrossRefs.push(ref);
+    }
+  };
+
+  const root = createDocumentNode(
+    notePath, noteTitle, [], 0, "note", noteTitle, 0, null, fmTags, updatedAt,
+  );
+  registerNode(root);
+
+  const bodyLines = frontmatter.body.replace(/\r\n?/g, "\n").split("\n");
+
+  const headingStack: DocumentNode[] = [];
+  let paragraphLines: string[] = [];
+  let pendingBullets: PendingBullet[] = [];
+  let inCodeFence = false;
+
+  const getCurrentParent = (): DocumentNode => {
+    if (headingStack.length > 0) {
+      return headingStack[headingStack.length - 1];
+    }
+    return root;
+  };
+
+  const getChildSequenceIndex = (parent: DocumentNode): number => {
+    return parent.childIds.length;
+  };
+
+  const flushParagraph = (): void => {
+    if (paragraphLines.length === 0) {
+      return;
+    }
+
+    const rawContent = paragraphLines.join("\n").trim();
+    paragraphLines = [];
+
+    if (!rawContent) {
+      return;
+    }
+
+    const parent = getCurrentParent();
+    const headingTrail = parent.nodeType === "note" ? [] : parent.headingTrail;
+
+    if (maxParagraphChars && rawContent.length > maxParagraphChars) {
+      const splits = splitBySentence(rawContent, maxParagraphChars);
+      for (const split of splits) {
+        const seqIdx = getChildSequenceIndex(parent);
+        const paraNode = createDocumentNode(
+          notePath, noteTitle, headingTrail, parent.depth + 1,
+          "paragraph", split.text, seqIdx, parent.nodeId, fmTags, updatedAt,
+        );
+        addChild(parent, paraNode);
+        registerNode(paraNode);
+        collectCrossRefs(paraNode);
+      }
+    } else {
+      const seqIdx = getChildSequenceIndex(parent);
+      const paraNode = createDocumentNode(
+        notePath, noteTitle, headingTrail, parent.depth + 1,
+        "paragraph", rawContent, seqIdx, parent.nodeId, fmTags, updatedAt,
+      );
+      addChild(parent, paraNode);
+      registerNode(paraNode);
+      collectCrossRefs(paraNode);
+    }
+  };
+
+  const flushBullets = (): void => {
+    if (pendingBullets.length === 0) {
+      return;
+    }
+
+    const bullets = [...pendingBullets];
+    pendingBullets = [];
+
+    const parent = getCurrentParent();
+    const headingTrail = parent.nodeType === "note" ? [] : parent.headingTrail;
+
+    const groupContent = bullets.map((b) => b.content).join("\n");
+    const groupSeqIdx = getChildSequenceIndex(parent);
+    const bulletGroup = createDocumentNode(
+      notePath, noteTitle, headingTrail, parent.depth + 1,
+      "bullet_group", groupContent, groupSeqIdx, parent.nodeId, fmTags, updatedAt,
+    );
+    addChild(parent, bulletGroup);
+    registerNode(bulletGroup);
+    collectCrossRefs(bulletGroup);
+
+    interface BulletStackEntry {
+      node: DocumentNode;
+      indent: number;
+    }
+
+    const bulletStack: BulletStackEntry[] = [];
+
+    for (const bullet of bullets) {
+      const bulletParent = (() => {
+        if (bullet.indent === 0) {
+          return bulletGroup;
+        }
+        while (bulletStack.length > 0) {
+          const top = bulletStack[bulletStack.length - 1];
+          if (top.indent < bullet.indent) {
+            return top.node;
+          }
+          bulletStack.pop();
+        }
+        return bulletGroup;
+      })();
+
+      const bulletSeqIdx = getChildSequenceIndex(bulletParent);
+      const bulletNode = createDocumentNode(
+        notePath, noteTitle, headingTrail, bulletParent.depth + 1,
+        "bullet", bullet.content, bulletSeqIdx, bulletParent.nodeId, fmTags, updatedAt,
+      );
+      addChild(bulletParent, bulletNode);
+      registerNode(bulletNode);
+      collectCrossRefs(bulletNode);
+
+      bulletStack.push({ node: bulletNode, indent: bullet.indent });
+    }
+  };
+
+  for (const line of bodyLines) {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("```")) {
+      if (!inCodeFence) {
+        inCodeFence = true;
+        paragraphLines.push(line);
+        continue;
+      } else {
+        inCodeFence = false;
+        paragraphLines.push(line);
+        continue;
+      }
+    }
+
+    if (inCodeFence) {
+      paragraphLines.push(line);
+      continue;
+    }
+
+    if (!trimmed) {
+      flushParagraph();
+      flushBullets();
+      continue;
+    }
+
+    const headingMatch = trimmed.match(HEADING_PATTERN);
+    if (headingMatch) {
+      flushParagraph();
+      flushBullets();
+
+      const level = headingMatch[1].length;
+      const headingTitle = headingMatch[2].trim();
+
+      while (headingStack.length > 0) {
+        const top = headingStack[headingStack.length - 1];
+        if (top.depth < level) {
+          break;
+        }
+        headingStack.pop();
+      }
+
+      const headingParent = headingStack.length > 0
+        ? headingStack[headingStack.length - 1]
+        : root;
+
+      const newTrail = [...headingParent.headingTrail, headingTitle];
+      if (headingParent === root) {
+        newTrail.splice(0, newTrail.length, headingTitle);
+      } else {
+        newTrail.splice(0, newTrail.length, ...headingParent.headingTrail, headingTitle);
+      }
+
+      const nodeType: NodeType = level === 1 ? "topic" : "subtopic";
+      const seqIdx = getChildSequenceIndex(headingParent);
+      const headingNode = createDocumentNode(
+        notePath, noteTitle, newTrail, level,
+        nodeType, headingTitle, seqIdx, headingParent.nodeId, fmTags, updatedAt,
+      );
+      addChild(headingParent, headingNode);
+      registerNode(headingNode);
+
+      headingStack.push(headingNode);
+      continue;
+    }
+
+    const bulletMatch = line.match(BULLET_PATTERN);
+    if (bulletMatch) {
+      flushParagraph();
+      const indent = bulletMatch[1].length;
+      const bulletContent = bulletMatch[3].trim();
+      pendingBullets.push({ indent, content: bulletContent });
+      continue;
+    }
+
+    flushBullets();
+    paragraphLines.push(line);
+  }
+
+  if (inCodeFence) {
+    flushParagraph();
+  } else {
+    flushParagraph();
+    flushBullets();
+  }
+
+  const tree: DocumentTree = { root, nodes: allNodes };
+
+  const elapsed = Date.now() - startTime;
+  logger.info({
+    event: "hierarchical.chunker.completed",
+    message: `Built document tree for "${noteTitle}" with ${allNodes.size} nodes in ${elapsed}ms`,
+    context: {
+      notePath,
+      nodeCount: allNodes.size,
+      crossRefCount: allCrossRefs.length,
+      elapsedMs: elapsed,
+    },
+  });
+
+  return { tree, crossReferences: allCrossRefs };
 };

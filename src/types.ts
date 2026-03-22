@@ -184,7 +184,7 @@ export interface SearchResult {
 
 export type JobType = "reindex-vault" | "index-changes" | "embed-batch" | "chat-completion";
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
-export type IndexingStage = "queued" | "crawl" | "chunk" | "embed" | "finalize";
+export type IndexingStage = "queued" | "crawl" | "chunk" | "summarize" | "embed" | "finalize";
 
 export interface JobProgress {
   completed: number;
@@ -351,6 +351,7 @@ export interface RuntimeServices {
   chatService: ChatServiceContract;
   agentService: AgentServiceContract;
   providerRegistry: ProviderRegistryContract;
+  hierarchicalStore?: HierarchicalStoreContract;
   dispose(): Promise<void>;
 }
 
@@ -368,4 +369,120 @@ export type RuntimeServiceName = (typeof RUNTIME_SERVICE_CONSTRUCTION_ORDER)[num
 export interface RuntimeBootstrapResult {
   services: RuntimeServices;
   initializationOrder: RuntimeServiceName[];
+}
+
+// ── Hierarchical Node Types (R1) ──────────────────────────────────────
+
+export type NodeType = "note" | "topic" | "subtopic" | "paragraph" | "bullet_group" | "bullet";
+
+export interface DocumentNode {
+  nodeId: string;
+  parentId: string | null;
+  childIds: string[];
+  notePath: string;
+  noteTitle: string;
+  headingTrail: string[];
+  depth: number;
+  nodeType: NodeType;
+  content: string;
+  sequenceIndex: number;
+  tags: string[];
+  contentHash: string;
+  updatedAt: number;
+}
+
+export interface DocumentTree {
+  root: DocumentNode;
+  nodes: Map<string, DocumentNode>;
+}
+
+// ── Summary Types (R2) ────────────────────────────────────────────────
+
+export interface SummaryRecord {
+  nodeId: string;
+  summary: string;
+  modelUsed: string;
+  promptVersion: string;
+  generatedAt: number;
+}
+
+// ── Embedding Types (hierarchical) ───────────────────────────────────
+
+export type EmbeddingType = "content" | "summary";
+
+export interface NodeMatch {
+  nodeId: string;
+  score: number;
+  embeddingType: EmbeddingType;
+}
+
+// ── Cross-Reference Types (R9) ───────────────────────────────────────
+
+export interface CrossReference {
+  sourceNodeId: string;
+  targetPath: string;
+  targetDisplay: string | null;
+}
+
+// ── Hierarchical Retrieval Types (R6, R7) ────────────────────────────
+
+export interface LeafMatch {
+  node: DocumentNode;
+  score: number;
+  ancestorChain: DocumentNode[];
+}
+
+export interface ContextTierUsage {
+  matchedContentTokens: number;
+  siblingContextTokens: number;
+  parentSummaryTokens: number;
+}
+
+export interface HierarchicalContextBlock {
+  notePath: string;
+  noteTitle: string;
+  headingTrail: string[];
+  matchedContent: string;
+  siblingContent: string;
+  parentSummary: string;
+  score: number;
+}
+
+export interface AssembledContext {
+  blocks: HierarchicalContextBlock[];
+  tierUsage: ContextTierUsage;
+}
+
+// ── Hierarchical Search Result ───────────────────────────────────────
+
+export interface HierarchicalSearchResult {
+  nodeId: string;
+  score: number;
+  notePath: string;
+  noteTitle: string;
+  headingTrail: string[];
+  matchedContent: string;
+  parentSummary: string;
+  siblingSnippet: string;
+  tags: string[];
+}
+
+// ── Hierarchical Store Contract ──────────────────────────────────────
+
+export interface HierarchicalStoreContract {
+  upsertNodeTree(tree: DocumentTree): Promise<void>;
+  deleteByNotePath(notePath: string): Promise<void>;
+  getNode(nodeId: string): Promise<DocumentNode | null>;
+  getChildren(nodeId: string): Promise<DocumentNode[]>;
+  getAncestorChain(nodeId: string): Promise<DocumentNode[]>;
+  getSiblings(nodeId: string): Promise<DocumentNode[]>;
+  getNodesByNotePath(notePath: string): Promise<DocumentNode[]>;
+  searchSummaryEmbeddings(vector: EmbeddingVector, topK: number): Promise<NodeMatch[]>;
+  searchContentEmbeddings(vector: EmbeddingVector, topK: number, parentId?: string): Promise<NodeMatch[]>;
+  upsertSummary(nodeId: string, summary: SummaryRecord): Promise<void>;
+  getSummary(nodeId: string): Promise<SummaryRecord | null>;
+  upsertEmbedding(nodeId: string, embeddingType: EmbeddingType, vector: EmbeddingVector): Promise<void>;
+  upsertTags(nodeId: string, tags: string[]): Promise<void>;
+  upsertCrossReferences(refs: CrossReference[]): Promise<void>;
+  getCrossReferences(nodeId: string): Promise<CrossReference[]>;
 }

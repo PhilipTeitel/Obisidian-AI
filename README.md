@@ -512,11 +512,11 @@ obsidian-ai-plugin/
 │   ├── secrets/
 │   │   └── PluginSecretStore.ts
 │   └── utils/
-│       ├── chunker.ts              # REWRITE: Hierarchical tree-building chunker
-│       ├── sentenceSplitter.ts     # NEW: Sentence-boundary paragraph splitting
-│       ├── wikilinkParser.ts       # NEW: Extract [[wikilinks]] from content
+│       ├── chunker.ts              # Flat chunker + hierarchical tree-building chunker (buildDocumentTree)
+│       ├── sentenceSplitter.ts     # Sentence-boundary paragraph splitting
+│       ├── wikilinkParser.ts       # Extract [[wikilinks]] from content
 │       ├── contextFormatter.ts     # NEW: Shared hierarchical context formatting
-│       ├── tokenEstimator.ts       # NEW: Token counting for budget enforcement
+│       ├── tokenEstimator.ts       # Token counting for budget enforcement
 │       ├── hasher.ts               # SHA-256 content hashing
 │       └── vaultCrawler.ts         # Vault file discovery
 ├── styles.css                      # Plugin CSS
@@ -618,6 +618,11 @@ The display names and command IDs in this table match the values registered by t
 |------|---------|
 | `src/__tests__/smoke.test.ts` | Lightweight compile-safe and contract smoke checks |
 | `src/__tests__/unit/**/*.test.ts` | Service-level unit tests with typed collaborators |
+| `src/__tests__/unit/hierarchicalTypes.test.ts` | Compile-time contract tests for hierarchical node types and store contract |
+| `src/__tests__/unit/hierarchicalChunker.test.ts` | Hierarchical tree chunker tests (tree structure, bullets, paragraphs, tags, cross-refs) |
+| `src/__tests__/unit/sentenceSplitter.test.ts` | Sentence-boundary splitting with abbreviation/URL/decimal handling |
+| `src/__tests__/unit/wikilinkParser.test.ts` | Wikilink extraction with code fence filtering and deduplication |
+| `src/__tests__/unit/tokenEstimator.test.ts` | Token estimation, budget checking, and truncation |
 | `src/__tests__/integration/**/*.test.ts` | Plugin lifecycle/command integration tests with Obsidian-compatible mocks |
 | `src/__tests__/integration/scaleValidation.integration.test.ts` | REL-2 scale validation for reindex/search/index-changes latency budgets |
 | `src/__tests__/harness/` | Reusable test harness factories for app/plugin runtime setup |
@@ -844,11 +849,11 @@ Replace the flat chunker with a tree-building chunker that produces typed hierar
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [HIER-1](docs/features/HIER-1-define-hierarchical-node-types-and-hierarchical-store-contract-interface.md) | Not Started | Define hierarchical node types and HierarchicalStoreContract interface | M | New types: DocumentNode, NodeType, DocumentTree, HierarchicalStoreContract. Extend types.ts with all node-related interfaces. No dependencies. |
-| [HIER-2](docs/features/HIER-2-implement-sentence-boundary-paragraph-splitter.md) | Not Started | Implement sentence-boundary paragraph splitter | S | New file: `src/utils/sentenceSplitter.ts`. Handles abbreviations, decimals, URLs. Each split carries `sequenceIndex`. Depends on HIER-1 (node types). |
-| [HIER-3](docs/features/HIER-3-implement-wikilink-parser-for-cross-reference-extraction.md) | Not Started | Implement wikilink parser for cross-reference extraction | S | New file: `src/utils/wikilinkParser.ts`. Extract `[[target]]` and `[[target\|display]]` from node content. No dependencies. |
-| [HIER-4](docs/features/HIER-4-implement-token-estimator-utility.md) | Not Started | Implement token estimator utility | S | New file: `src/utils/tokenEstimator.ts`. Approximate token count for budget enforcement. Use character-based heuristic (chars/4) with optional tiktoken integration. No dependencies. |
-| [HIER-5](docs/features/HIER-5-rewrite-chunker-to-produce-hierarchical-document-tree.md) | Not Started | Rewrite chunker to produce hierarchical document tree | L | Complete rewrite of `src/utils/chunker.ts`. Parse markdown into tree of typed nodes (note → topic → subtopic → paragraph/bullet_group → bullet). Sentence splitting for long paragraphs. Bullet grouping by blank-line boundaries. Scoped tag tracking. Cross-reference extraction. Depends on HIER-1, HIER-2, HIER-3, HIER-4. |
+| [HIER-1](docs/features/HIER-1-define-hierarchical-node-types-and-hierarchical-store-contract-interface.md) | Done | Define hierarchical node types and HierarchicalStoreContract interface | M | New types: DocumentNode, NodeType, DocumentTree, HierarchicalStoreContract. Extend types.ts with all node-related interfaces. No dependencies. |
+| [HIER-2](docs/features/HIER-2-implement-sentence-boundary-paragraph-splitter.md) | Done | Implement sentence-boundary paragraph splitter | S | New file: `src/utils/sentenceSplitter.ts`. Handles abbreviations, decimals, URLs. Each split carries `sequenceIndex`. Depends on HIER-1 (node types). |
+| [HIER-3](docs/features/HIER-3-implement-wikilink-parser-for-cross-reference-extraction.md) | Done | Implement wikilink parser for cross-reference extraction | S | New file: `src/utils/wikilinkParser.ts`. Extract `[[target]]` and `[[target\|display]]` from node content. No dependencies. |
+| [HIER-4](docs/features/HIER-4-implement-token-estimator-utility.md) | Done | Implement token estimator utility | S | New file: `src/utils/tokenEstimator.ts`. Approximate token count for budget enforcement. Use character-based heuristic (chars/4) with optional tiktoken integration. No dependencies. |
+| [HIER-5](docs/features/HIER-5-rewrite-chunker-to-produce-hierarchical-document-tree.md) | Done | Rewrite chunker to produce hierarchical document tree | L | Complete rewrite of `src/utils/chunker.ts`. Parse markdown into tree of typed nodes (note → topic → subtopic → paragraph/bullet_group → bullet). Sentence splitting for long paragraphs. Bullet grouping by blank-line boundaries. Scoped tag tracking. Cross-reference extraction. Depends on HIER-1, HIER-2, HIER-3, HIER-4. |
 
 ### Epic 12: SQLite Hierarchical Storage Migration
 

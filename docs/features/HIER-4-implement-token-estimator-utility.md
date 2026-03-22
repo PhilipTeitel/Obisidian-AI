@@ -3,7 +3,7 @@
 **Story**: Implement a token estimation utility that approximates token counts for text content, used by the context assembly service to enforce per-tier token budgets during retrieval.
 **Epic**: Epic 11 — Hierarchical Document Model and Tree Chunker
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -100,67 +100,67 @@ None. This is a standalone utility with no modifications to existing files.
 
 ### Phase A: Core Token Estimation
 
-- [ ] **A1** — `estimateTokens` returns approximate token count using chars/4 heuristic
+- [x] **A1** — `estimateTokens` returns approximate token count using chars/4 heuristic
   - For a 400-character string, the estimate should be `100`.
   - The function uses `Math.ceil(text.length / 4)` as the base formula.
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::A1_chars_divided_by_four(vitest)`
 
-- [ ] **A2** — `estimateTokens` handles empty and whitespace-only input
+- [x] **A2** — `estimateTokens` handles empty and whitespace-only input
   - `estimateTokens("")` returns `0`.
   - `estimateTokens("   ")` returns a small positive number (whitespace is counted).
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::A2_empty_and_whitespace_input(vitest)`
 
-- [ ] **A3** — `estimateTokens` is reasonably accurate for typical English text
+- [x] **A3** — `estimateTokens` is reasonably accurate for typical English text
   - For a representative paragraph of ~100 words, the estimate should be within 20% of the actual GPT-4 token count (typically ~130-150 tokens for 100 words).
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::A3_reasonable_accuracy_english_text(vitest)`
 
 ### Phase B: Budget Checking
 
-- [ ] **B1** — `fitsWithinBudget` returns `true` when text fits
+- [x] **B1** — `fitsWithinBudget` returns `true` when text fits
   - A 200-character string fits within a budget of `100` tokens (200/4 = 50 <= 100).
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::B1_fits_within_budget_true(vitest)`
 
-- [ ] **B2** — `fitsWithinBudget` returns `false` when text exceeds budget
+- [x] **B2** — `fitsWithinBudget` returns `false` when text exceeds budget
   - A 1000-character string does not fit within a budget of `100` tokens (1000/4 = 250 > 100).
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::B2_exceeds_budget_false(vitest)`
 
-- [ ] **B3** — `fitsWithinBudget` handles edge cases
+- [x] **B3** — `fitsWithinBudget` handles edge cases
   - Empty string fits within any positive budget. Zero budget returns `true` for empty string and `false` for non-empty.
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::B3_budget_edge_cases(vitest)`
 
 ### Phase C: Token-Budget Truncation
 
-- [ ] **C1** — `truncateToTokenBudget` truncates at word boundary
+- [x] **C1** — `truncateToTokenBudget` truncates at word boundary
   - A long string truncated to a small budget is cut at the last word boundary that fits within the budget.
   - The result does not end with a partial word.
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::C1_truncates_at_word_boundary(vitest)`
 
-- [ ] **C2** — `truncateToTokenBudget` returns full text when it fits
+- [x] **C2** — `truncateToTokenBudget` returns full text when it fits
   - If the text already fits within the budget, it is returned unchanged.
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::C2_returns_full_text_when_fits(vitest)`
 
-- [ ] **C3** — `truncateToTokenBudget` adds ellipsis indicator when truncated
+- [x] **C3** — `truncateToTokenBudget` adds ellipsis indicator when truncated
   - When truncation occurs, the result ends with `...` to indicate content was cut.
   - The `...` is included within the token budget (not added on top of it).
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::C3_ellipsis_on_truncation(vitest)`
 
-- [ ] **C4** — `truncateToTokenBudget` handles empty input
+- [x] **C4** — `truncateToTokenBudget` handles empty input
   - `truncateToTokenBudget("", 100)` returns `""`.
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::C4_empty_input_truncation(vitest)`
 
 ### Phase D: Determinism and Purity
 
-- [ ] **D1** — All functions are deterministic
+- [x] **D1** — All functions are deterministic
   - Given identical input, repeated calls produce identical output for all three functions.
   - Evidence: `src/__tests__/unit/tokenEstimator.test.ts::D1_deterministic_output(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 
