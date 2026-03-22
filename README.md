@@ -626,6 +626,7 @@ The display names and command IDs in this table match the values registered by t
 | `src/__tests__/unit/hierarchicalSchema.test.ts` | Hierarchical SQLite schema migration structure, table/index coverage, and old table cleanup |
 | `src/__tests__/unit/sqliteVecRepository.test.ts` | SqliteVecRepository HierarchicalStoreContract implementation (tree ops, search, summaries, tags) |
 | `src/__tests__/unit/summaryService.test.ts` | SummaryService bottom-up generation, leaf skipping, LLM integration, error handling, propagation |
+| `src/__tests__/unit/summaryService.incremental.test.ts` | Incremental summary propagation: staleness detection, ancestor deduplication, changed node propagation |
 | `src/__tests__/unit/bootstrapHierarchicalStore.test.ts` | Bootstrap wiring of SqliteVecRepository into ServiceContainer |
 | `src/__tests__/integration/**/*.test.ts` | Plugin lifecycle/command integration tests with Obsidian-compatible mocks |
 | `src/__tests__/integration/scaleValidation.integration.test.ts` | REL-2 scale validation for reindex/search/index-changes latency budgets |
@@ -876,7 +877,7 @@ Build the bottom-up summary generation pipeline that produces concise summaries 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
 | [SUM-1](docs/features/SUM-1-implement-summaryservice-with-bottom-up-generation.md) | Done | Implement SummaryService with bottom-up generation | L | New file: `src/services/SummaryService.ts`. Traverse tree bottom-up. Skip short leaf nodes (below ~200 tokens). Generate summaries via chat provider with `max_tokens` cap (~100 tokens). Store in `node_summaries`. Include structured logging (summary.generate.started/completed/skipped events). Depends on HIER-1 (node types), STOR-2 (storage), chat provider (existing). |
-| SUM-2 | Not Started | Implement incremental summary propagation for changed nodes | M | When a node's content changes, regenerate summaries from the changed node up through all ancestors to the note root. Detect staleness via `generatedAt < updatedAt`. Depends on SUM-1, STOR-2. |
+| [SUM-2](docs/features/SUM-2-implement-incremental-summary-propagation-for-changed-nodes.md) | Done | Implement incremental summary propagation for changed nodes | M | When a node's content changes, regenerate summaries from the changed node up through all ancestors to the note root. Detect staleness via `generatedAt < updatedAt`. Depends on SUM-1, STOR-2. |
 | SUM-3 | Not Started | Add summary generation progress events to IndexingService and ProgressSlideout | S | Emit progress events during summary phase. Update ProgressSlideout UI to display summary generation status (node count, current node, elapsed time). New indexing stage: `summarize`. Depends on SUM-1. |
 
 ### Epic 14: Three-Phase Hierarchical Retrieval

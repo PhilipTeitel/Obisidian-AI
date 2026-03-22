@@ -38,6 +38,12 @@ export interface SummaryGenerationResult {
   error?: string;
 }
 
+export interface StaleSummaryInfo {
+  nodeId: string;
+  nodeUpdatedAt: number;
+  summaryGeneratedAt: number | null;
+}
+
 const isLeafType = (nodeType: string): boolean =>
   nodeType === "paragraph" || nodeType === "bullet";
 
@@ -157,6 +163,108 @@ export class SummaryService implements RuntimeServiceLifecycle {
     }
 
     return results;
+  }
+
+  public async detectStaleSummaries(nodes: DocumentNode[]): Promise<StaleSummaryInfo[]> {
+    this.ensureNotDisposed();
+    const stale: StaleSummaryInfo[] = [];
+
+    for (const node of nodes) {
+      const summary = await this.deps.hierarchicalStore.getSummary(node.nodeId);
+      if (!summary) {
+        stale.push({ nodeId: node.nodeId, nodeUpdatedAt: node.updatedAt, summaryGeneratedAt: null });
+        continue;
+      }
+      if (summary.generatedAt < node.updatedAt) {
+        stale.push({ nodeId: node.nodeId, nodeUpdatedAt: node.updatedAt, summaryGeneratedAt: summary.generatedAt });
+      }
+    }
+
+    return stale;
+  }
+
+  public async propagateSummariesForChangedNodes(changedNodeIds: string[]): Promise<SummaryGenerationResult[]> {
+    this.ensureNotDisposed();
+
+    if (changedNodeIds.length === 0) {
+      return [];
+    }
+
+    this.logger.info({
+      event: "summary.propagate.started",
+      message: `Starting incremental summary propagation for ${changedNodeIds.length} changed nodes.`,
+      context: { changedNodeCount: changedNodeIds.length }
+    });
+
+    const startTime = Date.now();
+    const results: SummaryGenerationResult[] = [];
+    const processedNodeIds = new Set<string>();
+
+    const sortedNodeIds = await this.sortByDepthDesc(changedNodeIds);
+
+    for (const nodeId of sortedNodeIds) {
+      if (processedNodeIds.has(nodeId)) {
+        continue;
+      }
+
+      const node = await this.deps.hierarchicalStore.getNode(nodeId);
+      if (!node) {
+        this.logger.debug({
+          event: "summary.propagate.node_not_found",
+          message: `Skipping non-existent node ${nodeId} during propagation.`,
+          context: { nodeId }
+        });
+        continue;
+      }
+
+      const ancestorChain = await this.deps.hierarchicalStore.getAncestorChain(nodeId);
+      const nodesToProcess = [node, ...ancestorChain];
+
+      for (const current of nodesToProcess) {
+        if (processedNodeIds.has(current.nodeId)) {
+          continue;
+        }
+        processedNodeIds.add(current.nodeId);
+
+        try {
+          const result = await this.processStoredNode(current);
+          results.push(result);
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error);
+          results.push({ nodeId: current.nodeId, skipped: false, error: message });
+          this.logger.warn({
+            event: "summary.propagate.node_failed",
+            message: `Summary propagation failed for node ${current.nodeId}: ${message}`,
+            context: { nodeId: current.nodeId, nodeType: current.nodeType }
+          });
+        }
+      }
+    }
+
+    const elapsed = Date.now() - startTime;
+    this.logger.info({
+      event: "summary.propagate.completed",
+      message: `Incremental summary propagation completed: ${results.length} regenerated from ${changedNodeIds.length} changed nodes in ${elapsed}ms.`,
+      context: {
+        changedNodeCount: changedNodeIds.length,
+        regeneratedCount: results.length,
+        elapsedMs: elapsed
+      }
+    });
+
+    return results;
+  }
+
+  private async sortByDepthDesc(nodeIds: string[]): Promise<string[]> {
+    const nodesWithDepth: Array<{ nodeId: string; depth: number }> = [];
+    for (const nodeId of nodeIds) {
+      const node = await this.deps.hierarchicalStore.getNode(nodeId);
+      if (node) {
+        nodesWithDepth.push({ nodeId, depth: node.depth });
+      }
+    }
+    nodesWithDepth.sort((a, b) => b.depth - a.depth);
+    return nodesWithDepth.map((n) => n.nodeId);
   }
 
   private async processNode(
