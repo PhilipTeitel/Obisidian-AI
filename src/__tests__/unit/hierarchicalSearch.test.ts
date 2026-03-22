@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { SearchService, type SearchServiceDeps } from "../../services/SearchService";
 import type {
+  DocumentNode,
   EmbeddingServiceContract,
   EmbeddingVector,
   HierarchicalStoreContract,
@@ -63,6 +64,22 @@ const createSettings = (): ObsidianAISettings => ({
   maxGeneratedNoteSize: 5000,
   chatTimeout: 30000,
   logLevel: "info"
+});
+
+const createNode = (overrides: Partial<DocumentNode> & { nodeId: string }): DocumentNode => ({
+  nodeId: overrides.nodeId,
+  parentId: overrides.parentId ?? null,
+  childIds: overrides.childIds ?? [],
+  notePath: overrides.notePath ?? "notes/test.md",
+  noteTitle: overrides.noteTitle ?? "Test Note",
+  headingTrail: overrides.headingTrail ?? [],
+  depth: overrides.depth ?? 0,
+  nodeType: overrides.nodeType ?? "note",
+  content: overrides.content ?? "Test content",
+  sequenceIndex: overrides.sequenceIndex ?? 0,
+  tags: overrides.tags ?? [],
+  contentHash: overrides.contentHash ?? "abc123",
+  updatedAt: overrides.updatedAt ?? 1000
 });
 
 const createDeps = (overrides?: Partial<SearchServiceDeps>): SearchServiceDeps => ({
@@ -236,6 +253,244 @@ describe("SearchService — Phase 1 Hierarchical Search", () => {
       await expect(
         service.hierarchicalSearchPhase1({ query: "test", topK: 10 })
       ).rejects.toThrow("SearchService is disposed.");
+    });
+  });
+});
+
+describe("SearchService — Phase 2 Drill-Down Search", () => {
+  describe("Phase A: Drill-Down Logic", () => {
+    it("A1 — searches children content embeddings for each candidate", async () => {
+      const leafNode = createNode({
+        nodeId: "leaf-1",
+        parentId: "topic-1",
+        nodeType: "paragraph",
+        depth: 2,
+        content: "Leaf content"
+      });
+      const store = createMockHierarchicalStore();
+      (store.getNode as ReturnType<typeof vi.fn>).mockImplementation(async (id: string) => {
+        if (id === "topic-1") {
+          return createNode({ nodeId: "topic-1", nodeType: "topic", depth: 1, childIds: ["leaf-1"] });
+        }
+        if (id === "leaf-1") return leafNode;
+        return null;
+      });
+      (store.searchContentEmbeddings as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { nodeId: "leaf-1", score: 0.9, embeddingType: "content" }
+      ]);
+      (store.getAncestorChain as ReturnType<typeof vi.fn>).mockResolvedValue([
+        createNode({ nodeId: "topic-1", nodeType: "topic", depth: 1 })
+      ]);
+
+      const deps = createDeps({ hierarchicalStore: store });
+      const service = new SearchService(deps);
+      await service.init();
+
+      const candidates: NodeMatch[] = [{ nodeId: "topic-1", score: 0.95, embeddingType: "summary" }];
+      const results = await service.hierarchicalSearchPhase2(candidates, createQueryVector(), 10);
+
+      expect(store.searchContentEmbeddings).toHaveBeenCalledWith(createQueryVector(), 5, "topic-1");
+      expect(results).toHaveLength(1);
+      expect(results[0].node.nodeId).toBe("leaf-1");
+    });
+
+    it("A2 — recursively drills into non-leaf children", async () => {
+      const store = createMockHierarchicalStore();
+      (store.getNode as ReturnType<typeof vi.fn>).mockImplementation(async (id: string) => {
+        if (id === "topic-1") {
+          return createNode({ nodeId: "topic-1", nodeType: "topic", depth: 1, childIds: ["subtopic-1"] });
+        }
+        if (id === "subtopic-1") {
+          return createNode({ nodeId: "subtopic-1", nodeType: "subtopic", depth: 2, parentId: "topic-1", childIds: ["para-1"] });
+        }
+        if (id === "para-1") {
+          return createNode({ nodeId: "para-1", nodeType: "paragraph", depth: 3, parentId: "subtopic-1" });
+        }
+        return null;
+      });
+      (store.searchContentEmbeddings as ReturnType<typeof vi.fn>).mockImplementation(
+        async (_vec: EmbeddingVector, _topK: number, parentId?: string) => {
+          if (parentId === "topic-1") {
+            return [{ nodeId: "subtopic-1", score: 0.88, embeddingType: "content" }];
+          }
+          if (parentId === "subtopic-1") {
+            return [{ nodeId: "para-1", score: 0.92, embeddingType: "content" }];
+          }
+          return [];
+        }
+      );
+      (store.getAncestorChain as ReturnType<typeof vi.fn>).mockResolvedValue([
+        createNode({ nodeId: "subtopic-1", nodeType: "subtopic", depth: 2 }),
+        createNode({ nodeId: "topic-1", nodeType: "topic", depth: 1 })
+      ]);
+
+      const deps = createDeps({ hierarchicalStore: store });
+      const service = new SearchService(deps);
+      await service.init();
+
+      const candidates: NodeMatch[] = [{ nodeId: "topic-1", score: 0.95, embeddingType: "summary" }];
+      const results = await service.hierarchicalSearchPhase2(candidates, createQueryVector(), 10);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].node.nodeId).toBe("para-1");
+      expect(results[0].score).toBe(0.92);
+    });
+
+    it("A3 — collects leaf nodes as final matches", async () => {
+      const store = createMockHierarchicalStore();
+      (store.getNode as ReturnType<typeof vi.fn>).mockImplementation(async (id: string) => {
+        if (id === "topic-1") {
+          return createNode({ nodeId: "topic-1", nodeType: "topic", depth: 1, childIds: ["para-1", "para-2"] });
+        }
+        if (id === "para-1") {
+          return createNode({ nodeId: "para-1", nodeType: "paragraph", depth: 2, parentId: "topic-1" });
+        }
+        if (id === "para-2") {
+          return createNode({ nodeId: "para-2", nodeType: "paragraph", depth: 2, parentId: "topic-1" });
+        }
+        return null;
+      });
+      (store.searchContentEmbeddings as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { nodeId: "para-1", score: 0.9, embeddingType: "content" },
+        { nodeId: "para-2", score: 0.85, embeddingType: "content" }
+      ]);
+      (store.getAncestorChain as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+      const deps = createDeps({ hierarchicalStore: store });
+      const service = new SearchService(deps);
+      await service.init();
+
+      const candidates: NodeMatch[] = [{ nodeId: "topic-1", score: 0.95, embeddingType: "summary" }];
+      const results = await service.hierarchicalSearchPhase2(candidates, createQueryVector(), 10);
+
+      expect(results).toHaveLength(2);
+      expect(results[0].node.nodeType).toBe("paragraph");
+      expect(results[1].node.nodeType).toBe("paragraph");
+    });
+
+    it("A4 — deduplicates leaf nodes across ancestor paths", async () => {
+      const store = createMockHierarchicalStore();
+      const sharedLeaf = createNode({ nodeId: "para-1", nodeType: "paragraph", depth: 2, parentId: "topic-1" });
+      (store.getNode as ReturnType<typeof vi.fn>).mockImplementation(async (id: string) => {
+        if (id === "topic-1" || id === "topic-2") {
+          return createNode({ nodeId: id, nodeType: "topic", depth: 1, childIds: ["para-1"] });
+        }
+        if (id === "para-1") return sharedLeaf;
+        return null;
+      });
+      (store.searchContentEmbeddings as ReturnType<typeof vi.fn>).mockImplementation(
+        async (_vec: EmbeddingVector, _topK: number, parentId?: string) => {
+          if (parentId === "topic-1") {
+            return [{ nodeId: "para-1", score: 0.85, embeddingType: "content" }];
+          }
+          if (parentId === "topic-2") {
+            return [{ nodeId: "para-1", score: 0.90, embeddingType: "content" }];
+          }
+          return [];
+        }
+      );
+      (store.getAncestorChain as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+      const deps = createDeps({ hierarchicalStore: store });
+      const service = new SearchService(deps);
+      await service.init();
+
+      const candidates: NodeMatch[] = [
+        { nodeId: "topic-1", score: 0.95, embeddingType: "summary" },
+        { nodeId: "topic-2", score: 0.90, embeddingType: "summary" }
+      ];
+      const results = await service.hierarchicalSearchPhase2(candidates, createQueryVector(), 10);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].node.nodeId).toBe("para-1");
+      expect(results[0].score).toBe(0.90);
+    });
+
+    it("A5 — each LeafMatch includes the ancestor chain", async () => {
+      const store = createMockHierarchicalStore();
+      (store.getNode as ReturnType<typeof vi.fn>).mockImplementation(async (id: string) => {
+        if (id === "topic-1") {
+          return createNode({ nodeId: "topic-1", nodeType: "topic", depth: 1, childIds: ["para-1"] });
+        }
+        if (id === "para-1") {
+          return createNode({ nodeId: "para-1", nodeType: "paragraph", depth: 2, parentId: "topic-1" });
+        }
+        return null;
+      });
+      (store.searchContentEmbeddings as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { nodeId: "para-1", score: 0.9, embeddingType: "content" }
+      ]);
+      const topicNode = createNode({ nodeId: "topic-1", nodeType: "topic", depth: 1 });
+      const noteNode = createNode({ nodeId: "note-1", nodeType: "note", depth: 0 });
+      (store.getAncestorChain as ReturnType<typeof vi.fn>).mockResolvedValue([topicNode, noteNode]);
+
+      const deps = createDeps({ hierarchicalStore: store });
+      const service = new SearchService(deps);
+      await service.init();
+
+      const candidates: NodeMatch[] = [{ nodeId: "topic-1", score: 0.95, embeddingType: "summary" }];
+      const results = await service.hierarchicalSearchPhase2(candidates, createQueryVector(), 10);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].ancestorChain).toHaveLength(2);
+      expect(results[0].ancestorChain[0].nodeId).toBe("topic-1");
+      expect(results[0].ancestorChain[1].nodeId).toBe("note-1");
+    });
+  });
+
+  describe("Phase B: Edge Cases", () => {
+    it("B1 — empty candidates array returns empty results", async () => {
+      const service = new SearchService(createDeps());
+      await service.init();
+
+      const results = await service.hierarchicalSearchPhase2([], createQueryVector(), 10);
+      expect(results).toHaveLength(0);
+    });
+
+    it("B2 — candidates with no children return empty results", async () => {
+      const store = createMockHierarchicalStore();
+      (store.getNode as ReturnType<typeof vi.fn>).mockResolvedValue(
+        createNode({ nodeId: "topic-1", nodeType: "topic", depth: 1, childIds: [] })
+      );
+      (store.searchContentEmbeddings as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+      (store.getChildren as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+      const deps = createDeps({ hierarchicalStore: store });
+      const service = new SearchService(deps);
+      await service.init();
+
+      const candidates: NodeMatch[] = [{ nodeId: "topic-1", score: 0.95, embeddingType: "summary" }];
+      const results = await service.hierarchicalSearchPhase2(candidates, createQueryVector(), 10);
+      expect(results).toHaveLength(0);
+    });
+  });
+
+  describe("Phase C: Structured Logging", () => {
+    it("C1 — emits retrieval.phase2.completed event on success", async () => {
+      const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+      const store = createMockHierarchicalStore();
+      (store.getNode as ReturnType<typeof vi.fn>).mockResolvedValue(
+        createNode({ nodeId: "topic-1", nodeType: "topic", depth: 1 })
+      );
+      (store.searchContentEmbeddings as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+      (store.getChildren as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+      const deps = createDeps({ hierarchicalStore: store });
+      const service = new SearchService(deps);
+      await service.init();
+
+      const candidates: NodeMatch[] = [{ nodeId: "topic-1", score: 0.95, embeddingType: "summary" }];
+      await service.hierarchicalSearchPhase2(candidates, createQueryVector(), 10);
+
+      const phase2Event = infoSpy.mock.calls.find(
+        (call) =>
+          call[0] &&
+          typeof call[0] === "object" &&
+          (call[0] as Record<string, unknown>).event === "retrieval.phase2.completed"
+      );
+      expect(phase2Event).toBeDefined();
+
+      infoSpy.mockRestore();
     });
   });
 });

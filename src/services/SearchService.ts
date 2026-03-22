@@ -1,7 +1,10 @@
 import type {
+  DocumentNode,
   EmbeddingServiceContract,
+  EmbeddingVector,
   HierarchicalSearchRequest,
   HierarchicalStoreContract,
+  LeafMatch,
   NodeMatch,
   RuntimeBootstrapContext,
   SearchRequest,
@@ -20,7 +23,12 @@ export interface SearchServiceDeps {
 }
 
 const SEARCH_SELECTION_TOP_K = 5;
+const PHASE2_CHILDREN_TOP_K = 5;
+const PHASE2_MAX_DEPTH = 6;
 const logger = createRuntimeLogger("SearchService");
+
+const isLeafType = (nodeType: string): boolean =>
+  nodeType === "paragraph" || nodeType === "bullet";
 
 const normalizeTags = (tags: string[]): string[] => {
   return [...new Set(tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0))].sort((left, right) =>
@@ -232,6 +240,110 @@ export class SearchService implements SearchServiceContract {
         error: normalized
       });
       throw normalized;
+    }
+  }
+
+  public async hierarchicalSearchPhase2(
+    candidates: NodeMatch[],
+    queryVector: EmbeddingVector,
+    topK: number
+  ): Promise<LeafMatch[]> {
+    this.assertNotDisposed();
+    const operationLogger = logger.withOperation();
+    const phase2Start = Date.now();
+
+    if (candidates.length === 0) {
+      operationLogger.info({
+        event: "retrieval.phase2.completed",
+        message: "Phase 2 drill-down completed: 0 candidates provided.",
+        context: { candidateCount: 0, leafMatchCount: 0, elapsedMs: 0 }
+      });
+      return [];
+    }
+
+    const hierarchicalStore = this.deps.hierarchicalStore;
+    if (!hierarchicalStore) {
+      return [];
+    }
+
+    const leafMap = new Map<string, LeafMatch>();
+
+    for (const candidate of candidates) {
+      await this.drillDown(
+        hierarchicalStore,
+        candidate.nodeId,
+        queryVector,
+        candidate.score,
+        leafMap,
+        0
+      );
+    }
+
+    const results = [...leafMap.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topK);
+
+    operationLogger.info({
+      event: "retrieval.phase2.completed",
+      message: `Phase 2 drill-down completed: ${results.length} leaf matches from ${candidates.length} candidates.`,
+      context: {
+        candidateCount: candidates.length,
+        leafMatchCount: results.length,
+        elapsedMs: Date.now() - phase2Start
+      }
+    });
+
+    return results;
+  }
+
+  private async drillDown(
+    store: HierarchicalStoreContract,
+    nodeId: string,
+    queryVector: EmbeddingVector,
+    inheritedScore: number,
+    leafMap: Map<string, LeafMatch>,
+    depth: number
+  ): Promise<void> {
+    if (depth >= PHASE2_MAX_DEPTH) {
+      return;
+    }
+
+    const node = await store.getNode(nodeId);
+    if (!node) {
+      return;
+    }
+
+    if (isLeafType(node.nodeType)) {
+      const existing = leafMap.get(node.nodeId);
+      if (!existing || inheritedScore > existing.score) {
+        const ancestorChain = await store.getAncestorChain(node.nodeId);
+        leafMap.set(node.nodeId, { node, score: inheritedScore, ancestorChain });
+      }
+      return;
+    }
+
+    const childMatches = await store.searchContentEmbeddings(
+      queryVector,
+      PHASE2_CHILDREN_TOP_K,
+      nodeId
+    );
+
+    if (childMatches.length === 0) {
+      const children = await store.getChildren(nodeId);
+      for (const child of children) {
+        if (isLeafType(child.nodeType)) {
+          const existing = leafMap.get(child.nodeId);
+          if (!existing || inheritedScore > existing.score) {
+            const ancestorChain = await store.getAncestorChain(child.nodeId);
+            leafMap.set(child.nodeId, { node: child, score: inheritedScore, ancestorChain });
+          }
+        }
+      }
+      return;
+    }
+
+    for (const match of childMatches) {
+      await this.drillDown(store, match.nodeId, queryVector, match.score, leafMap, depth + 1);
     }
   }
 
