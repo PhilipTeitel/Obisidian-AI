@@ -1,5 +1,8 @@
 import type {
   EmbeddingServiceContract,
+  HierarchicalSearchRequest,
+  HierarchicalStoreContract,
+  NodeMatch,
   RuntimeBootstrapContext,
   SearchRequest,
   SearchResult,
@@ -13,6 +16,7 @@ export interface SearchServiceDeps {
   embeddingService: EmbeddingServiceContract;
   vectorStoreRepository: VectorStoreRepositoryContract;
   getSettings: RuntimeBootstrapContext["getSettings"];
+  hierarchicalStore?: HierarchicalStoreContract;
 }
 
 const SEARCH_SELECTION_TOP_K = 5;
@@ -140,6 +144,89 @@ export class SearchService implements SearchServiceContract {
       operationLogger.error({
         event: "search.query.failed",
         message: "Search query failed.",
+        domain: normalized.domain,
+        context: normalized.context,
+        error: normalized
+      });
+      throw normalized;
+    }
+  }
+
+  public async hierarchicalSearchPhase1(request: HierarchicalSearchRequest): Promise<NodeMatch[]> {
+    this.assertNotDisposed();
+    const operationLogger = logger.withOperation();
+
+    const query = request.query.trim();
+    if (query.length === 0 || request.topK <= 0) {
+      operationLogger.info({
+        event: "retrieval.phase1.skipped",
+        message: "Phase 1 search skipped due to empty query or non-positive topK.",
+        context: { queryLength: query.length, topK: request.topK }
+      });
+      return [];
+    }
+
+    const hierarchicalStore = this.deps.hierarchicalStore;
+    if (!hierarchicalStore) {
+      operationLogger.warn({
+        event: "retrieval.phase1.no_store",
+        message: "Phase 1 search skipped: no hierarchical store available."
+      });
+      return [];
+    }
+
+    const phase1Start = Date.now();
+
+    try {
+      const settings = this.deps.getSettings();
+      const embeddingStart = Date.now();
+      const embeddingResponse = await this.deps.embeddingService.embed({
+        providerId: settings.embeddingProvider,
+        model: settings.embeddingModel,
+        inputs: [query]
+      });
+      const embeddingElapsedMs = Date.now() - embeddingStart;
+
+      const queryVector = embeddingResponse.vectors[0];
+      if (!queryVector) {
+        operationLogger.warn({
+          event: "retrieval.phase1.embedding_empty",
+          message: "Phase 1 query embedding returned no vectors."
+        });
+        return [];
+      }
+
+      const searchStart = Date.now();
+      const matches = await hierarchicalStore.searchSummaryEmbeddings(queryVector, request.topK);
+      const searchElapsedMs = Date.now() - searchStart;
+
+      const filtered =
+        request.minScore !== undefined
+          ? matches.filter((m) => m.score >= request.minScore!)
+          : matches;
+
+      operationLogger.info({
+        event: "retrieval.phase1.completed",
+        message: `Phase 1 summary search completed: ${filtered.length} candidates.`,
+        context: {
+          resultCount: filtered.length,
+          unfilteredCount: matches.length,
+          embeddingElapsedMs,
+          searchElapsedMs,
+          elapsedMs: Date.now() - phase1Start
+        }
+      });
+
+      return filtered;
+    } catch (error: unknown) {
+      const normalized = normalizeRuntimeError(error, {
+        operation: "SearchService.hierarchicalSearchPhase1",
+        queryLength: query.length,
+        topK: request.topK
+      });
+      operationLogger.error({
+        event: "retrieval.phase1.failed",
+        message: "Phase 1 summary search failed.",
         domain: normalized.domain,
         context: normalized.context,
         error: normalized

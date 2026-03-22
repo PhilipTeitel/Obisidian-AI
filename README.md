@@ -628,6 +628,7 @@ The display names and command IDs in this table match the values registered by t
 | `src/__tests__/unit/summaryService.test.ts` | SummaryService bottom-up generation, leaf skipping, LLM integration, error handling, propagation |
 | `src/__tests__/unit/summaryService.incremental.test.ts` | Incremental summary propagation: staleness detection, ancestor deduplication, changed node propagation |
 | `src/__tests__/unit/summaryService.progress.test.ts` | Summary generation progress callback invocation, error swallowing, stage label |
+| `src/__tests__/unit/hierarchicalSearch.test.ts` | Phase 1 hierarchical summary search in SearchService |
 | `src/__tests__/unit/bootstrapHierarchicalStore.test.ts` | Bootstrap wiring of SqliteVecRepository into ServiceContainer |
 | `src/__tests__/integration/**/*.test.ts` | Plugin lifecycle/command integration tests with Obsidian-compatible mocks |
 | `src/__tests__/integration/scaleValidation.integration.test.ts` | REL-2 scale validation for reindex/search/index-changes latency budgets |
@@ -887,7 +888,7 @@ Replace flat top-K search with the three-phase hierarchical retrieval strategy. 
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| RET-1 | Not Started | Implement Phase 1 summary search in SearchService | M | Search summary embeddings only. Return top-K candidate topic/subtopic nodes (default K=10). Include structured logging (retrieval.phase1.completed). Depends on STOR-2 (searchSummaryEmbeddings). |
+| [RET-1](docs/features/RET-1-implement-phase-1-summary-search-in-searchservice.md) | Done | Implement Phase 1 summary search in SearchService | M | Search summary embeddings only. Return top-K candidate topic/subtopic nodes (default K=10). Include structured logging (retrieval.phase1.completed). Depends on STOR-2 (searchSummaryEmbeddings). |
 | RET-2 | Not Started | Implement Phase 2 drill-down search in SearchService | M | For each Phase 1 candidate, search children's content embeddings recursively. Collect high-similarity leaf nodes. Deduplicate across ancestor paths. Include structured logging (retrieval.phase2.completed). Depends on RET-1, STOR-2 (searchContentEmbeddings). |
 | RET-3 | Not Started | Implement ContextAssemblyService (Phase 3) | L | New file: `src/services/ContextAssemblyService.ts`. Walk up tree for heading trails, siblings, parent summaries. Apply per-tier token budgets (matched: ~2000, sibling: ~1000, parent summaries: ~1000). Track actual usage per tier. Include structured logging (retrieval.phase3.completed, context.assembly.budget_usage). Depends on RET-2, HIER-4 (token estimator), STOR-2 (getAncestorChain, getSiblings). |
 | RET-4 | Not Started | Implement shared hierarchical context formatter | M | New file: `src/utils/contextFormatter.ts`. Format assembled context preserving document structure (headings, summaries, bullets, paragraphs). Used by both chat providers. Depends on RET-3, HIER-1 (node types). |

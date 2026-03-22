@@ -453,6 +453,14 @@ export interface AssembledContext {
   tierUsage: ContextTierUsage;
 }
 
+// ── Hierarchical Search Request ──────────────────────────────────────
+
+export interface HierarchicalSearchRequest {
+  query: string;
+  topK: number;
+  minScore?: number;
+}
+
 // ── Hierarchical Search Result ───────────────────────────────────────
 
 export interface HierarchicalSearchResult {
