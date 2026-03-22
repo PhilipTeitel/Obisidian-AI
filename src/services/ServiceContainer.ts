@@ -4,6 +4,7 @@ import type {
   AgentServiceContract,
   ChatServiceContract,
   EmbeddingServiceContract,
+  HierarchicalStoreContract,
   IndexingServiceContract,
   NormalizedRuntimeError,
   ProviderRegistryContract,
@@ -30,6 +31,7 @@ export interface ServiceContainerDeps {
   chatService: ChatServiceContract;
   agentService: AgentServiceContract;
   providerRegistry: ProviderRegistryContract;
+  hierarchicalStore?: HierarchicalStoreContract;
   disposeOrder: RuntimeServiceName[];
 }
 
@@ -73,6 +75,7 @@ export class ServiceContainer implements RuntimeServices {
   public readonly chatService: ChatServiceContract;
   public readonly agentService: AgentServiceContract;
   public readonly providerRegistry: ProviderRegistryContract;
+  public readonly hierarchicalStore?: HierarchicalStoreContract;
 
   private readonly disposeOrder: RuntimeServiceName[];
   private disposed = false;
@@ -84,6 +87,7 @@ export class ServiceContainer implements RuntimeServices {
     this.chatService = deps.chatService;
     this.agentService = deps.agentService;
     this.providerRegistry = deps.providerRegistry;
+    this.hierarchicalStore = deps.hierarchicalStore;
     this.disposeOrder = [...deps.disposeOrder];
   }
 

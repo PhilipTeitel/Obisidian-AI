@@ -41,9 +41,13 @@ const createSettingsSnapshot = (): ObsidianAISettings => {
 };
 
 const createRuntimeContext = (): RuntimeBootstrapContext => {
+  let pluginData: unknown = null;
   return {
     app: {} as RuntimeBootstrapContext["app"],
-    plugin: {} as RuntimeBootstrapContext["plugin"],
+    plugin: {
+      loadData: async () => pluginData,
+      saveData: async (data: unknown) => { pluginData = data; }
+    } as unknown as RuntimeBootstrapContext["plugin"],
     getSettings: () => createSettingsSnapshot(),
     notify: () => undefined
   };

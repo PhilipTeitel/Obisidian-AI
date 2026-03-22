@@ -15,6 +15,7 @@ import { IndexManifestStore } from "../services/indexing/IndexManifestStore";
 import { SearchService } from "../services/SearchService";
 import { ServiceContainer, type NamedRuntimeService } from "../services/ServiceContainer";
 import { LocalVectorStoreRepository } from "../storage/LocalVectorStoreRepository";
+import { SqliteVecRepository } from "../storage/SqliteVecRepository";
 import type {
   NormalizedRuntimeError,
   RuntimeBootstrapContext,
@@ -97,6 +98,10 @@ export const bootstrapRuntimeServices = async (
     plugin: context.plugin,
     pluginId
   });
+  const hierarchicalStore = new SqliteVecRepository({
+    plugin: context.plugin,
+    pluginId
+  });
 
   providerRegistry.registerEmbeddingProvider(
     new OpenAIEmbeddingProvider({
@@ -163,6 +168,20 @@ export const bootstrapRuntimeServices = async (
   };
 
   try {
+    logger.log({
+      level: "info",
+      event: "runtime.hierarchical_store.init_start",
+      message: "Initializing hierarchical store.",
+      context: { operation: "bootstrapRuntimeServices", phase: "init" }
+    });
+    await hierarchicalStore.init();
+    logger.log({
+      level: "info",
+      event: "runtime.hierarchical_store.init_succeeded",
+      message: "Initialized hierarchical store.",
+      context: { operation: "bootstrapRuntimeServices", phase: "init" }
+    });
+
     for (const name of RUNTIME_SERVICE_CONSTRUCTION_ORDER) {
       const service = servicesByName[name];
       logger.log({
@@ -217,6 +236,7 @@ export const bootstrapRuntimeServices = async (
       agentService,
       chatService,
       indexingService,
+      hierarchicalStore,
       disposeOrder: [...RUNTIME_SERVICE_CONSTRUCTION_ORDER]
     });
 

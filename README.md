@@ -623,6 +623,9 @@ The display names and command IDs in this table match the values registered by t
 | `src/__tests__/unit/sentenceSplitter.test.ts` | Sentence-boundary splitting with abbreviation/URL/decimal handling |
 | `src/__tests__/unit/wikilinkParser.test.ts` | Wikilink extraction with code fence filtering and deduplication |
 | `src/__tests__/unit/tokenEstimator.test.ts` | Token estimation, budget checking, and truncation |
+| `src/__tests__/unit/hierarchicalSchema.test.ts` | Hierarchical SQLite schema migration structure, table/index coverage, and old table cleanup |
+| `src/__tests__/unit/sqliteVecRepository.test.ts` | SqliteVecRepository HierarchicalStoreContract implementation (tree ops, search, summaries, tags) |
+| `src/__tests__/unit/bootstrapHierarchicalStore.test.ts` | Bootstrap wiring of SqliteVecRepository into ServiceContainer |
 | `src/__tests__/integration/**/*.test.ts` | Plugin lifecycle/command integration tests with Obsidian-compatible mocks |
 | `src/__tests__/integration/scaleValidation.integration.test.ts` | REL-2 scale validation for reindex/search/index-changes latency budgets |
 | `src/__tests__/harness/` | Reusable test harness factories for app/plugin runtime setup |
@@ -861,9 +864,9 @@ Migrate from the flat chunk storage to the hierarchical node/summary/embedding s
 
 | ID | Status | Story | Size | Notes |
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| STOR-1 | Not Started | Define hierarchical SQLite schema migration | M | New migration `003_hierarchical_model` creating `nodes`, `node_children`, `node_summaries`, `node_embeddings`, `node_tags`, `node_cross_refs`, and `metadata` tables with all indexes. Drop old `chunks`/`chunk_embeddings` tables. Full reindex required after migration. Depends on HIER-1 (node types define schema shape). |
-| STOR-2 | Not Started | Implement SqliteVecRepository with HierarchicalStoreContract | L | New file: `src/storage/SqliteVecRepository.ts`. Implements tree traversal queries, summary/content embedding search, upsert/delete operations, tag queries. Include structured logging for all storage operations. Depends on STOR-1, HIER-1. |
-| STOR-3 | Not Started | Wire SqliteVecRepository into bootstrap and deprecate LocalVectorStoreRepository | M | Update `bootstrapRuntimeServices.ts` to construct `SqliteVecRepository`. Update all service dependencies. Mark `LocalVectorStoreRepository` as deprecated. Depends on STOR-2. |
+| [STOR-1](docs/features/STOR-1-define-hierarchical-sqlite-schema-migration.md) | Done | Define hierarchical SQLite schema migration | M | New migration `003_hierarchical_model` creating `nodes`, `node_children`, `node_summaries`, `node_embeddings`, `node_tags`, `node_cross_refs`, and `metadata` tables with all indexes. Drop old `chunks`/`chunk_embeddings` tables. Full reindex required after migration. Depends on HIER-1 (node types define schema shape). |
+| [STOR-2](docs/features/STOR-2-implement-sqlitevecrepository-with-hierarchical-store-contract.md) | Done | Implement SqliteVecRepository with HierarchicalStoreContract | L | New file: `src/storage/SqliteVecRepository.ts`. Implements tree traversal queries, summary/content embedding search, upsert/delete operations, tag queries. Include structured logging for all storage operations. Depends on STOR-1, HIER-1. |
+| [STOR-3](docs/features/STOR-3-wire-sqlitevecrepository-into-bootstrap-and-deprecate-localvectorstorerepository.md) | Done | Wire SqliteVecRepository into bootstrap and deprecate LocalVectorStoreRepository | M | Update `bootstrapRuntimeServices.ts` to construct `SqliteVecRepository`. Update all service dependencies. Mark `LocalVectorStoreRepository` as deprecated. Depends on STOR-2. |
 
 ### Epic 13: LLM Summary Generation Service
 

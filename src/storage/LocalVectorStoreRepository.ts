@@ -182,6 +182,11 @@ const cosineSimilarity = (left: EmbeddingVector, right: EmbeddingVector): number
   return dotProduct / (leftMagnitude * rightMagnitude);
 };
 
+/**
+ * @deprecated Use {@link SqliteVecRepository} instead. This flat chunk-based repository
+ * is retained for backward compatibility during the transition to the hierarchical model.
+ * It will be removed when Epic 15 (Hierarchical Indexing Pipeline Integration) is complete.
+ */
 export class LocalVectorStoreRepository implements VectorStoreRepositoryContract {
   private readonly plugin: RuntimeBootstrapContext["plugin"];
   private readonly paths: LocalVectorStorePaths;
