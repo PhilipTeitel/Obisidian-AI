@@ -1,11 +1,11 @@
 import type {
   AssembledContext,
+  ContextAssemblyServiceContract,
   ContextTierUsage,
   HierarchicalContextBlock,
   HierarchicalStoreContract,
   LeafMatch,
-  ObsidianAISettings,
-  RuntimeServiceLifecycle
+  ObsidianAISettings
 } from "../types";
 import { createRuntimeLogger } from "../logging/runtimeLogger";
 import { estimateTokens, truncateToTokenBudget } from "../utils/tokenEstimator";
@@ -39,7 +39,7 @@ const resolveBudgets = (settings: ObsidianAISettings): TokenBudgets => {
   };
 };
 
-export class ContextAssemblyService implements RuntimeServiceLifecycle {
+export class ContextAssemblyService implements ContextAssemblyServiceContract {
   private disposed = false;
   private readonly deps: ContextAssemblyServiceDeps;
 

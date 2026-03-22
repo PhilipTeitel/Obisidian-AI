@@ -345,6 +345,17 @@ export interface RuntimeBootstrapContext {
   notify: (message: string) => void;
 }
 
+export interface SummaryServiceContract extends RuntimeServiceLifecycle {
+  generateSummaries(tree: DocumentTree, options?: { onNodeProcessed?: (event: { completed: number; total: number; currentNodeId: string; currentNodeType: string }) => void }): Promise<{ nodeId: string; skipped: boolean; error?: string }[]>;
+  regenerateFromNode(nodeId: string): Promise<{ nodeId: string; skipped: boolean; error?: string }[]>;
+  detectStaleSummaries(nodes: DocumentNode[]): Promise<{ nodeId: string; nodeUpdatedAt: number; summaryGeneratedAt: number | null }[]>;
+  propagateSummariesForChangedNodes(changedNodeIds: string[]): Promise<{ nodeId: string; skipped: boolean; error?: string }[]>;
+}
+
+export interface ContextAssemblyServiceContract extends RuntimeServiceLifecycle {
+  assemble(matches: LeafMatch[]): Promise<AssembledContext>;
+}
+
 export interface RuntimeServices {
   indexingService: IndexingServiceContract;
   embeddingService: EmbeddingServiceContract;
@@ -352,14 +363,18 @@ export interface RuntimeServices {
   chatService: ChatServiceContract;
   agentService: AgentServiceContract;
   providerRegistry: ProviderRegistryContract;
-  hierarchicalStore?: HierarchicalStoreContract;
+  summaryService: SummaryServiceContract;
+  contextAssemblyService: ContextAssemblyServiceContract;
+  hierarchicalStore: HierarchicalStoreContract;
   dispose(): Promise<void>;
 }
 
 export const RUNTIME_SERVICE_CONSTRUCTION_ORDER = [
   "providerRegistry",
   "embeddingService",
+  "summaryService",
   "searchService",
+  "contextAssemblyService",
   "agentService",
   "chatService",
   "indexingService"

@@ -3,6 +3,7 @@ import { createRuntimeLogger } from "../logging/runtimeLogger";
 import type {
   AgentServiceContract,
   ChatServiceContract,
+  ContextAssemblyServiceContract,
   EmbeddingServiceContract,
   HierarchicalStoreContract,
   IndexingServiceContract,
@@ -11,7 +12,8 @@ import type {
   RuntimeServiceLifecycle,
   RuntimeServiceName,
   RuntimeServices,
-  SearchServiceContract
+  SearchServiceContract,
+  SummaryServiceContract
 } from "../types";
 
 export interface NamedRuntimeService {
@@ -31,7 +33,9 @@ export interface ServiceContainerDeps {
   chatService: ChatServiceContract;
   agentService: AgentServiceContract;
   providerRegistry: ProviderRegistryContract;
-  hierarchicalStore?: HierarchicalStoreContract;
+  summaryService: SummaryServiceContract;
+  contextAssemblyService: ContextAssemblyServiceContract;
+  hierarchicalStore: HierarchicalStoreContract;
   disposeOrder: RuntimeServiceName[];
 }
 
@@ -75,7 +79,9 @@ export class ServiceContainer implements RuntimeServices {
   public readonly chatService: ChatServiceContract;
   public readonly agentService: AgentServiceContract;
   public readonly providerRegistry: ProviderRegistryContract;
-  public readonly hierarchicalStore?: HierarchicalStoreContract;
+  public readonly summaryService: SummaryServiceContract;
+  public readonly contextAssemblyService: ContextAssemblyServiceContract;
+  public readonly hierarchicalStore: HierarchicalStoreContract;
 
   private readonly disposeOrder: RuntimeServiceName[];
   private disposed = false;
@@ -87,6 +93,8 @@ export class ServiceContainer implements RuntimeServices {
     this.chatService = deps.chatService;
     this.agentService = deps.agentService;
     this.providerRegistry = deps.providerRegistry;
+    this.summaryService = deps.summaryService;
+    this.contextAssemblyService = deps.contextAssemblyService;
     this.hierarchicalStore = deps.hierarchicalStore;
     this.disposeOrder = [...deps.disposeOrder];
   }
@@ -100,7 +108,9 @@ export class ServiceContainer implements RuntimeServices {
     const servicesByName: Record<RuntimeServiceName, RuntimeServiceLifecycle> = {
       providerRegistry: this.providerRegistry,
       embeddingService: this.embeddingService,
+      summaryService: this.summaryService,
       searchService: this.searchService,
+      contextAssemblyService: this.contextAssemblyService,
       agentService: this.agentService,
       chatService: this.chatService,
       indexingService: this.indexingService

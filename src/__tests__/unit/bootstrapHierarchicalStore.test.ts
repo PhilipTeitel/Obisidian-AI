@@ -4,14 +4,17 @@ import { SqliteVecRepository } from "../../storage/SqliteVecRepository";
 import type {
   AgentServiceContract,
   ChatServiceContract,
+  ContextAssemblyServiceContract,
   EmbeddingServiceContract,
   HierarchicalStoreContract,
   IndexingServiceContract,
   ProviderRegistryContract,
   RuntimeBootstrapContext,
   RuntimeServiceLifecycle,
-  SearchServiceContract
+  SearchServiceContract,
+  SummaryServiceContract
 } from "../../types";
+import { RUNTIME_SERVICE_CONSTRUCTION_ORDER } from "../../types";
 
 interface MemoryPluginLike {
   loadData: () => Promise<unknown>;
@@ -33,13 +36,19 @@ const createNoopService = (): RuntimeServiceLifecycle => ({
   dispose: async () => {}
 });
 
+const createMockHierarchicalStore = (): HierarchicalStoreContract =>
+  createNoopService() as unknown as HierarchicalStoreContract;
+
 const createMockServices = () => ({
   providerRegistry: createNoopService() as unknown as ProviderRegistryContract,
   embeddingService: createNoopService() as unknown as EmbeddingServiceContract,
   searchService: createNoopService() as unknown as SearchServiceContract,
   agentService: createNoopService() as unknown as AgentServiceContract,
   chatService: createNoopService() as unknown as ChatServiceContract,
-  indexingService: createNoopService() as unknown as IndexingServiceContract
+  indexingService: createNoopService() as unknown as IndexingServiceContract,
+  summaryService: createNoopService() as unknown as SummaryServiceContract,
+  contextAssemblyService: createNoopService() as unknown as ContextAssemblyServiceContract,
+  hierarchicalStore: createMockHierarchicalStore()
 });
 
 describe("STOR-3: Bootstrap hierarchical store wiring", () => {
@@ -74,7 +83,7 @@ describe("STOR-3: Bootstrap hierarchical store wiring", () => {
       const container = new ServiceContainer({
         ...createMockServices(),
         hierarchicalStore: repo,
-        disposeOrder: ["providerRegistry", "embeddingService", "searchService", "agentService", "chatService", "indexingService"]
+        disposeOrder: [...RUNTIME_SERVICE_CONSTRUCTION_ORDER]
       });
 
       expect(container.hierarchicalStore).toBeDefined();
@@ -83,19 +92,13 @@ describe("STOR-3: Bootstrap hierarchical store wiring", () => {
   });
 
   describe("Phase B: ServiceContainer Update", () => {
-    it("B1 — ServiceContainer accepts optional hierarchicalStore in deps", () => {
+    it("B1 — ServiceContainer accepts required hierarchicalStore in deps", () => {
       const containerWithStore = new ServiceContainer({
         ...createMockServices(),
         hierarchicalStore: {} as HierarchicalStoreContract,
-        disposeOrder: ["providerRegistry", "embeddingService", "searchService", "agentService", "chatService", "indexingService"]
+        disposeOrder: [...RUNTIME_SERVICE_CONSTRUCTION_ORDER]
       });
       expect(containerWithStore.hierarchicalStore).toBeDefined();
-
-      const containerWithout = new ServiceContainer({
-        ...createMockServices(),
-        disposeOrder: ["providerRegistry", "embeddingService", "searchService", "agentService", "chatService", "indexingService"]
-      });
-      expect(containerWithout.hierarchicalStore).toBeUndefined();
     });
 
     it("B2 — ServiceContainer exposes hierarchicalStore with correct contract methods", async () => {
@@ -109,10 +112,10 @@ describe("STOR-3: Bootstrap hierarchical store wiring", () => {
       const container = new ServiceContainer({
         ...createMockServices(),
         hierarchicalStore: repo,
-        disposeOrder: ["providerRegistry", "embeddingService", "searchService", "agentService", "chatService", "indexingService"]
+        disposeOrder: [...RUNTIME_SERVICE_CONSTRUCTION_ORDER]
       });
 
-      const store = container.hierarchicalStore!;
+      const store = container.hierarchicalStore;
       expect(typeof store.upsertNodeTree).toBe("function");
       expect(typeof store.deleteByNotePath).toBe("function");
       expect(typeof store.getNode).toBe("function");
@@ -125,13 +128,15 @@ describe("STOR-3: Bootstrap hierarchical store wiring", () => {
   });
 
   describe("Phase D: Backward Compatibility", () => {
-    it("D1 — ServiceContainer works without hierarchicalStore", async () => {
+    it("D1 — ServiceContainer exposes all services including new ones", async () => {
       const container = new ServiceContainer({
         ...createMockServices(),
-        disposeOrder: ["providerRegistry", "embeddingService", "searchService", "agentService", "chatService", "indexingService"]
+        disposeOrder: [...RUNTIME_SERVICE_CONSTRUCTION_ORDER]
       });
 
-      expect(container.hierarchicalStore).toBeUndefined();
+      expect(container.hierarchicalStore).toBeDefined();
+      expect(container.summaryService).toBeDefined();
+      expect(container.contextAssemblyService).toBeDefined();
       expect(container.indexingService).toBeDefined();
       expect(container.searchService).toBeDefined();
       expect(container.chatService).toBeDefined();

@@ -352,11 +352,11 @@ describe("hierarchical types compile-time contract tests", () => {
     expectTypeOf(summarizeStage).toMatchTypeOf<IndexingStage>();
   });
 
-  it("E2 — RuntimeServices includes optional hierarchicalStore", () => {
+  it("E2 — RuntimeServices includes required hierarchicalStore", () => {
     expectTypeOf<RuntimeServices>().toHaveProperty("hierarchicalStore");
 
     const servicesWithStore = {} as RuntimeServices;
-    expectTypeOf(servicesWithStore.hierarchicalStore).toEqualTypeOf<HierarchicalStoreContract | undefined>();
+    expectTypeOf(servicesWithStore.hierarchicalStore).toEqualTypeOf<HierarchicalStoreContract>();
   });
 
   it("E3 — existing flat types remain unchanged and compile", () => {

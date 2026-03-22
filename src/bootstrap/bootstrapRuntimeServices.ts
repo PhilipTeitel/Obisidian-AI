@@ -8,11 +8,13 @@ import { createRuntimeLogger } from "../logging/runtimeLogger";
 import { PluginSecretStore } from "../secrets/PluginSecretStore";
 import { AgentService } from "../services/AgentService";
 import { ChatService } from "../services/ChatService";
+import { ContextAssemblyService } from "../services/ContextAssemblyService";
 import { EmbeddingService } from "../services/EmbeddingService";
 import { IndexingService } from "../services/IndexingService";
 import { IndexJobStateStore } from "../services/indexing/IndexJobStateStore";
 import { IndexManifestStore } from "../services/indexing/IndexManifestStore";
 import { SearchService } from "../services/SearchService";
+import { SummaryService } from "../services/SummaryService";
 import { ServiceContainer, type NamedRuntimeService } from "../services/ServiceContainer";
 import { LocalVectorStoreRepository } from "../storage/LocalVectorStoreRepository";
 import { SqliteVecRepository } from "../storage/SqliteVecRepository";
@@ -130,9 +132,19 @@ export const bootstrapRuntimeServices = async (
     providerRegistry,
     getSettings: context.getSettings
   });
+  const summaryService = new SummaryService({
+    providerRegistry,
+    hierarchicalStore,
+    getSettings: context.getSettings
+  });
   const searchService = new SearchService({
     embeddingService,
     vectorStoreRepository,
+    getSettings: context.getSettings,
+    hierarchicalStore
+  });
+  const contextAssemblyService = new ContextAssemblyService({
+    hierarchicalStore,
     getSettings: context.getSettings
   });
   const agentService = new AgentService({
@@ -161,7 +173,9 @@ export const bootstrapRuntimeServices = async (
   const servicesByName: Record<RuntimeServiceName, RuntimeServiceLifecycle> = {
     providerRegistry,
     embeddingService,
+    summaryService,
     searchService,
+    contextAssemblyService,
     agentService,
     chatService,
     indexingService
@@ -232,7 +246,9 @@ export const bootstrapRuntimeServices = async (
     const services = new ServiceContainer({
       providerRegistry,
       embeddingService,
+      summaryService,
       searchService,
+      contextAssemblyService,
       agentService,
       chatService,
       indexingService,

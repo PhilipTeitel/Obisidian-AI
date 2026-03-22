@@ -6,7 +6,7 @@ import type {
   HierarchicalStoreContract,
   ObsidianAISettings,
   ProviderRegistryContract,
-  RuntimeServiceLifecycle,
+  SummaryServiceContract,
   SummaryRecord
 } from "../types";
 import { createRuntimeLogger } from "../logging/runtimeLogger";
@@ -75,7 +75,7 @@ const collectTokens = async (stream: AsyncIterable<ChatStreamEvent>): Promise<st
 const sortNodesByDepthDesc = (nodes: DocumentNode[]): DocumentNode[] =>
   [...nodes].sort((a, b) => b.depth - a.depth);
 
-export class SummaryService implements RuntimeServiceLifecycle {
+export class SummaryService implements SummaryServiceContract {
   private disposed = false;
   private readonly deps: SummaryServiceDeps;
   private readonly logger = createRuntimeLogger("SummaryService");
