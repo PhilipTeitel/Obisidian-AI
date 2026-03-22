@@ -44,6 +44,19 @@ export interface StaleSummaryInfo {
   summaryGeneratedAt: number | null;
 }
 
+export interface SummaryProgressEvent {
+  completed: number;
+  total: number;
+  currentNodeId: string;
+  currentNodeType: string;
+}
+
+export interface SummaryGenerationOptions {
+  onNodeProcessed?: (event: SummaryProgressEvent) => void;
+}
+
+export const SUMMARY_STAGE_LABEL = "Summarize";
+
 const isLeafType = (nodeType: string): boolean =>
   nodeType === "paragraph" || nodeType === "bullet";
 
@@ -79,7 +92,10 @@ export class SummaryService implements RuntimeServiceLifecycle {
     this.disposed = true;
   }
 
-  public async generateSummaries(tree: DocumentTree): Promise<SummaryGenerationResult[]> {
+  public async generateSummaries(
+    tree: DocumentTree,
+    options?: SummaryGenerationOptions
+  ): Promise<SummaryGenerationResult[]> {
     this.ensureNotDisposed();
 
     const allNodes = Array.from(tree.nodes.values());
@@ -96,6 +112,7 @@ export class SummaryService implements RuntimeServiceLifecycle {
     const summaryCache = new Map<string, string>();
     let skippedCount = 0;
     let errorCount = 0;
+    let completedCount = 0;
 
     for (const node of sorted) {
       try {
@@ -117,6 +134,14 @@ export class SummaryService implements RuntimeServiceLifecycle {
           context: { nodeId: node.nodeId, nodeType: node.nodeType }
         });
       }
+
+      completedCount++;
+      this.safeInvokeProgressCallback(options?.onNodeProcessed, {
+        completed: completedCount,
+        total: sorted.length,
+        currentNodeId: node.nodeId,
+        currentNodeType: node.nodeType
+      });
     }
 
     const elapsed = Date.now() - startTime;
@@ -415,6 +440,27 @@ export class SummaryService implements RuntimeServiceLifecycle {
       generatedAt: Date.now()
     };
     await this.deps.hierarchicalStore.upsertSummary(node.nodeId, record);
+  }
+
+  private safeInvokeProgressCallback(
+    callback: SummaryGenerationOptions["onNodeProcessed"],
+    event: SummaryProgressEvent
+  ): void {
+    if (!callback) {
+      return;
+    }
+    try {
+      callback(event);
+    } catch (error: unknown) {
+      this.logger.warn({
+        event: "summary.generate.progress_callback_failed",
+        message: "Summary progress callback failed and was ignored.",
+        context: {
+          nodeId: event.currentNodeId,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      });
+    }
   }
 
   private ensureNotDisposed(): void {
