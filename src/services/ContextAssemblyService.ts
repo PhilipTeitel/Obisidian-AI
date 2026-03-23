@@ -5,7 +5,8 @@ import type {
   HierarchicalContextBlock,
   HierarchicalStoreContract,
   LeafMatch,
-  ObsidianAISettings
+  ObsidianAISettings,
+  RuntimeLoggerContract
 } from "../types";
 import { createRuntimeLogger } from "../logging/runtimeLogger";
 import { estimateTokens, truncateToTokenBudget } from "../utils/tokenEstimator";
@@ -137,6 +138,14 @@ export class ContextAssemblyService implements ContextAssemblyServiceContract {
       });
     }
 
+    const crossRefResult = await this.expandWithCrossReferences(
+      matches, store, remainingParentBudget, operationLogger
+    );
+    for (const block of crossRefResult.blocks) {
+      blocks.push(block);
+    }
+    tierUsage.parentSummaryTokens += crossRefResult.tokensUsed;
+
     const elapsed = Date.now() - startTime;
 
     operationLogger.info({
@@ -144,6 +153,7 @@ export class ContextAssemblyService implements ContextAssemblyServiceContract {
       message: `Phase 3 context assembly completed: ${blocks.length} blocks.`,
       context: {
         blockCount: blocks.length,
+        crossRefBlockCount: crossRefResult.blocks.length,
         elapsedMs: elapsed
       }
     });
@@ -162,6 +172,90 @@ export class ContextAssemblyService implements ContextAssemblyServiceContract {
     });
 
     return { blocks, tierUsage };
+  }
+
+  private async expandWithCrossReferences(
+    matches: LeafMatch[],
+    store: HierarchicalStoreContract,
+    remainingParentBudget: number,
+    operationLogger: RuntimeLoggerContract
+  ): Promise<{ blocks: HierarchicalContextBlock[]; tokensUsed: number }> {
+    if (remainingParentBudget <= 0) {
+      return { blocks: [], tokensUsed: 0 };
+    }
+
+    const seenTargetPaths = new Set<string>();
+    const matchedNotePaths = new Set(matches.map((m) => m.node.notePath));
+    const allCrossRefs: { targetPath: string; targetDisplay: string | null }[] = [];
+
+    for (const match of matches) {
+      const refs = await store.getCrossReferences(match.node.nodeId);
+      for (const ref of refs) {
+        if (!seenTargetPaths.has(ref.targetPath) && !matchedNotePaths.has(ref.targetPath)) {
+          seenTargetPaths.add(ref.targetPath);
+          allCrossRefs.push({ targetPath: ref.targetPath, targetDisplay: ref.targetDisplay });
+        }
+      }
+    }
+
+    if (allCrossRefs.length === 0) {
+      return { blocks: [], tokensUsed: 0 };
+    }
+
+    const blocks: HierarchicalContextBlock[] = [];
+    let budget = remainingParentBudget;
+    let tokensUsed = 0;
+
+    for (const crossRef of allCrossRefs) {
+      if (budget <= 0) {
+        break;
+      }
+
+      const targetNodes = await store.getNodesByNotePath(crossRef.targetPath);
+      const rootNode = targetNodes.find((n) => n.nodeType === "note");
+      if (!rootNode) {
+        operationLogger.debug({
+          event: "context.assembly.cross_ref.target_missing",
+          message: `Cross-reference target not found: ${crossRef.targetPath}`,
+          context: { targetPath: crossRef.targetPath }
+        });
+        continue;
+      }
+
+      const summary = await store.getSummary(rootNode.nodeId);
+      if (!summary) {
+        continue;
+      }
+
+      const truncated = truncateToTokenBudget(summary.summary, budget);
+      const tokens = estimateTokens(truncated);
+      if (tokens === 0) {
+        continue;
+      }
+
+      budget -= tokens;
+      tokensUsed += tokens;
+
+      blocks.push({
+        notePath: rootNode.notePath,
+        noteTitle: rootNode.noteTitle,
+        headingTrail: [],
+        matchedContent: "",
+        siblingContent: "",
+        parentSummary: truncated,
+        score: 0
+      });
+    }
+
+    if (blocks.length > 0) {
+      operationLogger.debug({
+        event: "context.assembly.cross_ref.expanded",
+        message: `Expanded context with ${blocks.length} cross-referenced notes.`,
+        context: { crossRefBlockCount: blocks.length, tokensUsed }
+      });
+    }
+
+    return { blocks, tokensUsed };
   }
 
   private ensureNotDisposed(): void {

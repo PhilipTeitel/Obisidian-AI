@@ -65,7 +65,7 @@ const createMockStore = (): HierarchicalStoreContract => ({
   upsertTags: vi.fn(),
   getNodesByTag: vi.fn().mockResolvedValue([]),
   upsertCrossReferences: vi.fn(),
-  getCrossReferences: vi.fn()
+  getCrossReferences: vi.fn().mockResolvedValue([])
 });
 
 const createDeps = (overrides?: Partial<ContextAssemblyServiceDeps>): ContextAssemblyServiceDeps => ({

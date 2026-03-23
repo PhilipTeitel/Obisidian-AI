@@ -39,7 +39,7 @@ const createMockStore = (): HierarchicalStoreContract => ({
   upsertTags: vi.fn(),
   getNodesByTag: vi.fn().mockResolvedValue([]),
   upsertCrossReferences: vi.fn(),
-  getCrossReferences: vi.fn()
+  getCrossReferences: vi.fn().mockResolvedValue([])
 });
 
 const createNode = (overrides: Partial<DocumentNode> & { nodeId: string }): DocumentNode => ({
