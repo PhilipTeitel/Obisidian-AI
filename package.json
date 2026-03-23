@@ -9,7 +9,11 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint \"src/**/*.ts\" \"vitest.config.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:scale": "vitest run src/__tests__/integration/scaleValidation.integration.test.ts"
+    "test:scale": "vitest run src/__tests__/integration/scaleValidation.integration.test.ts",
+    "query:store": "node scripts/query-store.mjs",
+    "query:counts": "node scripts/query-store.mjs counts",
+    "query:node": "node scripts/query-store.mjs node",
+    "query:sample": "node scripts/query-store.mjs sample"
   },
   "devDependencies": {
     "@types/node": "^24.4.0",

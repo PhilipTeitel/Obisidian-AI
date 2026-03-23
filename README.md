@@ -1,7 +1,9 @@
 # Obsidian AI Plugin
 
 ## Preface
+
 This project represents 2 things for me.  The first is that I've always wanted AI capabilities in Obsidian.  This isn't even the first time I've built it.  It's become my "Hello World" project where I experiment with various ways of building software.  The second is to practice using Cursor's agentic abilities.  It was built using the following agents:
+
 - Architect
   - Build the high-level design document.  It doesn't write the code, only makes sure the project is properly spec'd to be built correctly and cleanly.  A template is used to assure completeness.
   - Create user stories.  Uses a template to spec everything out sufficiently so that the code meets the requirements.  The critical piece is the acceptance criteria.
@@ -14,11 +16,59 @@ Commands were used to execute the various steps and templates were used to maint
 The code on this branch was generated using the `GPT-5.3 Codex High` model.
 
 ## Purpose
+
 An Obsidian plugin that adds AI-powered **semantic search** and **chat completions** over your vault. Notes are indexed locally with embeddings stored in wa-SQLite/sqlite-vec. Chat uses only vault content as context and can create or update notes on request. Supports OpenAI and Ollama providers (abstracted for future additions).
 
 **Hierarchical Indexing (v2):** The indexing pipeline produces a hierarchical document tree (note → topic → subtopic → paragraph/bullet_group → bullet) with LLM-generated summaries at every non-leaf level. Retrieval uses a three-phase strategy (summary search → drill-down → context assembly) that preserves document structure and delivers coherent, contextualized results to the chat LLM.
 
-Requirements: 
+## Lessons Learned
+
+### AI-Assisted Development
+
+Since one of the main objectives of this plugin was to explore the concepts of AI-assisted development, it is important to keep track of lessons learned.
+
+- Context Management - The key to success here is managing context.  The models can only focus on so much at a time.  You have ~200 KB of a window.  That means that you have to keep things concise.  You can go to the Max models with 1 MB but some have shown that the drift increases rapidly beyond ~250 KB so that's not as cool as it sounds nor is it price-efficient.
+  - By separating the concerns, the context can be managed more effectively.  This also produces a better result.  Most of the efforts I've seen people say something like "I want to build an application that does..."  They then see that the application doesn't necessarily do what they want.  The code isn't clean, readable or maintainable.  The problem there is no separation of concerns where the lifecycle is concerned.  Designing and planning are very different from coding.  To make it worse, there's no real human in the loop to manage the development as it proceeds.  Most that I see doing the AI-assisted development are essentially doing end-to-end testing.  They might get the functionality they're looking for but, again, are disappointed in how it was implemented.  I separated the architecting from the coding.  This at least manages the context in terms of the lifecycle, but is still insufficient to get the desired result.
+  - Keeping actions small enough for the model to handle them without drift is essential.  
+    - For the architect-related functions, designing and planning are separate activities.  This not only has the advantage of being done in a more consistent manner but it also creates a natural checkpoint for the human to verify things are proceeding the way they want, e.g. "Do I agree with the stack choices?", "Are the endpoints following standards?", "Do the data flows make sense?", etc. are the sorts of things the developer needs to specify or verify.  This can also surface undecided design decisions.
+    - Planning is also its own activity.  Designing is done so how will this be implemented in a sensible, efficient manner.  The architect can then determine what actions need to be done and in what order.  I separated planning the application from planning the stories.  Planning a story can actually be a pretty involved process.  Keeping it within its own window allows for solid results in addition to another checkpoint for verification.
+    - Implementation is its separate activity.  It's a different concern.  It requires a different context as well.  For this, special instructions are needed to prevent hallucinations, surface any ambiguities, etc.  I created a separate sub-agent for this.  This also allows a setting coding and style standards.  Trying to set architectural standards along with coding standards really multiplies the complexities which can push against the window.  A proper plan ahead of time is one of the key components here.
+- How actions are batched can make a big difference in costs.  I've found that keeping related things together in requests really helps efficiently by getting more cache hits.  Of course that context window is always a concern so finding the right balance is critical.  I've seen cache hits go from 75% to >95% when batching operations.  This is particularly important with design and implementation where the whole codebase needs to be considered.  As the coding progresses, having that already in memory can greatly reduce costs as cache reads are much cheaper than inputs and cache writes.  *This is particularly relevant when you're paying for it!*
+- There's a sweetspot for how large the batches.  You might want to keep them small until you're confident the requirements are solid and the agents are producing what you're intending.
+- The particular model you use is very important.
+  - Composer - Fine for simple things not requiring a lot of reasoning
+  - ChatGPT Codex - Good for coding.  Good for designing.  Not bad for problem solving.  Can be pricey
+  - Opus - Very good.  Very pricey.  Very good at debugging problems.  Good for designing, but Codex may have a tiny advantage based on some of my observations.
+  - ChatGPT 4.6 - Very good.  Very good for designing.  It's new so haven't had enough experience to compare with Opus 4.6.
+
+### Indexing, Embedding, RAG and Search
+
+- Getting the notes properly indexed is a lot harder than it looks.
+  - The context window for embedding is much smaller than an LLM's.
+  - It's also important to keep things atomic enough to retain meaning while also retaining context.
+  - Simply shoving a whole note into the embedding model won't work because the note is likely too large.
+  - Breaking things down to sentences loses context.  Your search results can only pull up particular sentences with close enough matches to the search terms but will miss the real context which might have better confidence.
+- Finding a scheme that maintains context while also fitting into the window of the embedding model is more of an art than science.
+- I tried breaking things down by topic, paragraph, bullet list then sentences and having summaries for each step except the sentences produced very relevant results but the performance was horrible.  
+  - Not only is the complexity of the tree structure higher but the number of nodes that must be saved combinitorically higher.
+  - That also made the indexing and retrieval process much more complicated.  
+    - Search the summaries for the term
+    - Traverse the nodes of the note down to the relevant section
+    - Search for all of those nodes
+    - Reassemble
+    - Feed into the LLM to complete the chat
+
+### Obsidian and Plugins
+
+- Obsidian has its own way of saving data.  This creates bottlenecks and ineffeciencies
+- Privacy is a core requirement.  Keeping the data local at least sets up a border.  Obsidian has some idiosyncracies that require some thought:
+  - Obsidian's file watcher does look into the plugin's directory, particularly the `data.json` file so that if any configuration changes occur, it can reflect them.  It doesn't look in subdirectories, though.
+  - Obsidian has its own save function which may not be what you want for file write-heavy operations, like say indexing. I could be mistaken but I also think it writes in JSON which isn't efficient for data.
+
+
+
+## Requirements: 
+
 - [docs/prompts/01-initial.md](docs/prompts/01-initial.md)
 - [docs/prompts/02-second.md](docs/prompts/02-second.md)
 - [docs/prompts/03-search-chat-ux.md](docs/prompts/03-search-chat-ux.md)
@@ -105,19 +155,17 @@ graph TD
     ProgressSlideout --> EmbeddingSvc
 ```
 
+
+
 ### Data Flow
 
 1. **Indexing (Hierarchical):** `IndexingService` reads vault files via `VaultCrawler`. The `HierarchicalChunker` parses each note into a tree of typed nodes (note → topic → subtopic → paragraph/bullet_group → bullet). `SummaryService` generates bottom-up LLM summaries for non-leaf nodes using the user's configured chat model. `EmbeddingService` generates vectors for both raw content (leaf nodes) and summaries (non-leaf nodes) using the same embedding model. All nodes, summaries, embeddings, tags, and cross-references are stored in the `HierarchicalStore` (wa-SQLite + sqlite-vec).
-
 2. **Hierarchical Retrieval (Three-Phase):**
-   - **Phase 1 — Summary Search:** User query is embedded → search against summary embeddings only (note/topic/subtopic levels) → return top-K candidate nodes.
-   - **Phase 2 — Drill-Down:** For each Phase 1 candidate, search its children's content embeddings recursively until high-similarity leaf nodes are found.
-   - **Phase 3 — Context Assembly:** For each matched leaf, walk up the tree to collect heading trails, sibling nodes, and parent summaries. Apply per-tier token budgets (matched: ~2000, sibling: ~1000, parent summaries: ~1000). Assemble structured context blocks preserving document hierarchy.
-
+  - **Phase 1 — Summary Search:** User query is embedded → search against summary embeddings only (note/topic/subtopic levels) → return top-K candidate nodes.
+  - **Phase 2 — Drill-Down:** For each Phase 1 candidate, search its children's content embeddings recursively until high-similarity leaf nodes are found.
+  - **Phase 3 — Context Assembly:** For each matched leaf, walk up the tree to collect heading trails, sibling nodes, and parent summaries. Apply per-tier token budgets (matched: ~2000, sibling: ~1000, parent summaries: ~1000). Assemble structured context blocks preserving document hierarchy.
 3. **Chat:** User sends a message → `SearchService` performs hierarchical retrieval → `ContextAssemblyService` formats results preserving document structure → `ChatService` sends message + structured context to the chat provider → response streamed back.
-
 4. **Semantic Search:** Same three-phase retrieval as chat, but results are displayed in the search pane with hierarchical context (heading trail, parent summary, surrounding content).
-
 5. **Agent Operations:** When the user asks the chat to create/update files, `AgentService` writes to allowed folders with configurable max file size (default 5k chars).
 
 ### Index Pipeline Detail
@@ -141,6 +189,8 @@ flowchart TD
     end
 ```
 
+
+
 ### Retrieval Pipeline Detail
 
 ```mermaid
@@ -159,18 +209,22 @@ flowchart TD
     Store --> Phase3
 ```
 
+
+
 ## Technical Stack
 
-| Layer | Technology | Rationale |
-|-------|-----------|-----------|
-| Language | TypeScript | Required by Obsidian plugin API; confirmed in requirements |
-| Plugin Framework | Obsidian Plugin API (>= 1.11.4) | Minimum version that includes SecretStorage API for secure key management |
-| Vector Store | wa-SQLite + sqlite-vec | Bundled as plugin dependency (R5). Runs entirely in-browser via WASM, keeps all data local. Supports relational queries for tree traversal, joins across node/summary/embedding tables, and ANN vector search. |
-| Build Tool | esbuild | Standard Obsidian plugin build tool; fast, zero-config for TS |
-| Embedding Providers | OpenAI API, Ollama | Two providers for MVP; abstracted behind a common interface for future additions |
-| Chat Providers | OpenAI API, Ollama | Same providers as embedding; may use different models per task. Chat model also used for summary generation (R2). |
-| Testing | Vitest | Fast TS-native test runner; works well with esbuild projects |
-| Linting | ESLint | Standard for TypeScript projects |
+
+| Layer               | Technology                      | Rationale                                                                                                                                                                                                      |
+| ------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language            | TypeScript                      | Required by Obsidian plugin API; confirmed in requirements                                                                                                                                                     |
+| Plugin Framework    | Obsidian Plugin API (>= 1.11.4) | Minimum version that includes SecretStorage API for secure key management                                                                                                                                      |
+| Vector Store        | wa-SQLite + sqlite-vec          | Bundled as plugin dependency (R5). Runs entirely in-browser via WASM, keeps all data local. Supports relational queries for tree traversal, joins across node/summary/embedding tables, and ANN vector search. |
+| Build Tool          | esbuild                         | Standard Obsidian plugin build tool; fast, zero-config for TS                                                                                                                                                  |
+| Embedding Providers | OpenAI API, Ollama              | Two providers for MVP; abstracted behind a common interface for future additions                                                                                                                               |
+| Chat Providers      | OpenAI API, Ollama              | Same providers as embedding; may use different models per task. Chat model also used for summary generation (R2).                                                                                              |
+| Testing             | Vitest                          | Fast TS-native test runner; works well with esbuild projects                                                                                                                                                   |
+| Linting             | ESLint                          | Standard for TypeScript projects                                                                                                                                                                               |
+
 
 ## Key Design Decisions
 
@@ -323,17 +377,20 @@ CREATE INDEX idx_node_summaries_generated ON node_summaries(generated_at);
 Replaces flat top-K search:
 
 **Phase 1 — Summary Search (coarse):**
+
 - Embed the user's query.
 - Search against **summary embeddings only** (note-level and topic-level first, then subtopic).
 - Return top-K candidate topic/subtopic nodes (default K=10).
 
 **Phase 2 — Drill-Down (fine):**
+
 - For each Phase 1 candidate, search its children's **content embeddings**.
 - Recurse into subtopics until leaf nodes with high similarity are found.
 - Collect matching leaf nodes and their ancestor chains.
 - Deduplicate leaves that appear via multiple ancestor paths.
 
 **Phase 3 — Context Assembly:**
+
 - For each matched leaf node, walk UP the tree to collect:
   - Full heading trail (structural context)
   - Sibling nodes (surrounding context within the same bullet group or section)
@@ -368,6 +425,7 @@ Both `OpenAIChatProvider` and `OllamaChatProvider` use a shared `formatHierarchi
 ### 8. Scoped Tag Tracking (R8)
 
 Tags are tracked at every level of the hierarchy:
+
 - **Note-level tags:** From frontmatter, applied to the root `note` node and inherited by all descendants.
 - **Inline tags:** Extracted within each node's scope and stored in `node_tags` for that specific node.
 - Tags are queryable: "find all nodes tagged X under topic Y" via `SELECT n.* FROM nodes n JOIN node_tags t ON n.node_id = t.node_id WHERE t.tag = ? AND n.parent_id = ?`.
@@ -379,6 +437,7 @@ Wikilinks (`[[target]]` and `[[target|display]]`) within node content are parsed
 ### 10. Incremental Summary Updates (Resolved Decision #4)
 
 When a note's content hash changes during incremental indexing:
+
 1. Re-chunk the changed note into a new tree.
 2. Diff the new tree against the stored tree to identify changed nodes (by `content_hash`).
 3. For changed nodes, regenerate summaries from the changed node up through all ancestors to the note root.
@@ -431,16 +490,18 @@ The plugin uses a lightweight structured logging system tailored for an Obsidian
 
 **Format:** Structured `RuntimeLogPayload` objects emitted via `console.{level}()`. Each payload contains:
 
-| Field | Description |
-|-------|-------------|
-| `scope` | Module or class name (e.g. `"ChatService"`, `"SummaryService"`) |
-| `timestamp` | ISO-8601 timestamp |
-| `level` | `debug` / `info` / `warn` / `error` |
-| `event` | Dotted hierarchical event name (e.g. `summary.generate.started`, `retrieval.phase1.completed`) |
-| `message` | Human-readable description |
-| `domain` | Optional `RuntimeErrorDomain` for error events |
-| `context` | Optional typed key-value map with operation metadata |
-| `error` | Optional `NormalizedRuntimeError` for failure events |
+
+| Field       | Description                                                                                    |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| `scope`     | Module or class name (e.g. `"ChatService"`, `"SummaryService"`)                                |
+| `timestamp` | ISO-8601 timestamp                                                                             |
+| `level`     | `debug` / `info` / `warn` / `error`                                                            |
+| `event`     | Dotted hierarchical event name (e.g. `summary.generate.started`, `retrieval.phase1.completed`) |
+| `message`   | Human-readable description                                                                     |
+| `domain`    | Optional `RuntimeErrorDomain` for error events                                                 |
+| `context`   | Optional typed key-value map with operation metadata                                           |
+| `error`     | Optional `NormalizedRuntimeError` for failure events                                           |
+
 
 DevTools renders these natively with expandable object views.
 
@@ -448,14 +509,17 @@ DevTools renders these natively with expandable object views.
 
 **Log Levels:**
 
-| Level | Convention |
-|-------|-----------|
-| `debug` | Internal state detail: batch progress, vector dimensions, node counts, cache hits, tree traversal steps |
-| `info` | Operation lifecycle milestones: search started/completed, chat turn started/completed, indexing phase transitions, summary generation progress |
-| `warn` | Non-fatal degradations: timeout retry, partial batch failure, stale summary detected, summary generation skipped |
-| `error` | Unrecoverable failures that prevent the operation from completing |
+
+| Level   | Convention                                                                                                                                     |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `debug` | Internal state detail: batch progress, vector dimensions, node counts, cache hits, tree traversal steps                                        |
+| `info`  | Operation lifecycle milestones: search started/completed, chat turn started/completed, indexing phase transitions, summary generation progress |
+| `warn`  | Non-fatal degradations: timeout retry, partial batch failure, stale summary detected, summary generation skipped                               |
+| `error` | Unrecoverable failures that prevent the operation from completing                                                                              |
+
 
 **New logging events for hierarchical pipeline:**
+
 - `indexing.chunk.tree_built` — tree node count per note
 - `summary.generate.started`, `summary.generate.completed`, `summary.generate.skipped` — per-node summary lifecycle
 - `retrieval.phase1.completed`, `retrieval.phase2.completed`, `retrieval.phase3.completed` — per-phase retrieval metrics
@@ -593,142 +657,160 @@ This watches `src/` and rebuilds on changes. Reload Obsidian (Cmd+R / Ctrl+R) to
 Open Obsidian's command palette (Cmd+P on macOS, Ctrl+P on Windows/Linux), then run the commands below by display name.
 The display names and command IDs in this table match the values registered by the plugin command constants.
 
-| Display Name | Command ID | Purpose / Expected Behavior | Typical Usage |
-|--------------|------------|-----------------------------|---------------|
-| Reindex vault | `obsidian-ai:reindex-vault` | Runs a full reindex of configured folders, rebuilding the hierarchical node tree, summaries, and embeddings from scratch. | Use after major note refactors, model changes, schema migration, or when index consistency is uncertain. |
-| Index changes | `obsidian-ai:index-changes` | Runs incremental indexing for only new, modified, or deleted content. Regenerates summaries bottom-up from changed nodes to root. | Use routinely after normal note edits to keep search/chat context current with minimal cost. |
-| Semantic search selection | `obsidian-ai:search-selection` | Uses selected note text as the semantic query, opens the search pane, and executes hierarchical search. | Use while reading a note when you want related context from the vault for highlighted text. |
-| Open semantic search pane | `obsidian-ai:open-semantic-search-pane` | Opens or reveals the Semantic Search pane without running a query and reuses an existing pane if present. | Use when you want to prepare/search manually from the pane UI. |
-| Open chat pane | `obsidian-ai:open-chat-pane` | Opens or reveals the Chat pane without sending a prompt and reuses an existing pane if present. | Use when you want to start or continue a vault-grounded chat session. |
+
+| Display Name              | Command ID                              | Purpose / Expected Behavior                                                                                                       | Typical Usage                                                                                            |
+| ------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Reindex vault             | `obsidian-ai:reindex-vault`             | Runs a full reindex of configured folders, rebuilding the hierarchical node tree, summaries, and embeddings from scratch.         | Use after major note refactors, model changes, schema migration, or when index consistency is uncertain. |
+| Index changes             | `obsidian-ai:index-changes`             | Runs incremental indexing for only new, modified, or deleted content. Regenerates summaries bottom-up from changed nodes to root. | Use routinely after normal note edits to keep search/chat context current with minimal cost.             |
+| Semantic search selection | `obsidian-ai:search-selection`          | Uses selected note text as the semantic query, opens the search pane, and executes hierarchical search.                           | Use while reading a note when you want related context from the vault for highlighted text.              |
+| Open semantic search pane | `obsidian-ai:open-semantic-search-pane` | Opens or reveals the Semantic Search pane without running a query and reuses an existing pane if present.                         | Use when you want to prepare/search manually from the pane UI.                                           |
+| Open chat pane            | `obsidian-ai:open-chat-pane`            | Opens or reveals the Chat pane without sending a prompt and reuses an existing pane if present.                                   | Use when you want to start or continue a vault-grounded chat session.                                    |
+
 
 ## Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Build with esbuild in watch mode |
-| `npm run build` | Production build that emits `main.js` |
-| `npm run lint` | Run ESLint on TypeScript source and config |
-| `npm run test` | Run Vitest test suite |
+
+| Command              | Description                                           |
+| -------------------- | ----------------------------------------------------- |
+| `npm run dev`        | Build with esbuild in watch mode                      |
+| `npm run build`      | Production build that emits `main.js`                 |
+| `npm run lint`       | Run ESLint on TypeScript source and config            |
+| `npm run test`       | Run Vitest test suite                                 |
 | `npm run test:scale` | Run REL-2 scale validation integration scenarios only |
-| `npm run typecheck` | Run `tsc --noEmit` for type checking |
+| `npm run typecheck`  | Run `tsc --noEmit` for type checking                  |
+
 
 ### Test Suite Layout
 
-| Path | Purpose |
-|------|---------|
-| `src/__tests__/smoke.test.ts` | Lightweight compile-safe and contract smoke checks |
-| `src/__tests__/unit/**/*.test.ts` | Service-level unit tests with typed collaborators |
-| `src/__tests__/unit/hierarchicalTypes.test.ts` | Compile-time contract tests for hierarchical node types and store contract |
-| `src/__tests__/unit/hierarchicalChunker.test.ts` | Hierarchical tree chunker tests (tree structure, bullets, paragraphs, tags, cross-refs) |
-| `src/__tests__/unit/sentenceSplitter.test.ts` | Sentence-boundary splitting with abbreviation/URL/decimal handling |
-| `src/__tests__/unit/wikilinkParser.test.ts` | Wikilink extraction with code fence filtering and deduplication |
-| `src/__tests__/unit/tokenEstimator.test.ts` | Token estimation, budget checking, and truncation |
-| `src/__tests__/unit/hierarchicalSchema.test.ts` | Hierarchical SQLite schema migration structure, table/index coverage, and old table cleanup |
-| `src/__tests__/unit/sqliteVecRepository.test.ts` | SqliteVecRepository HierarchicalStoreContract implementation (tree ops, search, summaries, tags) |
-| `src/__tests__/unit/summaryService.test.ts` | SummaryService bottom-up generation, leaf skipping, LLM integration, error handling, propagation |
-| `src/__tests__/unit/summaryService.incremental.test.ts` | Incremental summary propagation: staleness detection, ancestor deduplication, changed node propagation |
-| `src/__tests__/unit/summaryService.progress.test.ts` | Summary generation progress callback invocation, error swallowing, stage label |
-| `src/__tests__/unit/hierarchicalSearch.test.ts` | Phase 1 and Phase 2 hierarchical search in SearchService |
-| `src/__tests__/unit/contextAssemblyService.test.ts` | Phase 3 context assembly with per-tier token budgets |
-| `src/__tests__/unit/contextFormatter.test.ts` | Hierarchical context formatting with heading trails, summaries, and sibling content |
-| `src/__tests__/unit/chatProviderHierarchicalContext.test.ts` | Chat provider hierarchical context integration for OpenAI and Ollama |
-| `src/__tests__/unit/bootstrapHierarchicalStore.test.ts` | Bootstrap wiring of SqliteVecRepository into ServiceContainer |
-| `src/__tests__/unit/scopedTagTracking.test.ts` | META-1 scoped tag tracking: frontmatter inheritance, inline scoping, getNodesByTag queries |
-| `src/__tests__/unit/crossReferenceTracking.test.ts` | META-2 cross-reference tracking: storage, retrieval, context expansion, deduplication |
-| `src/__tests__/unit/hierarchicalSearchView.test.ts` | META-3 hierarchical search view: HierarchicalSearchResult model, rendering, adapter |
-| `src/__tests__/unit/bootstrapIntegration.test.ts` | INTG-1 bootstrap wiring of SummaryService, ContextAssemblyService, and hierarchicalStore |
-| `src/__tests__/unit/indexing.hierarchicalReindex.test.ts` | INTG-2 hierarchical full reindex pipeline (tree building, summaries, embeddings, progress) |
-| `src/__tests__/unit/indexing.incrementalHierarchical.test.ts` | INTG-3 hierarchical incremental index (stale cleanup, propagation, embedding, edge cases) |
-| `src/__tests__/unit/settings.tokenBudgets.test.ts` | INTG-4 token budget settings schema, defaults, snapshot preservation, and service integration |
-| `src/__tests__/integration/**/*.test.ts` | Plugin lifecycle/command integration tests with Obsidian-compatible mocks |
-| `src/__tests__/integration/scaleValidation.integration.test.ts` | REL-2 scale validation for reindex/search/index-changes latency budgets |
-| `src/__tests__/harness/` | Reusable test harness factories for app/plugin runtime setup |
-| `src/__tests__/setup/mockObsidianModule.ts` | Test-time `obsidian` compatibility shim used by Vitest |
+
+| Path                                                            | Purpose                                                                                                |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `src/__tests__/smoke.test.ts`                                   | Lightweight compile-safe and contract smoke checks                                                     |
+| `src/__tests__/unit/**/*.test.ts`                               | Service-level unit tests with typed collaborators                                                      |
+| `src/__tests__/unit/hierarchicalTypes.test.ts`                  | Compile-time contract tests for hierarchical node types and store contract                             |
+| `src/__tests__/unit/hierarchicalChunker.test.ts`                | Hierarchical tree chunker tests (tree structure, bullets, paragraphs, tags, cross-refs)                |
+| `src/__tests__/unit/sentenceSplitter.test.ts`                   | Sentence-boundary splitting with abbreviation/URL/decimal handling                                     |
+| `src/__tests__/unit/wikilinkParser.test.ts`                     | Wikilink extraction with code fence filtering and deduplication                                        |
+| `src/__tests__/unit/tokenEstimator.test.ts`                     | Token estimation, budget checking, and truncation                                                      |
+| `src/__tests__/unit/hierarchicalSchema.test.ts`                 | Hierarchical SQLite schema migration structure, table/index coverage, and old table cleanup            |
+| `src/__tests__/unit/sqliteVecRepository.test.ts`                | SqliteVecRepository HierarchicalStoreContract implementation (tree ops, search, summaries, tags)       |
+| `src/__tests__/unit/summaryService.test.ts`                     | SummaryService bottom-up generation, leaf skipping, LLM integration, error handling, propagation       |
+| `src/__tests__/unit/summaryService.incremental.test.ts`         | Incremental summary propagation: staleness detection, ancestor deduplication, changed node propagation |
+| `src/__tests__/unit/summaryService.progress.test.ts`            | Summary generation progress callback invocation, error swallowing, stage label                         |
+| `src/__tests__/unit/hierarchicalSearch.test.ts`                 | Phase 1 and Phase 2 hierarchical search in SearchService                                               |
+| `src/__tests__/unit/contextAssemblyService.test.ts`             | Phase 3 context assembly with per-tier token budgets                                                   |
+| `src/__tests__/unit/contextFormatter.test.ts`                   | Hierarchical context formatting with heading trails, summaries, and sibling content                    |
+| `src/__tests__/unit/chatProviderHierarchicalContext.test.ts`    | Chat provider hierarchical context integration for OpenAI and Ollama                                   |
+| `src/__tests__/unit/bootstrapHierarchicalStore.test.ts`         | Bootstrap wiring of SqliteVecRepository into ServiceContainer                                          |
+| `src/__tests__/unit/scopedTagTracking.test.ts`                  | META-1 scoped tag tracking: frontmatter inheritance, inline scoping, getNodesByTag queries             |
+| `src/__tests__/unit/crossReferenceTracking.test.ts`             | META-2 cross-reference tracking: storage, retrieval, context expansion, deduplication                  |
+| `src/__tests__/unit/hierarchicalSearchView.test.ts`             | META-3 hierarchical search view: HierarchicalSearchResult model, rendering, adapter                    |
+| `src/__tests__/unit/bootstrapIntegration.test.ts`               | INTG-1 bootstrap wiring of SummaryService, ContextAssemblyService, and hierarchicalStore               |
+| `src/__tests__/unit/indexing.hierarchicalReindex.test.ts`       | INTG-2 hierarchical full reindex pipeline (tree building, summaries, embeddings, progress)             |
+| `src/__tests__/unit/indexing.incrementalHierarchical.test.ts`   | INTG-3 hierarchical incremental index (stale cleanup, propagation, embedding, edge cases)              |
+| `src/__tests__/unit/settings.tokenBudgets.test.ts`              | INTG-4 token budget settings schema, defaults, snapshot preservation, and service integration          |
+| `src/__tests__/integration/**/*.test.ts`                        | Plugin lifecycle/command integration tests with Obsidian-compatible mocks                              |
+| `src/__tests__/integration/scaleValidation.integration.test.ts` | REL-2 scale validation for reindex/search/index-changes latency budgets                                |
+| `src/__tests__/harness/`                                        | Reusable test harness factories for app/plugin runtime setup                                           |
+| `src/__tests__/setup/mockObsidianModule.ts`                     | Test-time `obsidian` compatibility shim used by Vitest                                                 |
+
 
 ## UI Components
 
 Obsidian UI views registered by the plugin:
 
-| Component | Type | Description |
-|-----------|------|-------------|
-| `SearchView` | `ItemView` | Semantic search pane. Query input, top-k and min-score controls, and result list showing matching nodes with note title, heading trail, snippet, relevance score, and parent summary context. Clicking a result opens the note at the matching location (with heading context when available). |
-| `ChatView` | `ItemView` | Chat completions pane. Message input, scrollable conversation history, streaming responses. The chat agent can create/update files when asked. Sources (retrieved nodes with hierarchical context) shown alongside responses. |
-| `ProgressSlideout` | Custom slideout | Slideout panel showing progress for long-running operations (indexing, summary generation, embedding). Displays current task, progress bar/count, and elapsed time. |
+
+| Component          | Type            | Description                                                                                                                                                                                                                                                                                    |
+| ------------------ | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SearchView`       | `ItemView`      | Semantic search pane. Query input, top-k and min-score controls, and result list showing matching nodes with note title, heading trail, snippet, relevance score, and parent summary context. Clicking a result opens the note at the matching location (with heading context when available). |
+| `ChatView`         | `ItemView`      | Chat completions pane. Message input, scrollable conversation history, streaming responses. The chat agent can create/update files when asked. Sources (retrieved nodes with hierarchical context) shown alongside responses.                                                                  |
+| `ProgressSlideout` | Custom slideout | Slideout panel showing progress for long-running operations (indexing, summary generation, embedding). Displays current task, progress bar/count, and elapsed time.                                                                                                                            |
+
 
 ### Commands
 
-| Command | ID | Description |
-|---------|----|-------------|
-| Reindex vault | `obsidian-ai:reindex-vault` | Full reindex — re-chunks, re-summarizes, and re-embeds all notes in configured folders |
-| Index changes | `obsidian-ai:index-changes` | Incremental index — only processes new/modified/deleted notes with bottom-up summary propagation |
-| Semantic search selection | `obsidian-ai:search-selection` | Uses selected note text as query, opens the search pane, and runs hierarchical search with active quality controls |
-| Open semantic search pane | `obsidian-ai:open-semantic-search-pane` | Opens or reveals the semantic search pane and reuses an existing pane when present |
-| Open chat pane | `obsidian-ai:open-chat-pane` | Opens or reveals the chat pane and reuses an existing pane when present |
+
+| Command                   | ID                                      | Description                                                                                                        |
+| ------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Reindex vault             | `obsidian-ai:reindex-vault`             | Full reindex — re-chunks, re-summarizes, and re-embeds all notes in configured folders                             |
+| Index changes             | `obsidian-ai:index-changes`             | Incremental index — only processes new/modified/deleted notes with bottom-up summary propagation                   |
+| Semantic search selection | `obsidian-ai:search-selection`          | Uses selected note text as query, opens the search pane, and runs hierarchical search with active quality controls |
+| Open semantic search pane | `obsidian-ai:open-semantic-search-pane` | Opens or reveals the semantic search pane and reuses an existing pane when present                                 |
+| Open chat pane            | `obsidian-ai:open-chat-pane`            | Opens or reveals the chat pane and reuses an existing pane when present                                            |
+
 
 ## API Contract (Internal Service Interfaces)
 
 This is an Obsidian plugin, not a REST API. The table below describes the key internal service methods that form the contract between layers.
 
-| Service | Method | Signature | Description |
-|---------|--------|-----------|-------------|
-| `IndexingService` | `reindexVault()` | `() → Promise<IndexResult>` | Full reindex: chunk → summarize → embed all configured folders |
-| `IndexingService` | `indexChanges()` | `() → Promise<IndexResult>` | Incremental index with bottom-up summary propagation |
-| `SummaryService` | `generateSummaries(tree)` | `(DocumentTree) → Promise<SummaryResult[]>` | Generate bottom-up summaries for a document tree |
-| `SummaryService` | `regenerateFromNode(nodeId)` | `(string) → Promise<SummaryResult[]>` | Regenerate summaries from a changed node up to root |
-| `SearchService` | `search(request)` | `(SearchRequest) → Promise<HierarchicalSearchResult[]>` | Three-phase hierarchical retrieval |
-| `ContextAssemblyService` | `assemble(matches)` | `(LeafMatch[]) → Promise<AssembledContext>` | Phase 3: walk tree, collect context, apply token budgets |
-| `ChatService` | `chat(request)` | `(ChatRequest) → AsyncIterable<ChatStreamEvent>` | RAG chat: hierarchical retrieve + structured context + stream completion |
-| `AgentService` | `createNote(path, content)` | `(string, string) → Promise<void>` | Create a note in an allowed folder |
-| `AgentService` | `updateNote(path, content)` | `(string, string) → Promise<void>` | Update an existing note in an allowed folder |
-| `EmbeddingService` | `embed(request)` | `(EmbeddingRequest) → Promise<EmbeddingResponse>` | Generate embeddings via configured provider |
-| `HierarchicalStore` | `upsertNodeTree(tree)` | `(DocumentTree) → Promise<void>` | Insert or update a full node tree for a note |
-| `HierarchicalStore` | `deleteByNotePath(path)` | `(string) → Promise<void>` | Delete all nodes/summaries/embeddings for a note |
-| `HierarchicalStore` | `getChildren(nodeId)` | `(string) → Promise<DocumentNode[]>` | Get ordered children of a node |
-| `HierarchicalStore` | `getAncestorChain(nodeId)` | `(string) → Promise<DocumentNode[]>` | Walk up to root, returning ancestor nodes |
-| `HierarchicalStore` | `getSiblings(nodeId)` | `(string) → Promise<DocumentNode[]>` | Get sibling nodes (same parent, ordered) |
-| `HierarchicalStore` | `searchSummaryEmbeddings(vec, k)` | `(number[], number) → Promise<NodeMatch[]>` | ANN search on summary embeddings only |
-| `HierarchicalStore` | `searchContentEmbeddings(vec, k, parentId?)` | `(number[], number, string?) → Promise<NodeMatch[]>` | ANN search on content embeddings, optionally scoped to a parent |
-| `HierarchicalStore` | `upsertSummary(nodeId, summary)` | `(string, SummaryRecord) → Promise<void>` | Insert or update a node's summary |
-| `HierarchicalStore` | `upsertEmbedding(nodeId, type, vec)` | `(string, EmbeddingType, number[]) → Promise<void>` | Insert or update a node's embedding |
-| `ProviderRegistry` | `getEmbedding()` | `() → EmbeddingProvider` | Return the active embedding provider |
-| `ProviderRegistry` | `getChat()` | `() → ChatProvider` | Return the active chat provider |
+
+| Service                  | Method                                       | Signature                                               | Description                                                              |
+| ------------------------ | -------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `IndexingService`        | `reindexVault()`                             | `() → Promise<IndexResult>`                             | Full reindex: chunk → summarize → embed all configured folders           |
+| `IndexingService`        | `indexChanges()`                             | `() → Promise<IndexResult>`                             | Incremental index with bottom-up summary propagation                     |
+| `SummaryService`         | `generateSummaries(tree)`                    | `(DocumentTree) → Promise<SummaryResult[]>`             | Generate bottom-up summaries for a document tree                         |
+| `SummaryService`         | `regenerateFromNode(nodeId)`                 | `(string) → Promise<SummaryResult[]>`                   | Regenerate summaries from a changed node up to root                      |
+| `SearchService`          | `search(request)`                            | `(SearchRequest) → Promise<HierarchicalSearchResult[]>` | Three-phase hierarchical retrieval                                       |
+| `ContextAssemblyService` | `assemble(matches)`                          | `(LeafMatch[]) → Promise<AssembledContext>`             | Phase 3: walk tree, collect context, apply token budgets                 |
+| `ChatService`            | `chat(request)`                              | `(ChatRequest) → AsyncIterable<ChatStreamEvent>`        | RAG chat: hierarchical retrieve + structured context + stream completion |
+| `AgentService`           | `createNote(path, content)`                  | `(string, string) → Promise<void>`                      | Create a note in an allowed folder                                       |
+| `AgentService`           | `updateNote(path, content)`                  | `(string, string) → Promise<void>`                      | Update an existing note in an allowed folder                             |
+| `EmbeddingService`       | `embed(request)`                             | `(EmbeddingRequest) → Promise<EmbeddingResponse>`       | Generate embeddings via configured provider                              |
+| `HierarchicalStore`      | `upsertNodeTree(tree)`                       | `(DocumentTree) → Promise<void>`                        | Insert or update a full node tree for a note                             |
+| `HierarchicalStore`      | `deleteByNotePath(path)`                     | `(string) → Promise<void>`                              | Delete all nodes/summaries/embeddings for a note                         |
+| `HierarchicalStore`      | `getChildren(nodeId)`                        | `(string) → Promise<DocumentNode[]>`                    | Get ordered children of a node                                           |
+| `HierarchicalStore`      | `getAncestorChain(nodeId)`                   | `(string) → Promise<DocumentNode[]>`                    | Walk up to root, returning ancestor nodes                                |
+| `HierarchicalStore`      | `getSiblings(nodeId)`                        | `(string) → Promise<DocumentNode[]>`                    | Get sibling nodes (same parent, ordered)                                 |
+| `HierarchicalStore`      | `searchSummaryEmbeddings(vec, k)`            | `(number[], number) → Promise<NodeMatch[]>`             | ANN search on summary embeddings only                                    |
+| `HierarchicalStore`      | `searchContentEmbeddings(vec, k, parentId?)` | `(number[], number, string?) → Promise<NodeMatch[]>`    | ANN search on content embeddings, optionally scoped to a parent          |
+| `HierarchicalStore`      | `upsertSummary(nodeId, summary)`             | `(string, SummaryRecord) → Promise<void>`               | Insert or update a node's summary                                        |
+| `HierarchicalStore`      | `upsertEmbedding(nodeId, type, vec)`         | `(string, EmbeddingType, number[]) → Promise<void>`     | Insert or update a node's embedding                                      |
+| `ProviderRegistry`       | `getEmbedding()`                             | `() → EmbeddingProvider`                                | Return the active embedding provider                                     |
+| `ProviderRegistry`       | `getChat()`                                  | `() → ChatProvider`                                     | Return the active chat provider                                          |
+
 
 ### Runtime Error + Logging Contracts
 
-| Contract | Signature | Description |
-|----------|-----------|-------------|
+
+| Contract                | Signature                                                                      | Description                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
 | `normalizeRuntimeError` | `(error: unknown, context?: Record<string, unknown>) → NormalizedRuntimeError` | Normalizes unknown thrown values into consistent domain, code, message, retryability, and user-facing guidance |
-| `createRuntimeLogger` | `(scope: string) → RuntimeLoggerContract` | Emits structured runtime log events (`debug`/`info`/`warn`/`error`) with scope and timestamp metadata |
-| `RuntimeErrorDomain` | `"provider" \| "network" \| "storage" \| "runtime"` | Classifies failure source for consistent handling paths and user notices |
+| `createRuntimeLogger`   | `(scope: string) → RuntimeLoggerContract`                                      | Emits structured runtime log events (`debug`/`info`/`warn`/`error`) with scope and timestamp metadata          |
+| `RuntimeErrorDomain`    | `"provider" | "network" | "storage" | "runtime"`                               | Classifies failure source for consistent handling paths and user notices                                       |
+
 
 ## Plugin Settings
 
 Settings stored via `Plugin.loadData()` / `Plugin.saveData()` in `.obsidian/plugins/obsidian-ai/data.json`. API keys are stored separately in Obsidian's SecretStorage (Keychain).
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `embeddingProvider` | `string` | `"openai"` | Active embedding provider ID (`openai` or `ollama`) |
-| `chatProvider` | `string` | `"openai"` | Active chat provider ID (`openai` or `ollama`) |
-| `embeddingModel` | `string` | `"text-embedding-3-small"` | Model name for embeddings (used for both content and summary embeddings) |
-| `chatModel` | `string` | `"gpt-4o-mini"` | Model name for chat completions and summary generation |
-| `ollamaEndpoint` | `string` | `"http://localhost:11434"` | Ollama server URL |
-| `openaiEndpoint` | `string` | `"https://api.openai.com/v1"` | OpenAI-compatible API base URL |
-| `indexedFolders` | `string[]` | `["/"]` | Folders to include in indexing (vault-relative) |
-| `excludedFolders` | `string[]` | `[]` | Folders to exclude from indexing |
-| `agentOutputFolders` | `string[]` | `[]` | Folders the agent is allowed to create/update files in |
-| `maxGeneratedNoteSize` | `number` | `5000` | Max characters for agent-generated notes |
-| `chatTimeout` | `number` | `30000` | Chat completion timeout in milliseconds |
-| `summaryMaxTokens` | `number` | `100` | Max tokens per LLM summary generation call |
-| `matchedContentBudget` | `number` | `2000` | Token budget for matched leaf content in context assembly |
-| `siblingContextBudget` | `number` | `1000` | Token budget for sibling context in context assembly |
-| `parentSummaryBudget` | `number` | `1000` | Token budget for parent summary context in context assembly |
-| `logLevel` | `string` | `"info"` | Minimum log level emitted to console (`debug`, `info`, `warn`, `error`) |
+
+| Setting                | Type       | Default                       | Description                                                              |
+| ---------------------- | ---------- | ----------------------------- | ------------------------------------------------------------------------ |
+| `embeddingProvider`    | `string`   | `"openai"`                    | Active embedding provider ID (`openai` or `ollama`)                      |
+| `chatProvider`         | `string`   | `"openai"`                    | Active chat provider ID (`openai` or `ollama`)                           |
+| `embeddingModel`       | `string`   | `"text-embedding-3-small"`    | Model name for embeddings (used for both content and summary embeddings) |
+| `chatModel`            | `string`   | `"gpt-4o-mini"`               | Model name for chat completions and summary generation                   |
+| `ollamaEndpoint`       | `string`   | `"http://localhost:11434"`    | Ollama server URL                                                        |
+| `openaiEndpoint`       | `string`   | `"https://api.openai.com/v1"` | OpenAI-compatible API base URL                                           |
+| `indexedFolders`       | `string[]` | `["/"]`                       | Folders to include in indexing (vault-relative)                          |
+| `excludedFolders`      | `string[]` | `[]`                          | Folders to exclude from indexing                                         |
+| `agentOutputFolders`   | `string[]` | `[]`                          | Folders the agent is allowed to create/update files in                   |
+| `maxGeneratedNoteSize` | `number`   | `5000`                        | Max characters for agent-generated notes                                 |
+| `chatTimeout`          | `number`   | `30000`                       | Chat completion timeout in milliseconds                                  |
+| `summaryMaxTokens`     | `number`   | `100`                         | Max tokens per LLM summary generation call                               |
+| `matchedContentBudget` | `number`   | `2000`                        | Token budget for matched leaf content in context assembly                |
+| `siblingContextBudget` | `number`   | `1000`                        | Token budget for sibling context in context assembly                     |
+| `parentSummaryBudget`  | `number`   | `1000`                        | Token budget for parent summary context in context assembly              |
+| `logLevel`             | `string`   | `"info"`                      | Minimum log level emitted to console (`debug`, `info`, `warn`, `error`)  |
+
 
 Secrets (stored in SecretStorage, not in `data.json`):
 
-| Secret Key | Description |
-|------------|-------------|
+
+| Secret Key       | Description    |
+| ---------------- | -------------- |
 | `openai-api-key` | OpenAI API key |
+
 
 ## Backlog Items
 
@@ -736,214 +818,251 @@ Secrets (stored in SecretStorage, not in `data.json`):
 
 Establish the plugin skeleton, lifecycle wiring, and baseline developer workflows.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [FND-1](docs/features/FND-1-initialize-obsidian-plugin-scaffold-and-build-pipeline.md) | Done | Initialize Obsidian plugin scaffold and build pipeline | S | Ensure `manifest.json`, `versions.json`, `esbuild`, lint, and test scripts are wired |
-| [FND-2](docs/features/FND-2-register-plugin-lifecycle-views-commands-and-settings-tab-shell.md) | Done | Register plugin lifecycle, views, commands, and settings tab shell | M | View/command/settings/progress shells registered with deterministic unload cleanup |
-| [FND-3](docs/features/FND-3-define-shared-domain-types-for-chunks-providers-search-chat-and-jobs.md) | Done | Define shared domain types for chunks, providers, search, chat, and jobs | S | Types should support future providers without refactors |
-| [FND-4](docs/features/FND-4-implement-service-container-bootstrap-orchestration.md) | Done | Implement service container/bootstrap orchestration | M | Runtime bootstrap and service disposal order are explicit and tested |
-| [FND-5](docs/features/FND-5-add-structured-logging-and-error-normalization.md) | Done | Add structured logging and error normalization | S | Provide actionable errors for provider/network/storage failures |
-| [FND-6](docs/features/FND-6-set-up-unit-integration-test-harness-with-obsidian-compatible-mocks.md) | Done | Set up unit/integration test harness with Obsidian-compatible mocks | M | Required for service-level and command-level planning in later stories |
+
+| ID                                                                                                   | Status | Story                                                                    | Size | Notes                                                                                |
+| ---------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------ | ---- | ------------------------------------------------------------------------------------ |
+| [FND-1](docs/features/FND-1-initialize-obsidian-plugin-scaffold-and-build-pipeline.md)               | Done   | Initialize Obsidian plugin scaffold and build pipeline                   | S    | Ensure `manifest.json`, `versions.json`, `esbuild`, lint, and test scripts are wired |
+| [FND-2](docs/features/FND-2-register-plugin-lifecycle-views-commands-and-settings-tab-shell.md)      | Done   | Register plugin lifecycle, views, commands, and settings tab shell       | M    | View/command/settings/progress shells registered with deterministic unload cleanup   |
+| [FND-3](docs/features/FND-3-define-shared-domain-types-for-chunks-providers-search-chat-and-jobs.md) | Done   | Define shared domain types for chunks, providers, search, chat, and jobs | S    | Types should support future providers without refactors                              |
+| [FND-4](docs/features/FND-4-implement-service-container-bootstrap-orchestration.md)                  | Done   | Implement service container/bootstrap orchestration                      | M    | Runtime bootstrap and service disposal order are explicit and tested                 |
+| [FND-5](docs/features/FND-5-add-structured-logging-and-error-normalization.md)                       | Done   | Add structured logging and error normalization                           | S    | Provide actionable errors for provider/network/storage failures                      |
+| [FND-6](docs/features/FND-6-set-up-unit-integration-test-harness-with-obsidian-compatible-mocks.md)  | Done   | Set up unit/integration test harness with Obsidian-compatible mocks      | M    | Required for service-level and command-level planning in later stories               |
+
 
 ### Epic 2: Indexing and Metadata Pipeline
 
 Build full and incremental indexing that preserves note structure and metadata.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [IDX-1](docs/features/IDX-1-implement-markdown-chunker-preserving-heading-paragraph-bullet-context-and-tags.md) | Done | Implement markdown chunker preserving heading, paragraph/bullet context, and tags | M | Metadata minimum: note name, heading, paragraph/bullet, tags |
-| [IDX-2](docs/features/IDX-2-implement-vault-crawler-with-configurable-include-exclude-folders.md) | Done | Implement vault crawler with configurable include/exclude folders | M | Folder scoping comes from plugin settings |
-| [IDX-3](docs/features/IDX-3-build-full-reindex-workflow-and-reindex-vault-command.md) | Done | Build full reindex workflow and `Reindex vault` command | M | Always rebuild chunks/embeddings for configured scope |
-| [IDX-4](docs/features/IDX-4-build-incremental-index-workflow-and-index-changes-command.md) | Done | Build incremental index workflow and `Index changes` command | L | Detect new/updated/deleted content via content hash strategy |
-| [IDX-5](docs/features/IDX-5-persist-index-job-state-and-progress-events-for-long-running-tasks.md) | Done | Persist index job state and progress events for long-running tasks | M | Drives slideout progress UI and prevents duplicate jobs |
-| [IDX-6](docs/features/IDX-6-add-index-consistency-checks-and-recovery-flow.md) | Done | Add index consistency checks and recovery flow | S | Handle partial failures and resume safely |
+
+| ID                                                                                                              | Status | Story                                                                             | Size | Notes                                                        |
+| --------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------ |
+| [IDX-1](docs/features/IDX-1-implement-markdown-chunker-preserving-heading-paragraph-bullet-context-and-tags.md) | Done   | Implement markdown chunker preserving heading, paragraph/bullet context, and tags | M    | Metadata minimum: note name, heading, paragraph/bullet, tags |
+| [IDX-2](docs/features/IDX-2-implement-vault-crawler-with-configurable-include-exclude-folders.md)               | Done   | Implement vault crawler with configurable include/exclude folders                 | M    | Folder scoping comes from plugin settings                    |
+| [IDX-3](docs/features/IDX-3-build-full-reindex-workflow-and-reindex-vault-command.md)                           | Done   | Build full reindex workflow and `Reindex vault` command                           | M    | Always rebuild chunks/embeddings for configured scope        |
+| [IDX-4](docs/features/IDX-4-build-incremental-index-workflow-and-index-changes-command.md)                      | Done   | Build incremental index workflow and `Index changes` command                      | L    | Detect new/updated/deleted content via content hash strategy |
+| [IDX-5](docs/features/IDX-5-persist-index-job-state-and-progress-events-for-long-running-tasks.md)              | Done   | Persist index job state and progress events for long-running tasks                | M    | Drives slideout progress UI and prevents duplicate jobs      |
+| [IDX-6](docs/features/IDX-6-add-index-consistency-checks-and-recovery-flow.md)                                  | Done   | Add index consistency checks and recovery flow                                    | S    | Handle partial failures and resume safely                    |
+
 
 ### Epic 3: Local Vector Storage and Embedding Providers
 
 Provide local embedding storage and provider-backed embedding generation.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [STO-1](docs/features/STO-1-implement-wa-sqlite-sqlite-vec-schema-migrations-and-local-storage-paths.md) | Done | Implement wa-SQLite/sqlite-vec schema, migrations, and local storage paths | M | Indexed data must remain local in plugin directory |
-| [STO-2](docs/features/STO-2-implement-vector-store-repository-for-upsert-delete-and-nearest-neighbor-query.md) | Done | Implement vector store repository for upsert, delete, and nearest-neighbor query | M | Optimize for vaults with thousands of notes |
-| [STO-3](docs/features/STO-3-implement-embedding-provider-abstraction-and-registry.md) | Done | Implement embedding provider abstraction and registry | S | Keep provider interface extensible for post-MVP providers |
-| [STO-4](docs/features/STO-4-implement-openai-embedding-provider-integration.md) | Done | Implement OpenAI embedding provider integration | M | Endpoint and API key configurable; key from secret store |
-| [STO-5](docs/features/STO-5-implement-ollama-embedding-provider-integration.md) | Done | Implement Ollama embedding provider integration | M | Endpoint/model configurable for local runtime |
-| [STO-6](docs/features/STO-6-add-batching-retry-and-timeout-handling-for-embedding-jobs.md) | Done | Add batching, retry, and timeout handling for embedding jobs | M | Use safe defaults and surface per-note failures |
+
+| ID                                                                                                             | Status | Story                                                                            | Size | Notes                                                     |
+| -------------------------------------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------- | ---- | --------------------------------------------------------- |
+| [STO-1](docs/features/STO-1-implement-wa-sqlite-sqlite-vec-schema-migrations-and-local-storage-paths.md)       | Done   | Implement wa-SQLite/sqlite-vec schema, migrations, and local storage paths       | M    | Indexed data must remain local in plugin directory        |
+| [STO-2](docs/features/STO-2-implement-vector-store-repository-for-upsert-delete-and-nearest-neighbor-query.md) | Done   | Implement vector store repository for upsert, delete, and nearest-neighbor query | M    | Optimize for vaults with thousands of notes               |
+| [STO-3](docs/features/STO-3-implement-embedding-provider-abstraction-and-registry.md)                          | Done   | Implement embedding provider abstraction and registry                            | S    | Keep provider interface extensible for post-MVP providers |
+| [STO-4](docs/features/STO-4-implement-openai-embedding-provider-integration.md)                                | Done   | Implement OpenAI embedding provider integration                                  | M    | Endpoint and API key configurable; key from secret store  |
+| [STO-5](docs/features/STO-5-implement-ollama-embedding-provider-integration.md)                                | Done   | Implement Ollama embedding provider integration                                  | M    | Endpoint/model configurable for local runtime             |
+| [STO-6](docs/features/STO-6-add-batching-retry-and-timeout-handling-for-embedding-jobs.md)                     | Done   | Add batching, retry, and timeout handling for embedding jobs                     | M    | Use safe defaults and surface per-note failures           |
+
 
 ### Epic 4: Semantic Search Experience
 
 Deliver semantic search end to end from query entry to note navigation.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [SRCH-1](docs/features/SRCH-1-implement-search-service-using-query-embeddings-and-vector-similarity.md) | Done | Implement search service using query embeddings and vector similarity | M | Return ranked results with metadata and excerpts |
-| [SRCH-2](docs/features/SRCH-2-build-semantic-search-pane-ui.md) | Done | Build Semantic Search pane UI | M | Include query input, loading state, result list, empty/error states |
-| [SRCH-3](docs/features/SRCH-3-implement-semantic-search-selection-command.md) | Done | Implement `Semantic search selection` command | S | Uses selected note text as query input |
-| [SRCH-4](docs/features/SRCH-4-wire-result-actions-to-open-note-at-relevant-location.md) | Done | Wire result actions to open note at relevant location | S | Preserve heading context when navigating |
-| [SRCH-5](docs/features/SRCH-5-add-search-quality-controls-and-result-limits.md) | Done | Add search quality controls and result limits | S | Include top-k, relevance threshold, and sane defaults |
+
+| ID                                                                                                      | Status | Story                                                                 | Size | Notes                                                               |
+| ------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------- |
+| [SRCH-1](docs/features/SRCH-1-implement-search-service-using-query-embeddings-and-vector-similarity.md) | Done   | Implement search service using query embeddings and vector similarity | M    | Return ranked results with metadata and excerpts                    |
+| [SRCH-2](docs/features/SRCH-2-build-semantic-search-pane-ui.md)                                         | Done   | Build Semantic Search pane UI                                         | M    | Include query input, loading state, result list, empty/error states |
+| [SRCH-3](docs/features/SRCH-3-implement-semantic-search-selection-command.md)                           | Done   | Implement `Semantic search selection` command                         | S    | Uses selected note text as query input                              |
+| [SRCH-4](docs/features/SRCH-4-wire-result-actions-to-open-note-at-relevant-location.md)                 | Done   | Wire result actions to open note at relevant location                 | S    | Preserve heading context when navigating                            |
+| [SRCH-5](docs/features/SRCH-5-add-search-quality-controls-and-result-limits.md)                         | Done   | Add search quality controls and result limits                         | S    | Include top-k, relevance threshold, and sane defaults               |
+
 
 ### Epic 5: Chat Completions and Agent File Operations
 
 Deliver vault-grounded chat and controlled note creation/update workflows.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [CHAT-1](docs/features/CHAT-1-implement-chat-provider-abstraction-with-streaming-completion-support.md) | Done | Implement chat provider abstraction with streaming completion support | M | Shared contract for OpenAI and Ollama |
-| [CHAT-2](docs/features/CHAT-2-implement-openai-chat-provider-integration.md) | Done | Implement OpenAI chat provider integration | M | Configurable model, endpoint, timeout |
-| [CHAT-3](docs/features/CHAT-3-implement-ollama-chat-provider-integration.md) | Done | Implement Ollama chat provider integration | M | Configurable model, endpoint, timeout |
-| [CHAT-4](docs/features/CHAT-4-implement-retrieval-augmented-chat-orchestration.md) | Done | Implement retrieval-augmented chat orchestration | L | Chat context must come only from indexed vault content |
-| [CHAT-5](docs/features/CHAT-5-build-chat-pane-ui-with-streaming-responses-and-source-context-display.md) | Done | Build Chat pane UI with streaming responses and source context display | M | Include conversation history and cancellation controls |
-| [CHAT-6](docs/features/CHAT-6-implement-agent-create-note-workflow-with-allowed-folder-enforcement.md) | Done | Implement agent create-note workflow with allowed-folder enforcement | M | Allowed output folders configurable and validated |
-| [CHAT-7](docs/features/CHAT-7-implement-agent-update-note-workflow-with-max-size-enforcement.md) | Done | Implement agent update-note workflow with max-size enforcement | M | Default max generated note size: 5,000 characters |
+
+| ID                                                                                                       | Status | Story                                                                  | Size | Notes                                                  |
+| -------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------- | ---- | ------------------------------------------------------ |
+| [CHAT-1](docs/features/CHAT-1-implement-chat-provider-abstraction-with-streaming-completion-support.md)  | Done   | Implement chat provider abstraction with streaming completion support  | M    | Shared contract for OpenAI and Ollama                  |
+| [CHAT-2](docs/features/CHAT-2-implement-openai-chat-provider-integration.md)                             | Done   | Implement OpenAI chat provider integration                             | M    | Configurable model, endpoint, timeout                  |
+| [CHAT-3](docs/features/CHAT-3-implement-ollama-chat-provider-integration.md)                             | Done   | Implement Ollama chat provider integration                             | M    | Configurable model, endpoint, timeout                  |
+| [CHAT-4](docs/features/CHAT-4-implement-retrieval-augmented-chat-orchestration.md)                       | Done   | Implement retrieval-augmented chat orchestration                       | L    | Chat context must come only from indexed vault content |
+| [CHAT-5](docs/features/CHAT-5-build-chat-pane-ui-with-streaming-responses-and-source-context-display.md) | Done   | Build Chat pane UI with streaming responses and source context display | M    | Include conversation history and cancellation controls |
+| [CHAT-6](docs/features/CHAT-6-implement-agent-create-note-workflow-with-allowed-folder-enforcement.md)   | Done   | Implement agent create-note workflow with allowed-folder enforcement   | M    | Allowed output folders configurable and validated      |
+| [CHAT-7](docs/features/CHAT-7-implement-agent-update-note-workflow-with-max-size-enforcement.md)         | Done   | Implement agent update-note workflow with max-size enforcement         | M    | Default max generated note size: 5,000 characters      |
+
 
 ### Epic 6: Settings, Secrets, and Configuration Guardrails
 
 Provide secure, configurable runtime settings for indexing, providers, and chat behavior.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [CFG-1](docs/features/CFG-1-implement-settings-schema-with-defaults-and-runtime-validation.md) | Done | Implement settings schema with defaults and runtime validation | M | Include folders, providers, models, endpoints, limits, and timeout |
-| [CFG-2](docs/features/CFG-2-build-settings-ui-for-indexing-scope-and-agent-output-folder-controls.md) | Done | Build settings UI for indexing scope and agent output folder controls | M | Keep indexing scope and write scope independently configurable |
-| [CFG-3](docs/features/CFG-3-integrate-obsidian-secret-store-for-api-key-management.md) | Done | Integrate Obsidian secret store for API key management | S | No secrets in plain config files |
-| [CFG-4](docs/features/CFG-4-implement-provider-model-selection-for-embeddings-and-chat.md) | Done | Implement provider/model selection for embeddings and chat | S | Must support OpenAI and Ollama in MVP |
-| [CFG-5](docs/features/CFG-5-add-configurable-chat-timeout-with-30s-default.md) | Done | Add configurable chat timeout with 30s default | S | Should support slower local models and remote APIs |
-| [CFG-6](docs/features/CFG-6-add-settings-migration-versioning-support.md) | Done | Add settings migration/versioning support | S | Preserve compatibility across plugin updates |
+
+| ID                                                                                                    | Status | Story                                                                 | Size | Notes                                                              |
+| ----------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------ |
+| [CFG-1](docs/features/CFG-1-implement-settings-schema-with-defaults-and-runtime-validation.md)        | Done   | Implement settings schema with defaults and runtime validation        | M    | Include folders, providers, models, endpoints, limits, and timeout |
+| [CFG-2](docs/features/CFG-2-build-settings-ui-for-indexing-scope-and-agent-output-folder-controls.md) | Done   | Build settings UI for indexing scope and agent output folder controls | M    | Keep indexing scope and write scope independently configurable     |
+| [CFG-3](docs/features/CFG-3-integrate-obsidian-secret-store-for-api-key-management.md)                | Done   | Integrate Obsidian secret store for API key management                | S    | No secrets in plain config files                                   |
+| [CFG-4](docs/features/CFG-4-implement-provider-model-selection-for-embeddings-and-chat.md)            | Done   | Implement provider/model selection for embeddings and chat            | S    | Must support OpenAI and Ollama in MVP                              |
+| [CFG-5](docs/features/CFG-5-add-configurable-chat-timeout-with-30s-default.md)                        | Done   | Add configurable chat timeout with 30s default                        | S    | Should support slower local models and remote APIs                 |
+| [CFG-6](docs/features/CFG-6-add-settings-migration-versioning-support.md)                             | Done   | Add settings migration/versioning support                             | S    | Preserve compatibility across plugin updates                       |
+
 
 ### Epic 7: Performance, Reliability, and MVP Readiness
 
 Validate performance constraints and readiness for MVP release.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [REL-1](docs/features/REL-1-implement-lazy-runtime-initialization-for-fast-plugin-startup.md) | Done | Implement lazy initialization strategy to keep plugin startup under 2 seconds | M | Defer DB/provider-heavy work until first use/background task |
-| [REL-2](docs/features/REL-2-run-scale-validation-for-indexing-and-search-latency.md) | Done | Run scale validation on vaults with hundreds to thousands of notes | M | Verify indexing/search latency remains practical |
-| [REL-3](docs/features/REL-3-add-end-to-end-tests-for-core-user-journeys.md) | Done | Add end-to-end tests for core user journeys | L | Reindex, index changes, semantic search, chat, and agent note writes |
-| [REL-4](docs/features/REL-4-harden-provider-outage-and-partial-indexing-failure-recovery.md) | Done | Harden failure handling for provider outages and partial indexing failures | M | Include retries, user-facing errors, and recovery actions |
-| [REL-5](docs/features/REL-5-prepare-mvp-release-checklist-and-acceptance-criteria.md) | Done | Prepare MVP release checklist and acceptance criteria | S | Ensure success criteria map to measurable verification steps |
+
+| ID                                                                                            | Status | Story                                                                         | Size | Notes                                                                |
+| --------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------- |
+| [REL-1](docs/features/REL-1-implement-lazy-runtime-initialization-for-fast-plugin-startup.md) | Done   | Implement lazy initialization strategy to keep plugin startup under 2 seconds | M    | Defer DB/provider-heavy work until first use/background task         |
+| [REL-2](docs/features/REL-2-run-scale-validation-for-indexing-and-search-latency.md)          | Done   | Run scale validation on vaults with hundreds to thousands of notes            | M    | Verify indexing/search latency remains practical                     |
+| [REL-3](docs/features/REL-3-add-end-to-end-tests-for-core-user-journeys.md)                   | Done   | Add end-to-end tests for core user journeys                                   | L    | Reindex, index changes, semantic search, chat, and agent note writes |
+| [REL-4](docs/features/REL-4-harden-provider-outage-and-partial-indexing-failure-recovery.md)  | Done   | Harden failure handling for provider outages and partial indexing failures    | M    | Include retries, user-facing errors, and recovery actions            |
+| [REL-5](docs/features/REL-5-prepare-mvp-release-checklist-and-acceptance-criteria.md)         | Done   | Prepare MVP release checklist and acceptance criteria                         | S    | Ensure success criteria map to measurable verification steps         |
+
 
 ### Epic 8: Command Palette Pane Access and Command UX
 
 Add pane-opening commands and command documentation so users can discover and open core plugin experiences directly from the command palette.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [CMD-1](docs/features/CMD-1-add-pane-open-command-constants-and-command-id-type-coverage.md) | Done | Add pane-open command constants and command ID type coverage | S | Centralize IDs/names and include new IDs in command type unions for compile-time safety |
-| [CMD-2](docs/features/CMD-2-add-open-semantic-search-pane-command-registration-and-reveal-behavior.md) | Done | Add `Open semantic search pane` command registration and reveal behavior | S | Reuse existing search leaf when present; open one when missing; do not execute search automatically |
-| [CMD-3](docs/features/CMD-3-add-open-chat-pane-command-registration-and-reveal-behavior.md) | Done | Add `Open chat pane` command registration and reveal behavior | S | Reuse existing chat leaf when present; open one when missing; do not trigger completion automatically |
-| [CMD-4](docs/features/CMD-4-update-getting-started-command-reference-aligned-with-registered-command-names.md) | Done | Update `Getting Started` command reference aligned with registered command names | S | Document display name, behavior, and usage context for all user-facing plugin commands |
-| [CMD-5](docs/features/CMD-5-add-integration-tests-for-pane-command-discoverability-and-open-reveal-semantics.md) | Done | Add integration tests for pane command discoverability and open/reveal semantics | M | Verify commands are registered and reliably reveal existing panes or create missing panes |
+
+| ID                                                                                                               | Status | Story                                                                            | Size | Notes                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------- |
+| [CMD-1](docs/features/CMD-1-add-pane-open-command-constants-and-command-id-type-coverage.md)                     | Done   | Add pane-open command constants and command ID type coverage                     | S    | Centralize IDs/names and include new IDs in command type unions for compile-time safety               |
+| [CMD-2](docs/features/CMD-2-add-open-semantic-search-pane-command-registration-and-reveal-behavior.md)           | Done   | Add `Open semantic search pane` command registration and reveal behavior         | S    | Reuse existing search leaf when present; open one when missing; do not execute search automatically   |
+| [CMD-3](docs/features/CMD-3-add-open-chat-pane-command-registration-and-reveal-behavior.md)                      | Done   | Add `Open chat pane` command registration and reveal behavior                    | S    | Reuse existing chat leaf when present; open one when missing; do not trigger completion automatically |
+| [CMD-4](docs/features/CMD-4-update-getting-started-command-reference-aligned-with-registered-command-names.md)   | Done   | Update `Getting Started` command reference aligned with registered command names | S    | Document display name, behavior, and usage context for all user-facing plugin commands                |
+| [CMD-5](docs/features/CMD-5-add-integration-tests-for-pane-command-discoverability-and-open-reveal-semantics.md) | Done   | Add integration tests for pane command discoverability and open/reveal semantics | M    | Verify commands are registered and reliably reveal existing panes or create missing panes             |
+
 
 ### Epic 9: Logging and Observability Instrumentation
 
 Instrument all service, provider, storage, and UI layers with structured logging, operation IDs, and log-level controls to make the application maintainable and debuggable.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [LOG-1](docs/features/LOG-1-enhance-runtime-logger-with-operation-id-support-and-log-level-filtering.md) | Done | Enhance runtime logger with operation ID support and log-level filtering | S | Add `operationId` generator, `logLevel` threshold check, convenience methods, and `logLevel` setting |
-| [LOG-2](docs/features/LOG-2-instrument-searchservice-and-searchpanemodel-with-structured-logging.md) | Done | Instrument SearchService and SearchPaneModel with structured logging | M | Log query lifecycle: start, embedding timing, vector search timing, result count, completion/failure |
-| [LOG-3](docs/features/LOG-3-instrument-chatservice-and-chatpanemodel-with-structured-logging.md) | Done | Instrument ChatService and ChatPaneModel with structured logging | M | Log turn lifecycle: start, context retrieval, provider call timing, stream events, completion/failure |
-| [LOG-4](docs/features/LOG-4-instrument-embeddingservice-and-provider-http-layer-with-structured-logging.md) | Done | Instrument EmbeddingService and provider HTTP layer with structured logging | M | Log batch processing, HTTP request/response timing, retries; redact Authorization headers |
-| [LOG-5](docs/features/LOG-5-instrument-storage-layer-and-agentservice-with-structured-logging.md) | Done | Instrument storage layer and AgentService with structured logging | S | Log VectorStore load/persist/query timing and AgentService create/update lifecycle |
-| [LOG-6](docs/features/LOG-6-add-log-level-setting-ui-and-sensitive-data-redaction-tests.md) | Done | Add log-level setting UI and sensitive data redaction tests | S | Add `logLevel` dropdown to settings, `redactSensitiveContext` utility, and unit tests |
+
+| ID                                                                                                          | Status | Story                                                                       | Size | Notes                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------- |
+| [LOG-1](docs/features/LOG-1-enhance-runtime-logger-with-operation-id-support-and-log-level-filtering.md)    | Done   | Enhance runtime logger with operation ID support and log-level filtering    | S    | Add `operationId` generator, `logLevel` threshold check, convenience methods, and `logLevel` setting  |
+| [LOG-2](docs/features/LOG-2-instrument-searchservice-and-searchpanemodel-with-structured-logging.md)        | Done   | Instrument SearchService and SearchPaneModel with structured logging        | M    | Log query lifecycle: start, embedding timing, vector search timing, result count, completion/failure  |
+| [LOG-3](docs/features/LOG-3-instrument-chatservice-and-chatpanemodel-with-structured-logging.md)            | Done   | Instrument ChatService and ChatPaneModel with structured logging            | M    | Log turn lifecycle: start, context retrieval, provider call timing, stream events, completion/failure |
+| [LOG-4](docs/features/LOG-4-instrument-embeddingservice-and-provider-http-layer-with-structured-logging.md) | Done   | Instrument EmbeddingService and provider HTTP layer with structured logging | M    | Log batch processing, HTTP request/response timing, retries; redact Authorization headers             |
+| [LOG-5](docs/features/LOG-5-instrument-storage-layer-and-agentservice-with-structured-logging.md)           | Done   | Instrument storage layer and AgentService with structured logging           | S    | Log VectorStore load/persist/query timing and AgentService create/update lifecycle                    |
+| [LOG-6](docs/features/LOG-6-add-log-level-setting-ui-and-sensitive-data-redaction-tests.md)                 | Done   | Add log-level setting UI and sensitive data redaction tests                 | S    | Add `logLevel` dropdown to settings, `redactSensitiveContext` utility, and unit tests                 |
+
 
 ### Epic 10: Search and Chat Pane UX Polish
 
 Improve visual formatting, text selectability, and interaction patterns for the Semantic Search and Chat panes.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | ----- | ---- | ----- |
-| [UX-1](docs/features/UX-1-create-plugin-stylesheet-with-design-tokens-and-shared-styles.md) | Done | Create plugin stylesheet with design tokens and shared styles | S | Create `styles.css` at project root using Obsidian CSS variables for theme compatibility; define tokens for spacing, border-radius, and colors |
-| [UX-2](docs/features/UX-2-redesign-semantic-search-result-cards-with-visual-hierarchy-and-text-selectability.md) | Done | Redesign Semantic Search result cards with visual hierarchy and text selectability | M | Style each result as a card with distinct note title (clickable link), file path (muted), selectable snippet, and score badge; ensure all text is selectable |
-| [UX-3](docs/features/UX-3-redesign-chat-pane-layout-with-bubble-alignment-and-bottom-input-area.md) | Done | Redesign Chat pane layout with bubble alignment and bottom input area | M | Restructure ChatView: right-aligned user bubbles, left-aligned assistant bubbles, multi-line textarea at bottom, scrollable history area, auto-scroll to newest |
-| [UX-4](docs/features/UX-4-add-copy-to-clipboard-button-on-assistant-response-bubbles.md) | Done | Add copy-to-clipboard button on assistant response bubbles | S | Add a copy icon button in the upper-right corner of each assistant bubble; copies full response text via `navigator.clipboard.writeText` |
-| [UX-5](docs/features/UX-5-add-source-pill-buttons-to-chat-responses-with-note-navigation.md) | Done | Add source pill buttons to chat responses with note navigation | M | Render sources as clickable pill buttons below assistant bubbles; wire `openSource` callback through ChatPaneModel to open notes using existing search navigation |
-| [UX-6](docs/features/UX-6-add-new-conversation-button-and-clear-conversation-support.md) | Done | Add New Conversation button and clear conversation support | S | Add `clearConversation()` to ChatPaneModel; render "New Conversation" button in chat header that resets turns and status |
+
+| ID                                                                                                               | Status | Story                                                                              | Size | Notes                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [UX-1](docs/features/UX-1-create-plugin-stylesheet-with-design-tokens-and-shared-styles.md)                      | Done   | Create plugin stylesheet with design tokens and shared styles                      | S    | Create `styles.css` at project root using Obsidian CSS variables for theme compatibility; define tokens for spacing, border-radius, and colors                    |
+| [UX-2](docs/features/UX-2-redesign-semantic-search-result-cards-with-visual-hierarchy-and-text-selectability.md) | Done   | Redesign Semantic Search result cards with visual hierarchy and text selectability | M    | Style each result as a card with distinct note title (clickable link), file path (muted), selectable snippet, and score badge; ensure all text is selectable      |
+| [UX-3](docs/features/UX-3-redesign-chat-pane-layout-with-bubble-alignment-and-bottom-input-area.md)              | Done   | Redesign Chat pane layout with bubble alignment and bottom input area              | M    | Restructure ChatView: right-aligned user bubbles, left-aligned assistant bubbles, multi-line textarea at bottom, scrollable history area, auto-scroll to newest   |
+| [UX-4](docs/features/UX-4-add-copy-to-clipboard-button-on-assistant-response-bubbles.md)                         | Done   | Add copy-to-clipboard button on assistant response bubbles                         | S    | Add a copy icon button in the upper-right corner of each assistant bubble; copies full response text via `navigator.clipboard.writeText`                          |
+| [UX-5](docs/features/UX-5-add-source-pill-buttons-to-chat-responses-with-note-navigation.md)                     | Done   | Add source pill buttons to chat responses with note navigation                     | M    | Render sources as clickable pill buttons below assistant bubbles; wire `openSource` callback through ChatPaneModel to open notes using existing search navigation |
+| [UX-6](docs/features/UX-6-add-new-conversation-button-and-clear-conversation-support.md)                         | Done   | Add New Conversation button and clear conversation support                         | S    | Add `clearConversation()` to ChatPaneModel; render "New Conversation" button in chat header that resets turns and status                                          |
+
 
 ### Epic 11: Hierarchical Document Model and Tree Chunker
 
 Replace the flat chunker with a tree-building chunker that produces typed hierarchical nodes with full metadata. Covers requirements R1, R3, R4.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [HIER-1](docs/features/HIER-1-define-hierarchical-node-types-and-hierarchical-store-contract-interface.md) | Done | Define hierarchical node types and HierarchicalStoreContract interface | M | New types: DocumentNode, NodeType, DocumentTree, HierarchicalStoreContract. Extend types.ts with all node-related interfaces. No dependencies. |
-| [HIER-2](docs/features/HIER-2-implement-sentence-boundary-paragraph-splitter.md) | Done | Implement sentence-boundary paragraph splitter | S | New file: `src/utils/sentenceSplitter.ts`. Handles abbreviations, decimals, URLs. Each split carries `sequenceIndex`. Depends on HIER-1 (node types). |
-| [HIER-3](docs/features/HIER-3-implement-wikilink-parser-for-cross-reference-extraction.md) | Done | Implement wikilink parser for cross-reference extraction | S | New file: `src/utils/wikilinkParser.ts`. Extract `[[target]]` and `[[target\|display]]` from node content. No dependencies. |
-| [HIER-4](docs/features/HIER-4-implement-token-estimator-utility.md) | Done | Implement token estimator utility | S | New file: `src/utils/tokenEstimator.ts`. Approximate token count for budget enforcement. Use character-based heuristic (chars/4) with optional tiktoken integration. No dependencies. |
-| [HIER-5](docs/features/HIER-5-rewrite-chunker-to-produce-hierarchical-document-tree.md) | Done | Rewrite chunker to produce hierarchical document tree | L | Complete rewrite of `src/utils/chunker.ts`. Parse markdown into tree of typed nodes (note → topic → subtopic → paragraph/bullet_group → bullet). Sentence splitting for long paragraphs. Bullet grouping by blank-line boundaries. Scoped tag tracking. Cross-reference extraction. Depends on HIER-1, HIER-2, HIER-3, HIER-4. |
+
+| ID                                                                                                         | Status | Story                                                                  | Size | Notes                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [HIER-1](docs/features/HIER-1-define-hierarchical-node-types-and-hierarchical-store-contract-interface.md) | Done   | Define hierarchical node types and HierarchicalStoreContract interface | M    | New types: DocumentNode, NodeType, DocumentTree, HierarchicalStoreContract. Extend types.ts with all node-related interfaces. No dependencies.                                                                                                                                                                                 |
+| [HIER-2](docs/features/HIER-2-implement-sentence-boundary-paragraph-splitter.md)                           | Done   | Implement sentence-boundary paragraph splitter                         | S    | New file: `src/utils/sentenceSplitter.ts`. Handles abbreviations, decimals, URLs. Each split carries `sequenceIndex`. Depends on HIER-1 (node types).                                                                                                                                                                          |
+| [HIER-3](docs/features/HIER-3-implement-wikilink-parser-for-cross-reference-extraction.md)                 | Done   | Implement wikilink parser for cross-reference extraction               | S    | New file: `src/utils/wikilinkParser.ts`. Extract `[[target]]` and `[[target|display]]` from node content. No dependencies.                                                                                                                                                                                                     |
+| [HIER-4](docs/features/HIER-4-implement-token-estimator-utility.md)                                        | Done   | Implement token estimator utility                                      | S    | New file: `src/utils/tokenEstimator.ts`. Approximate token count for budget enforcement. Use character-based heuristic (chars/4) with optional tiktoken integration. No dependencies.                                                                                                                                          |
+| [HIER-5](docs/features/HIER-5-rewrite-chunker-to-produce-hierarchical-document-tree.md)                    | Done   | Rewrite chunker to produce hierarchical document tree                  | L    | Complete rewrite of `src/utils/chunker.ts`. Parse markdown into tree of typed nodes (note → topic → subtopic → paragraph/bullet_group → bullet). Sentence splitting for long paragraphs. Bullet grouping by blank-line boundaries. Scoped tag tracking. Cross-reference extraction. Depends on HIER-1, HIER-2, HIER-3, HIER-4. |
+
 
 ### Epic 12: SQLite Hierarchical Storage Migration
 
 Migrate from the flat chunk storage to the hierarchical node/summary/embedding schema in wa-SQLite. Covers requirement R5.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [STOR-1](docs/features/STOR-1-define-hierarchical-sqlite-schema-migration.md) | Done | Define hierarchical SQLite schema migration | M | New migration `003_hierarchical_model` creating `nodes`, `node_children`, `node_summaries`, `node_embeddings`, `node_tags`, `node_cross_refs`, and `metadata` tables with all indexes. Drop old `chunks`/`chunk_embeddings` tables. Full reindex required after migration. Depends on HIER-1 (node types define schema shape). |
-| [STOR-2](docs/features/STOR-2-implement-sqlitevecrepository-with-hierarchical-store-contract.md) | Done | Implement SqliteVecRepository with HierarchicalStoreContract | L | New file: `src/storage/SqliteVecRepository.ts`. Implements tree traversal queries, summary/content embedding search, upsert/delete operations, tag queries. Include structured logging for all storage operations. Depends on STOR-1, HIER-1. |
-| [STOR-3](docs/features/STOR-3-wire-sqlitevecrepository-into-bootstrap-and-deprecate-localvectorstorerepository.md) | Done | Wire SqliteVecRepository into bootstrap and deprecate LocalVectorStoreRepository | M | Update `bootstrapRuntimeServices.ts` to construct `SqliteVecRepository`. Update all service dependencies. Mark `LocalVectorStoreRepository` as deprecated. Depends on STOR-2. |
+
+| ID                                                                                                                 | Status | Story                                                                            | Size | Notes                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------ | ------ | -------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [STOR-1](docs/features/STOR-1-define-hierarchical-sqlite-schema-migration.md)                                      | Done   | Define hierarchical SQLite schema migration                                      | M    | New migration `003_hierarchical_model` creating `nodes`, `node_children`, `node_summaries`, `node_embeddings`, `node_tags`, `node_cross_refs`, and `metadata` tables with all indexes. Drop old `chunks`/`chunk_embeddings` tables. Full reindex required after migration. Depends on HIER-1 (node types define schema shape). |
+| [STOR-2](docs/features/STOR-2-implement-sqlitevecrepository-with-hierarchical-store-contract.md)                   | Done   | Implement SqliteVecRepository with HierarchicalStoreContract                     | L    | New file: `src/storage/SqliteVecRepository.ts`. Implements tree traversal queries, summary/content embedding search, upsert/delete operations, tag queries. Include structured logging for all storage operations. Depends on STOR-1, HIER-1.                                                                                  |
+| [STOR-3](docs/features/STOR-3-wire-sqlitevecrepository-into-bootstrap-and-deprecate-localvectorstorerepository.md) | Done   | Wire SqliteVecRepository into bootstrap and deprecate LocalVectorStoreRepository | M    | Update `bootstrapRuntimeServices.ts` to construct `SqliteVecRepository`. Update all service dependencies. Mark `LocalVectorStoreRepository` as deprecated. Depends on STOR-2.                                                                                                                                                  |
+
 
 ### Epic 13: LLM Summary Generation Service
 
 Build the bottom-up summary generation pipeline that produces concise summaries at every non-leaf level of the document tree. Covers requirement R2.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [SUM-1](docs/features/SUM-1-implement-summaryservice-with-bottom-up-generation.md) | Done | Implement SummaryService with bottom-up generation | L | New file: `src/services/SummaryService.ts`. Traverse tree bottom-up. Skip short leaf nodes (below ~200 tokens). Generate summaries via chat provider with `max_tokens` cap (~100 tokens). Store in `node_summaries`. Include structured logging (summary.generate.started/completed/skipped events). Depends on HIER-1 (node types), STOR-2 (storage), chat provider (existing). |
-| [SUM-2](docs/features/SUM-2-implement-incremental-summary-propagation-for-changed-nodes.md) | Done | Implement incremental summary propagation for changed nodes | M | When a node's content changes, regenerate summaries from the changed node up through all ancestors to the note root. Detect staleness via `generatedAt < updatedAt`. Depends on SUM-1, STOR-2. |
-| [SUM-3](docs/features/SUM-3-add-summary-generation-progress-events.md) | Done | Add summary generation progress events to IndexingService and ProgressSlideout | S | Emit progress events during summary phase. Update ProgressSlideout UI to display summary generation status (node count, current node, elapsed time). New indexing stage: `summarize`. Depends on SUM-1. |
+
+| ID                                                                                          | Status | Story                                                                          | Size | Notes                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------ | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [SUM-1](docs/features/SUM-1-implement-summaryservice-with-bottom-up-generation.md)          | Done   | Implement SummaryService with bottom-up generation                             | L    | New file: `src/services/SummaryService.ts`. Traverse tree bottom-up. Skip short leaf nodes (below ~~200 tokens). Generate summaries via chat provider with `max_tokens` cap (~~100 tokens). Store in `node_summaries`. Include structured logging (summary.generate.started/completed/skipped events). Depends on HIER-1 (node types), STOR-2 (storage), chat provider (existing). |
+| [SUM-2](docs/features/SUM-2-implement-incremental-summary-propagation-for-changed-nodes.md) | Done   | Implement incremental summary propagation for changed nodes                    | M    | When a node's content changes, regenerate summaries from the changed node up through all ancestors to the note root. Detect staleness via `generatedAt < updatedAt`. Depends on SUM-1, STOR-2.                                                                                                                                                                                     |
+| [SUM-3](docs/features/SUM-3-add-summary-generation-progress-events.md)                      | Done   | Add summary generation progress events to IndexingService and ProgressSlideout | S    | Emit progress events during summary phase. Update ProgressSlideout UI to display summary generation status (node count, current node, elapsed time). New indexing stage: `summarize`. Depends on SUM-1.                                                                                                                                                                            |
+
 
 ### Epic 14: Three-Phase Hierarchical Retrieval
 
 Replace flat top-K search with the three-phase hierarchical retrieval strategy. Covers requirements R6, R7.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [RET-1](docs/features/RET-1-implement-phase-1-summary-search-in-searchservice.md) | Done | Implement Phase 1 summary search in SearchService | M | Search summary embeddings only. Return top-K candidate topic/subtopic nodes (default K=10). Include structured logging (retrieval.phase1.completed). Depends on STOR-2 (searchSummaryEmbeddings). |
-| [RET-2](docs/features/RET-2-implement-phase-2-drill-down-search-in-searchservice.md) | Done | Implement Phase 2 drill-down search in SearchService | M | For each Phase 1 candidate, search children's content embeddings recursively. Collect high-similarity leaf nodes. Deduplicate across ancestor paths. Include structured logging (retrieval.phase2.completed). Depends on RET-1, STOR-2 (searchContentEmbeddings). |
-| [RET-3](docs/features/RET-3-implement-contextassemblyservice-phase-3.md) | Done | Implement ContextAssemblyService (Phase 3) | L | New file: `src/services/ContextAssemblyService.ts`. Walk up tree for heading trails, siblings, parent summaries. Apply per-tier token budgets (matched: ~2000, sibling: ~1000, parent summaries: ~1000). Track actual usage per tier. Include structured logging (retrieval.phase3.completed, context.assembly.budget_usage). Depends on RET-2, HIER-4 (token estimator), STOR-2 (getAncestorChain, getSiblings). |
-| [RET-4](docs/features/RET-4-implement-shared-hierarchical-context-formatter.md) | Done | Implement shared hierarchical context formatter | M | New file: `src/utils/contextFormatter.ts`. Format assembled context preserving document structure (headings, summaries, bullets, paragraphs). Used by both chat providers. Depends on RET-3, HIER-1 (node types). |
-| [RET-5](docs/features/RET-5-update-chatservice-and-chat-providers-for-hierarchical-context.md) | Done | Update ChatService and chat providers for hierarchical context | M | Replace `ChatContextChunk` with `HierarchicalContextBlock`. Update `OpenAIChatProvider` and `OllamaChatProvider` to use `formatHierarchicalContext()`. Depends on RET-4. |
+
+| ID                                                                                             | Status | Story                                                          | Size | Notes                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [RET-1](docs/features/RET-1-implement-phase-1-summary-search-in-searchservice.md)              | Done   | Implement Phase 1 summary search in SearchService              | M    | Search summary embeddings only. Return top-K candidate topic/subtopic nodes (default K=10). Include structured logging (retrieval.phase1.completed). Depends on STOR-2 (searchSummaryEmbeddings).                                                                                                                                                                                                                 |
+| [RET-2](docs/features/RET-2-implement-phase-2-drill-down-search-in-searchservice.md)           | Done   | Implement Phase 2 drill-down search in SearchService           | M    | For each Phase 1 candidate, search children's content embeddings recursively. Collect high-similarity leaf nodes. Deduplicate across ancestor paths. Include structured logging (retrieval.phase2.completed). Depends on RET-1, STOR-2 (searchContentEmbeddings).                                                                                                                                                 |
+| [RET-3](docs/features/RET-3-implement-contextassemblyservice-phase-3.md)                       | Done   | Implement ContextAssemblyService (Phase 3)                     | L    | New file: `src/services/ContextAssemblyService.ts`. Walk up tree for heading trails, siblings, parent summaries. Apply per-tier token budgets (matched: ~2000, sibling: ~1000, parent summaries: ~1000). Track actual usage per tier. Include structured logging (retrieval.phase3.completed, context.assembly.budget_usage). Depends on RET-2, HIER-4 (token estimator), STOR-2 (getAncestorChain, getSiblings). |
+| [RET-4](docs/features/RET-4-implement-shared-hierarchical-context-formatter.md)                | Done   | Implement shared hierarchical context formatter                | M    | New file: `src/utils/contextFormatter.ts`. Format assembled context preserving document structure (headings, summaries, bullets, paragraphs). Used by both chat providers. Depends on RET-3, HIER-1 (node types).                                                                                                                                                                                                 |
+| [RET-5](docs/features/RET-5-update-chatservice-and-chat-providers-for-hierarchical-context.md) | Done   | Update ChatService and chat providers for hierarchical context | M    | Replace `ChatContextChunk` with `HierarchicalContextBlock`. Update `OpenAIChatProvider` and `OllamaChatProvider` to use `formatHierarchicalContext()`. Depends on RET-4.                                                                                                                                                                                                                                          |
+
 
 ### Epic 15: Hierarchical Indexing Pipeline Integration
 
 Wire the hierarchical chunker, summary service, and new storage into the IndexingService for both full and incremental indexing. Integrates Epics 11-14 into the runtime.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [INTG-1](docs/features/INTG-1-update-bootstrap-to-wire-summaryservice-contextassemblyservice-and-sqlitevecrepository.md) | Done | Update bootstrap to wire SummaryService, ContextAssemblyService, and SqliteVecRepository | M | Update `bootstrapRuntimeServices.ts` with new service construction order. Add `SummaryService` and `ContextAssemblyService` to `RuntimeServices`. Must be done first — other INTG stories depend on the wired services. Depends on STOR-3, SUM-1, RET-3. |
-| [INTG-2](docs/features/INTG-2-update-indexingservice-for-hierarchical-full-reindex.md) | Done | Update IndexingService for hierarchical full reindex | L | Replace flat chunk → embed flow with: chunk tree → store nodes → generate summaries → embed content + summaries. Update progress events for new phases. Depends on INTG-1, HIER-5 (chunker), SUM-1, STOR-2. |
-| [INTG-3](docs/features/INTG-3-update-indexingservice-for-hierarchical-incremental-index.md) | Done | Update IndexingService for hierarchical incremental index | L | Diff node trees for changed notes. Delete stale nodes. Upsert changed nodes. Trigger incremental summary propagation (SUM-2). Re-embed changed content + summaries. Depends on INTG-2, SUM-2. |
-| [INTG-4](docs/features/INTG-4-add-token-budget-settings-to-plugin-settings-ui.md) | Done | Add token budget settings to plugin settings UI | S | Add `summaryMaxTokens`, `matchedContentBudget`, `siblingContextBudget`, `parentSummaryBudget` to settings schema, defaults, and settings tab UI. Consumed by RET-3 (ContextAssemblyService) and SUM-1. Can be done in parallel with INTG-1. |
+
+| ID                                                                                                                       | Status | Story                                                                                    | Size | Notes                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [INTG-1](docs/features/INTG-1-update-bootstrap-to-wire-summaryservice-contextassemblyservice-and-sqlitevecrepository.md) | Done   | Update bootstrap to wire SummaryService, ContextAssemblyService, and SqliteVecRepository | M    | Update `bootstrapRuntimeServices.ts` with new service construction order. Add `SummaryService` and `ContextAssemblyService` to `RuntimeServices`. Must be done first — other INTG stories depend on the wired services. Depends on STOR-3, SUM-1, RET-3. |
+| [INTG-2](docs/features/INTG-2-update-indexingservice-for-hierarchical-full-reindex.md)                                   | Done   | Update IndexingService for hierarchical full reindex                                     | L    | Replace flat chunk → embed flow with: chunk tree → store nodes → generate summaries → embed content + summaries. Update progress events for new phases. Depends on INTG-1, HIER-5 (chunker), SUM-1, STOR-2.                                              |
+| [INTG-3](docs/features/INTG-3-update-indexingservice-for-hierarchical-incremental-index.md)                              | Done   | Update IndexingService for hierarchical incremental index                                | L    | Diff node trees for changed notes. Delete stale nodes. Upsert changed nodes. Trigger incremental summary propagation (SUM-2). Re-embed changed content + summaries. Depends on INTG-2, SUM-2.                                                            |
+| [INTG-4](docs/features/INTG-4-add-token-budget-settings-to-plugin-settings-ui.md)                                        | Done   | Add token budget settings to plugin settings UI                                          | S    | Add `summaryMaxTokens`, `matchedContentBudget`, `siblingContextBudget`, `parentSummaryBudget` to settings schema, defaults, and settings tab UI. Consumed by RET-3 (ContextAssemblyService) and SUM-1. Can be done in parallel with INTG-1.              |
+
 
 ### Epic 16: Scoped Tags, Cross-References, and Search UX Updates
 
 Implement scoped tag tracking, cross-reference following, and update the search pane for hierarchical results. Covers requirements R8, R9.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| [META-1](docs/features/META-1-implement-scoped-tag-tracking-in-chunker-and-storage.md) | Done | Implement scoped tag tracking in chunker and storage | M | Tags inherited from note frontmatter + inline tags per node scope. Store in `node_tags`. Queryable: "find all nodes tagged X under topic Y". Depends on HIER-5 (chunker), STOR-2 (node_tags table). |
-| [META-2](docs/features/META-2-implement-cross-reference-tracking-and-retrieval-expansion.md) | Done | Implement cross-reference tracking and retrieval expansion | M | Parse wikilinks during chunking (uses HIER-3), store in `node_cross_refs`. During retrieval, optionally follow cross-references to expand context with related material. Depends on HIER-3, HIER-5, STOR-2 (node_cross_refs table), RET-3. |
-| [META-3](docs/features/META-3-update-searchview-for-hierarchical-result-display.md) | Done | Update SearchView for hierarchical result display | M | Show heading trail, parent summary context, and surrounding content in search result cards. Update `SearchResult` type to use `HierarchicalSearchResult`. Depends on RET-1, RET-2, RET-3. |
+
+| ID                                                                                           | Status | Story                                                      | Size | Notes                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [META-1](docs/features/META-1-implement-scoped-tag-tracking-in-chunker-and-storage.md)       | Done   | Implement scoped tag tracking in chunker and storage       | M    | Tags inherited from note frontmatter + inline tags per node scope. Store in `node_tags`. Queryable: "find all nodes tagged X under topic Y". Depends on HIER-5 (chunker), STOR-2 (node_tags table).                                        |
+| [META-2](docs/features/META-2-implement-cross-reference-tracking-and-retrieval-expansion.md) | Done   | Implement cross-reference tracking and retrieval expansion | M    | Parse wikilinks during chunking (uses HIER-3), store in `node_cross_refs`. During retrieval, optionally follow cross-references to expand context with related material. Depends on HIER-3, HIER-5, STOR-2 (node_cross_refs table), RET-3. |
+| [META-3](docs/features/META-3-update-searchview-for-hierarchical-result-display.md)          | Done   | Update SearchView for hierarchical result display          | M    | Show heading trail, parent summary context, and surrounding content in search result cards. Update `SearchResult` type to use `HierarchicalSearchResult`. Depends on RET-1, RET-2, RET-3.                                                  |
+
 
 ### Epic 17: User-Facing Authoring Guide
 
 Document the hierarchical indexing and retrieval scheme for end users. Covers requirement R10.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| DOC-1 | Not Started | Write authoring guide for optimal note structure | M | New file: `docs/authoring-guide/README.md`. Cover: heading mapping to topics/subtopics, bullet grouping semantics, paragraph splitting by sentence, tag scoping (frontmatter + inline), wikilink cross-references, and best practices. Can be written once Epics 11-14 are stable. |
+
+| ID    | Status      | Story                                            | Size | Notes                                                                                                                                                                                                                                                                              |
+| ----- | ----------- | ------------------------------------------------ | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DOC-1 | Not Started | Write authoring guide for optimal note structure | M    | New file: `docs/authoring-guide/README.md`. Cover: heading mapping to topics/subtopics, bullet grouping semantics, paragraph splitting by sentence, tag scoping (frontmatter + inline), wikilink cross-references, and best practices. Can be written once Epics 11-14 are stable. |
+
 
 ### Epic 18: Hierarchical Pipeline Testing and Validation
 
 Validate the hierarchical pipeline end-to-end with unit, integration, and scale tests. Ensures all requirements R1-R10 are verified.
 
-| ID | Status | Story | Size | Notes |
-| ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| TEST-1 | Not Started | Add unit tests for hierarchical chunker | M | Test tree structure for various markdown inputs: headings, nested bullets, long paragraphs, mixed content, edge cases (empty notes, no headings, deeply nested bullets). Also covers sentence splitter and wikilink parser. Depends on HIER-5. |
-| TEST-2 | Not Started | Add unit tests for SummaryService | M | Test bottom-up traversal, leaf skipping (below ~200 tokens), incremental propagation, error handling. Mock chat provider. Depends on SUM-1, SUM-2. |
-| TEST-3 | Not Started | Add unit tests for three-phase retrieval | M | Test Phase 1 summary search, Phase 2 drill-down, Phase 3 context assembly with token budgets. Verify per-tier budget enforcement and actual usage tracking. Mock HierarchicalStore. Depends on RET-1, RET-2, RET-3. |
-| TEST-4 | Not Started | Add integration tests for hierarchical index → search → chat flow | L | End-to-end: index a set of notes → hierarchical search → verify structured context format → chat completion with hierarchical context. Depends on INTG-2, RET-5. |
-| TEST-5 | Not Started | Run scale validation for hierarchical pipeline | M | Verify indexing (with summaries) and search latency for vaults with hundreds to thousands of notes. Ensure summary generation cost is bounded. Compare latency budgets against existing REL-2 baselines. Depends on TEST-4. |
+
+| ID     | Status      | Story                                                             | Size | Notes                                                                                                                                                                                                                                          |
+| ------ | ----------- | ----------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TEST-1 | Not Started | Add unit tests for hierarchical chunker                           | M    | Test tree structure for various markdown inputs: headings, nested bullets, long paragraphs, mixed content, edge cases (empty notes, no headings, deeply nested bullets). Also covers sentence splitter and wikilink parser. Depends on HIER-5. |
+| TEST-2 | Not Started | Add unit tests for SummaryService                                 | M    | Test bottom-up traversal, leaf skipping (below ~200 tokens), incremental propagation, error handling. Mock chat provider. Depends on SUM-1, SUM-2.                                                                                             |
+| TEST-3 | Not Started | Add unit tests for three-phase retrieval                          | M    | Test Phase 1 summary search, Phase 2 drill-down, Phase 3 context assembly with token budgets. Verify per-tier budget enforcement and actual usage tracking. Mock HierarchicalStore. Depends on RET-1, RET-2, RET-3.                            |
+| TEST-4 | Not Started | Add integration tests for hierarchical index → search → chat flow | L    | End-to-end: index a set of notes → hierarchical search → verify structured context format → chat completion with hierarchical context. Depends on INTG-2, RET-5.                                                                               |
+| TEST-5 | Not Started | Run scale validation for hierarchical pipeline                    | M    | Verify indexing (with summaries) and search latency for vaults with hundreds to thousands of notes. Ensure summary generation cost is bounded. Compare latency budgets against existing REL-2 baselines. Depends on TEST-4.                    |
+
 
 ## License
+
 MIT © Philip Teitel
