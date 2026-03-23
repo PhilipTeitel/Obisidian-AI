@@ -167,6 +167,7 @@ const createMockHierarchicalStore = (opts: {
     upsertTags: async (nodeId: string, tags: string[]) => {
       calls.upsertTags.push({ nodeId, tags });
     },
+    getNodesByTag: async () => [],
     upsertCrossReferences: async (refs: CrossReference[]) => {
       calls.upsertCrossReferences.push(refs);
     },

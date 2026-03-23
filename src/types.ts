@@ -511,6 +511,7 @@ export interface HierarchicalStoreContract {
   getSummary(nodeId: string): Promise<SummaryRecord | null>;
   upsertEmbedding(nodeId: string, embeddingType: EmbeddingType, vector: EmbeddingVector): Promise<void>;
   upsertTags(nodeId: string, tags: string[]): Promise<void>;
+  getNodesByTag(tag: string, parentId?: string): Promise<DocumentNode[]>;
   upsertCrossReferences(refs: CrossReference[]): Promise<void>;
   getCrossReferences(nodeId: string): Promise<CrossReference[]>;
 }

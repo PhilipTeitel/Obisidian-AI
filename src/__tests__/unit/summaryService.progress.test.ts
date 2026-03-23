@@ -102,6 +102,7 @@ const createMockStore = (): HierarchicalStoreContract => {
     getSummary: vi.fn(async (nodeId: string) => summaries.get(nodeId) ?? null),
     upsertEmbedding: vi.fn(),
     upsertTags: vi.fn(),
+    getNodesByTag: vi.fn().mockResolvedValue([]),
     upsertCrossReferences: vi.fn(),
     getCrossReferences: vi.fn()
   };

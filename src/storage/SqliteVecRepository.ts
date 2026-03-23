@@ -328,6 +328,59 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
     });
   }
 
+  public async getNodesByTag(tag: string, parentId?: string): Promise<DocumentNode[]> {
+    const normalizedTag = tag.trim().toLowerCase();
+    if (!normalizedTag) {
+      return [];
+    }
+
+    const matchingNodeIds: string[] = [];
+    for (const [nodeId, nodeTags] of this.tags) {
+      if (nodeTags.includes(normalizedTag)) {
+        matchingNodeIds.push(nodeId);
+      }
+    }
+
+    if (parentId === undefined) {
+      const result: DocumentNode[] = [];
+      for (const nodeId of matchingNodeIds) {
+        const node = this.nodes.get(nodeId);
+        if (node) {
+          result.push({ ...node });
+        }
+      }
+      return result;
+    }
+
+    const descendantIds = this.collectDescendantIds(parentId);
+    const result: DocumentNode[] = [];
+    for (const nodeId of matchingNodeIds) {
+      if (descendantIds.has(nodeId)) {
+        const node = this.nodes.get(nodeId);
+        if (node) {
+          result.push({ ...node });
+        }
+      }
+    }
+    return result;
+  }
+
+  private collectDescendantIds(parentId: string): Set<string> {
+    const descendants = new Set<string>();
+    const queue = [parentId];
+    while (queue.length > 0) {
+      const current = queue.shift() as string;
+      const entries = this.children.get(current);
+      if (entries) {
+        for (const entry of entries) {
+          descendants.add(entry.childId);
+          queue.push(entry.childId);
+        }
+      }
+    }
+    return descendants;
+  }
+
   public async upsertCrossReferences(refs: CrossReference[]): Promise<void> {
     for (const ref of refs) {
       const existing = this.crossRefs.get(ref.sourceNodeId) ?? [];

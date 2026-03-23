@@ -285,6 +285,7 @@ describe("hierarchical types compile-time contract tests", () => {
       getSummary: async () => null,
       upsertEmbedding: async () => undefined,
       upsertTags: async () => undefined,
+      getNodesByTag: async () => [],
       upsertCrossReferences: async () => undefined,
       getCrossReferences: async () => []
     };
@@ -302,6 +303,7 @@ describe("hierarchical types compile-time contract tests", () => {
     expectTypeOf(store.getSummary).toBeFunction();
     expectTypeOf(store.upsertEmbedding).toBeFunction();
     expectTypeOf(store.upsertTags).toBeFunction();
+    expectTypeOf(store.getNodesByTag).toBeFunction();
     expectTypeOf(store.upsertCrossReferences).toBeFunction();
     expectTypeOf(store.getCrossReferences).toBeFunction();
 
@@ -313,6 +315,7 @@ describe("hierarchical types compile-time contract tests", () => {
     expect(store.upsertEmbedding("node-1", "content", mockVector)).resolves.toBeUndefined();
     expect(store.upsertCrossReferences([])).resolves.toBeUndefined();
     expect(store.getCrossReferences("node-1")).resolves.toEqual([]);
+    expect(store.getNodesByTag("tag-1")).resolves.toEqual([]);
   });
 
   it("D2 — searchContentEmbeddings accepts optional parentId", async () => {
@@ -332,6 +335,7 @@ describe("hierarchical types compile-time contract tests", () => {
       getSummary: async () => null,
       upsertEmbedding: async () => undefined,
       upsertTags: async () => undefined,
+      getNodesByTag: async () => [],
       upsertCrossReferences: async () => undefined,
       getCrossReferences: async () => []
     };

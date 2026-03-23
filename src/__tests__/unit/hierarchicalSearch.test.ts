@@ -47,6 +47,7 @@ const createMockHierarchicalStore = (matches: NodeMatch[] = []): HierarchicalSto
   getSummary: vi.fn(),
   upsertEmbedding: vi.fn(),
   upsertTags: vi.fn(),
+  getNodesByTag: vi.fn().mockResolvedValue([]),
   upsertCrossReferences: vi.fn(),
   getCrossReferences: vi.fn()
 });

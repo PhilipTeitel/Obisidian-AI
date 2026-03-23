@@ -200,6 +200,7 @@ describe("runtime service unit behavior", () => {
         getSummary: async () => null,
         upsertEmbedding: async () => undefined,
         upsertTags: async () => undefined,
+        getNodesByTag: async () => [],
         upsertCrossReferences: async () => undefined,
         getCrossReferences: async () => []
       }

@@ -120,6 +120,7 @@ const createMockHierarchicalStore = () => ({
   getSummary: async () => null,
   upsertEmbedding: async () => undefined,
   upsertTags: async () => undefined,
+  getNodesByTag: async () => [],
   upsertCrossReferences: async () => undefined,
   getCrossReferences: async () => []
 });
