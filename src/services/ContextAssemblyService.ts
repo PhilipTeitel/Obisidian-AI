@@ -27,17 +27,11 @@ interface TokenBudgets {
   parentSummaryBudget: number;
 }
 
-const resolveBudgets = (settings: ObsidianAISettings): TokenBudgets => {
-  const s = settings as Record<string, unknown>;
-  return {
-    matchedContentBudget:
-      typeof s.matchedContentBudget === "number" ? s.matchedContentBudget : DEFAULT_MATCHED_CONTENT_BUDGET,
-    siblingContextBudget:
-      typeof s.siblingContextBudget === "number" ? s.siblingContextBudget : DEFAULT_SIBLING_CONTEXT_BUDGET,
-    parentSummaryBudget:
-      typeof s.parentSummaryBudget === "number" ? s.parentSummaryBudget : DEFAULT_PARENT_SUMMARY_BUDGET
-  };
-};
+const resolveBudgets = (settings: ObsidianAISettings): TokenBudgets => ({
+  matchedContentBudget: settings.matchedContentBudget ?? DEFAULT_MATCHED_CONTENT_BUDGET,
+  siblingContextBudget: settings.siblingContextBudget ?? DEFAULT_SIBLING_CONTEXT_BUDGET,
+  parentSummaryBudget: settings.parentSummaryBudget ?? DEFAULT_PARENT_SUMMARY_BUDGET
+});
 
 export class ContextAssemblyService implements ContextAssemblyServiceContract {
   private disposed = false;

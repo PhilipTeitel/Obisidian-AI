@@ -258,6 +258,10 @@ export interface ObsidianAISettings {
   maxGeneratedNoteSize: number;
   chatTimeout: number;
   logLevel: RuntimeLogLevel;
+  summaryMaxTokens: number;
+  matchedContentBudget: number;
+  siblingContextBudget: number;
+  parentSummaryBudget: number;
 }
 
 export type RuntimeLogContextValue = string | number | boolean | null | undefined;

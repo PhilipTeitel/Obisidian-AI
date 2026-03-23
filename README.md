@@ -636,6 +636,7 @@ The display names and command IDs in this table match the values registered by t
 | `src/__tests__/unit/bootstrapIntegration.test.ts` | INTG-1 bootstrap wiring of SummaryService, ContextAssemblyService, and hierarchicalStore |
 | `src/__tests__/unit/indexing.hierarchicalReindex.test.ts` | INTG-2 hierarchical full reindex pipeline (tree building, summaries, embeddings, progress) |
 | `src/__tests__/unit/indexing.incrementalHierarchical.test.ts` | INTG-3 hierarchical incremental index (stale cleanup, propagation, embedding, edge cases) |
+| `src/__tests__/unit/settings.tokenBudgets.test.ts` | INTG-4 token budget settings schema, defaults, snapshot preservation, and service integration |
 | `src/__tests__/integration/**/*.test.ts` | Plugin lifecycle/command integration tests with Obsidian-compatible mocks |
 | `src/__tests__/integration/scaleValidation.integration.test.ts` | REL-2 scale validation for reindex/search/index-changes latency budgets |
 | `src/__tests__/harness/` | Reusable test harness factories for app/plugin runtime setup |
@@ -909,7 +910,7 @@ Wire the hierarchical chunker, summary service, and new storage into the Indexin
 | [INTG-1](docs/features/INTG-1-update-bootstrap-to-wire-summaryservice-contextassemblyservice-and-sqlitevecrepository.md) | Done | Update bootstrap to wire SummaryService, ContextAssemblyService, and SqliteVecRepository | M | Update `bootstrapRuntimeServices.ts` with new service construction order. Add `SummaryService` and `ContextAssemblyService` to `RuntimeServices`. Must be done first — other INTG stories depend on the wired services. Depends on STOR-3, SUM-1, RET-3. |
 | [INTG-2](docs/features/INTG-2-update-indexingservice-for-hierarchical-full-reindex.md) | Done | Update IndexingService for hierarchical full reindex | L | Replace flat chunk → embed flow with: chunk tree → store nodes → generate summaries → embed content + summaries. Update progress events for new phases. Depends on INTG-1, HIER-5 (chunker), SUM-1, STOR-2. |
 | [INTG-3](docs/features/INTG-3-update-indexingservice-for-hierarchical-incremental-index.md) | Done | Update IndexingService for hierarchical incremental index | L | Diff node trees for changed notes. Delete stale nodes. Upsert changed nodes. Trigger incremental summary propagation (SUM-2). Re-embed changed content + summaries. Depends on INTG-2, SUM-2. |
-| INTG-4 | Not Started | Add token budget settings to plugin settings UI | S | Add `summaryMaxTokens`, `matchedContentBudget`, `siblingContextBudget`, `parentSummaryBudget` to settings schema, defaults, and settings tab UI. Consumed by RET-3 (ContextAssemblyService) and SUM-1. Can be done in parallel with INTG-1. |
+| [INTG-4](docs/features/INTG-4-add-token-budget-settings-to-plugin-settings-ui.md) | Done | Add token budget settings to plugin settings UI | S | Add `summaryMaxTokens`, `matchedContentBudget`, `siblingContextBudget`, `parentSummaryBudget` to settings schema, defaults, and settings tab UI. Consumed by RET-3 (ContextAssemblyService) and SUM-1. Can be done in parallel with INTG-1. |
 
 ### Epic 16: Scoped Tags, Cross-References, and Search UX Updates
 

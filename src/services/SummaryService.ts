@@ -10,7 +10,7 @@ import type {
   SummaryRecord
 } from "../types";
 import { createRuntimeLogger } from "../logging/runtimeLogger";
-import { estimateTokens } from "../utils/tokenEstimator";
+import { estimateTokens, truncateToTokenBudget } from "../utils/tokenEstimator";
 
 export const SUMMARY_PROMPT_VERSION = "v1";
 export const SHORT_LEAF_TOKEN_THRESHOLD = 200;
@@ -404,6 +404,11 @@ export class SummaryService implements SummaryServiceContract {
     const settings = this.deps.getSettings();
     const provider = this.deps.providerRegistry.getChatProvider();
 
+    const summaryMaxTokens =
+      typeof settings.summaryMaxTokens === "number" && settings.summaryMaxTokens > 0
+        ? settings.summaryMaxTokens
+        : SUMMARY_MAX_TOKENS_DEFAULT;
+
     const request: ChatRequest = {
       providerId: provider.id,
       model: settings.chatModel,
@@ -416,7 +421,12 @@ export class SummaryService implements SummaryServiceContract {
     };
 
     const stream = provider.complete(request);
-    return collectTokens(stream);
+    const raw = await collectTokens(stream);
+    const tokenCount = estimateTokens(raw);
+    if (tokenCount > summaryMaxTokens) {
+      return truncateToTokenBudget(raw, summaryMaxTokens);
+    }
+    return raw;
   }
 
   private async storeSummary(node: DocumentNode, summary: string): Promise<void> {

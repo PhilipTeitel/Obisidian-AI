@@ -19,7 +19,11 @@ export const DEFAULT_SETTINGS: ObsidianAISettings = {
   agentOutputFolders: [],
   maxGeneratedNoteSize: 5000,
   chatTimeout: 30000,
-  logLevel: "info"
+  logLevel: "info",
+  summaryMaxTokens: 100,
+  matchedContentBudget: 2000,
+  siblingContextBudget: 1000,
+  parentSummaryBudget: 1000
 };
 
 export const snapshotSettings = (settings: ObsidianAISettings): ObsidianAISettings => {
@@ -235,6 +239,72 @@ export class ObsidianAISettingTab extends PluginSettingTab {
             const parsedValue = Number.parseInt(value, 10);
             if (Number.isFinite(parsedValue) && parsedValue > 0) {
               this.plugin.settings.chatTimeout = parsedValue;
+              await this.plugin.saveSettings();
+            }
+          });
+      });
+
+    containerEl.createEl("h3", { text: "Hierarchical Indexing" });
+
+    new Setting(containerEl)
+      .setName("Summary max tokens")
+      .setDesc("Maximum tokens for LLM-generated summaries of document nodes.")
+      .addText((text) => {
+        text
+          .setPlaceholder("100")
+          .setValue(String(this.plugin.settings.summaryMaxTokens))
+          .onChange(async (value) => {
+            const parsedValue = Number.parseInt(value, 10);
+            if (Number.isFinite(parsedValue) && parsedValue > 0) {
+              this.plugin.settings.summaryMaxTokens = parsedValue;
+              await this.plugin.saveSettings();
+            }
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Matched content budget")
+      .setDesc("Token budget for matched content in hierarchical retrieval context assembly.")
+      .addText((text) => {
+        text
+          .setPlaceholder("2000")
+          .setValue(String(this.plugin.settings.matchedContentBudget))
+          .onChange(async (value) => {
+            const parsedValue = Number.parseInt(value, 10);
+            if (Number.isFinite(parsedValue) && parsedValue > 0) {
+              this.plugin.settings.matchedContentBudget = parsedValue;
+              await this.plugin.saveSettings();
+            }
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Sibling context budget")
+      .setDesc("Token budget for sibling context in hierarchical retrieval context assembly.")
+      .addText((text) => {
+        text
+          .setPlaceholder("1000")
+          .setValue(String(this.plugin.settings.siblingContextBudget))
+          .onChange(async (value) => {
+            const parsedValue = Number.parseInt(value, 10);
+            if (Number.isFinite(parsedValue) && parsedValue > 0) {
+              this.plugin.settings.siblingContextBudget = parsedValue;
+              await this.plugin.saveSettings();
+            }
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Parent summary budget")
+      .setDesc("Token budget for parent summaries in hierarchical retrieval context assembly.")
+      .addText((text) => {
+        text
+          .setPlaceholder("1000")
+          .setValue(String(this.plugin.settings.parentSummaryBudget))
+          .onChange(async (value) => {
+            const parsedValue = Number.parseInt(value, 10);
+            if (Number.isFinite(parsedValue) && parsedValue > 0) {
+              this.plugin.settings.parentSummaryBudget = parsedValue;
               await this.plugin.saveSettings();
             }
           });

@@ -135,7 +135,11 @@ export const normalizeSettingsSnapshot = (
     agentOutputFolders: normalizeFolders(source.agentOutputFolders, defaults.agentOutputFolders),
     maxGeneratedNoteSize: toPositiveInteger(source.maxGeneratedNoteSize, defaults.maxGeneratedNoteSize),
     chatTimeout: toPositiveInteger(source.chatTimeout, defaults.chatTimeout, 1000),
-    logLevel: normalizeLogLevel(source.logLevel, defaults.logLevel)
+    logLevel: normalizeLogLevel(source.logLevel, defaults.logLevel),
+    summaryMaxTokens: toPositiveInteger(source.summaryMaxTokens, defaults.summaryMaxTokens),
+    matchedContentBudget: toPositiveInteger(source.matchedContentBudget, defaults.matchedContentBudget),
+    siblingContextBudget: toPositiveInteger(source.siblingContextBudget, defaults.siblingContextBudget),
+    parentSummaryBudget: toPositiveInteger(source.parentSummaryBudget, defaults.parentSummaryBudget)
   };
 };
 

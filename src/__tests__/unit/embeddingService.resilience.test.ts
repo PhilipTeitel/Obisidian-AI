@@ -22,7 +22,11 @@ const createSettings = (): ObsidianAISettings => {
     agentOutputFolders: [],
     maxGeneratedNoteSize: 5000,
     chatTimeout: 30000,
-    logLevel: "info"
+    logLevel: "info",
+    summaryMaxTokens: 100,
+    matchedContentBudget: 2000,
+    siblingContextBudget: 1000,
+    parentSummaryBudget: 1000
   };
 };
 
