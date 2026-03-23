@@ -10,6 +10,7 @@ import {
   serializeSettingsForPersistence
 } from "./settingsSchema";
 import type {
+  HierarchicalSearchResult,
   JobSnapshot,
   JobStatus,
   JobType,
@@ -26,6 +27,18 @@ import { ProgressSlideout } from "./ui/ProgressSlideout";
 import { buildSearchResultLink } from "./ui/searchNavigation";
 
 const SETTINGS_STORAGE_KEY = "settings";
+
+const adaptSearchResultToHierarchical = (result: SearchResult): HierarchicalSearchResult => ({
+  nodeId: result.chunkId,
+  score: result.score,
+  notePath: result.notePath,
+  noteTitle: result.noteTitle,
+  headingTrail: result.heading ? [result.heading] : [],
+  matchedContent: result.snippet,
+  parentSummary: "",
+  siblingSnippet: "",
+  tags: result.tags
+});
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -50,9 +63,18 @@ export default class ObsidianAIPlugin extends Plugin {
     });
 
     this.searchPaneModel = new SearchPaneModel({
-      runSearch: async (request) => (await this.ensureRuntimeServices()).searchService.search(request),
+      runSearch: async (request) => {
+        const services = await this.ensureRuntimeServices();
+        const flatResults = await services.searchService.search(request);
+        return flatResults.map((r) => adaptSearchResultToHierarchical(r));
+      },
       openResult: async (result) => {
-        await this.openSearchResult(result);
+        await this.openSearchResult({
+          notePath: result.notePath,
+          heading: result.headingTrail.length > 0
+            ? result.headingTrail[result.headingTrail.length - 1]
+            : undefined
+        });
       },
       notify: (message) => {
         new Notice(message);
@@ -408,7 +430,7 @@ export default class ObsidianAIPlugin extends Plugin {
     return this.chatPaneModel;
   }
 
-  private async openSearchResult(result: SearchResult): Promise<void> {
+  private async openSearchResult(result: Pick<SearchResult, "notePath" | "heading">): Promise<void> {
     const target = buildSearchResultLink(result);
     const workspace = this.app.workspace as unknown as {
       openLinkText?: (linktext: string, sourcePath: string, newLeaf?: boolean) => Promise<void> | void;

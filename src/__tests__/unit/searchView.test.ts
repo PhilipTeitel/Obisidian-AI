@@ -7,12 +7,14 @@ const createResultModel = () =>
   new SearchPaneModel({
     runSearch: async () => [
       {
-        chunkId: "chunk-1",
+        nodeId: "chunk-1",
         score: 0.923,
         notePath: "notes/semantic.md",
         noteTitle: "Semantic",
-        heading: "Heading",
-        snippet: "Snippet preview",
+        headingTrail: ["Heading"],
+        matchedContent: "Snippet preview",
+        parentSummary: "",
+        siblingSnippet: "",
         tags: ["ai"]
       }
     ],

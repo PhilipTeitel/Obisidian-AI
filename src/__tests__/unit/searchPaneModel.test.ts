@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { SearchRequest, SearchResult } from "../../types";
+import type { HierarchicalSearchResult, SearchRequest } from "../../types";
 import { SEARCH_TOP_K_DEFAULT, SearchPaneModel } from "../../ui/SearchPaneModel";
 
-const createResult = (overrides?: Partial<SearchResult>): SearchResult => {
+const createResult = (overrides?: Partial<HierarchicalSearchResult>): HierarchicalSearchResult => {
   return {
-    chunkId: "chunk-1",
+    nodeId: "chunk-1",
     score: 0.91,
     notePath: "notes/example.md",
     noteTitle: "Example",
-    heading: "Section",
-    snippet: "Example snippet",
+    headingTrail: ["Section"],
+    matchedContent: "Example snippet",
+    parentSummary: "",
+    siblingSnippet: "",
     tags: ["ai"],
     ...overrides
   };
@@ -56,8 +58,8 @@ describe("SearchPaneModel", () => {
   });
 
   it("A3_success_state_preserves_result_order", async () => {
-    const first = createResult({ chunkId: "chunk-a", noteTitle: "A", score: 0.9 });
-    const second = createResult({ chunkId: "chunk-b", noteTitle: "B", score: 0.8 });
+    const first = createResult({ nodeId: "chunk-a", noteTitle: "A", score: 0.9 });
+    const second = createResult({ nodeId: "chunk-b", noteTitle: "B", score: 0.8 });
     const model = new SearchPaneModel({
       runSearch: async () => [first, second],
       openResult: async () => undefined,
@@ -68,7 +70,7 @@ describe("SearchPaneModel", () => {
 
     const state = model.getState();
     expect(state.status).toBe("success");
-    expect(state.results.map((result) => result.chunkId)).toEqual(["chunk-a", "chunk-b"]);
+    expect(state.results.map((result) => result.nodeId)).toEqual(["chunk-a", "chunk-b"]);
   });
 
   it("B1_failed_search_sets_error_state", async () => {
@@ -92,7 +94,7 @@ describe("SearchPaneModel", () => {
   });
 
   it("A1_open_result_delegates_to_runtime", async () => {
-    const opened: SearchResult[] = [];
+    const opened: HierarchicalSearchResult[] = [];
     const expected = createResult();
     const model = new SearchPaneModel({
       runSearch: async () => [expected],

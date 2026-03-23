@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { SEARCH_VIEW_TYPE } from "../constants";
+import type { HierarchicalSearchResult } from "../types";
 import type { SearchPaneState } from "./SearchPaneModel";
 import { SearchPaneModel } from "./SearchPaneModel";
 
@@ -90,29 +91,66 @@ export class SearchView extends ItemView {
     }
 
     for (const result of state.results) {
-      const row = this.resultsEl.createDiv({ cls: "obsidian-ai-search-result" });
-      const title = result.heading ? `${result.noteTitle} \u2014 ${result.heading}` : result.noteTitle;
-      const action = row.createEl("span", {
-        cls: "obsidian-ai-search-result__action",
-        text: title
-      });
-      this.bindEvent(action, "click", async () => {
-        await this.model.openResult(result);
-      });
-      row.createEl("p", {
-        cls: "obsidian-ai-search-result__path",
-        text: result.notePath
-      });
-      row.createEl("p", {
-        cls: "obsidian-ai-search-result__snippet",
-        text: result.snippet
-      });
-      const scoreRow = row.createDiv();
-      scoreRow.createEl("span", {
-        cls: "obsidian-ai-search-result__score",
-        text: `Score: ${result.score.toFixed(3)}`
+      this.renderHierarchicalResult(result);
+    }
+  }
+
+  private renderHierarchicalResult(result: HierarchicalSearchResult): void {
+    if (!this.resultsEl) {
+      return;
+    }
+
+    const card = this.resultsEl.createDiv({ cls: "obsidian-ai-search-result" });
+
+    if (result.headingTrail.length > 0) {
+      card.createEl("p", {
+        cls: "obsidian-ai-search-result__trail",
+        text: result.headingTrail.join(" > ")
       });
     }
+
+    const title = result.headingTrail.length > 0
+      ? `${result.noteTitle} — ${result.headingTrail[result.headingTrail.length - 1]}`
+      : result.noteTitle;
+    const action = card.createEl("span", {
+      cls: "obsidian-ai-search-result__action",
+      text: title
+    });
+    this.bindEvent(action, "click", async () => {
+      await this.model.openResult(result);
+    });
+
+    card.createEl("p", {
+      cls: "obsidian-ai-search-result__path",
+      text: result.notePath
+    });
+
+    if (result.parentSummary) {
+      card.createEl("p", {
+        cls: "obsidian-ai-search-result__summary",
+        text: result.parentSummary
+      });
+    }
+
+    if (result.matchedContent) {
+      card.createEl("p", {
+        cls: "obsidian-ai-search-result__snippet",
+        text: result.matchedContent
+      });
+    }
+
+    if (result.siblingSnippet) {
+      card.createEl("p", {
+        cls: "obsidian-ai-search-result__sibling",
+        text: result.siblingSnippet
+      });
+    }
+
+    const scoreRow = card.createDiv();
+    scoreRow.createEl("span", {
+      cls: "obsidian-ai-search-result__score",
+      text: `Score: ${result.score.toFixed(3)}`
+    });
   }
 
   private renderStatusText(state: SearchPaneState): string {

@@ -635,6 +635,7 @@ The display names and command IDs in this table match the values registered by t
 | `src/__tests__/unit/bootstrapHierarchicalStore.test.ts` | Bootstrap wiring of SqliteVecRepository into ServiceContainer |
 | `src/__tests__/unit/scopedTagTracking.test.ts` | META-1 scoped tag tracking: frontmatter inheritance, inline scoping, getNodesByTag queries |
 | `src/__tests__/unit/crossReferenceTracking.test.ts` | META-2 cross-reference tracking: storage, retrieval, context expansion, deduplication |
+| `src/__tests__/unit/hierarchicalSearchView.test.ts` | META-3 hierarchical search view: HierarchicalSearchResult model, rendering, adapter |
 | `src/__tests__/unit/bootstrapIntegration.test.ts` | INTG-1 bootstrap wiring of SummaryService, ContextAssemblyService, and hierarchicalStore |
 | `src/__tests__/unit/indexing.hierarchicalReindex.test.ts` | INTG-2 hierarchical full reindex pipeline (tree building, summaries, embeddings, progress) |
 | `src/__tests__/unit/indexing.incrementalHierarchical.test.ts` | INTG-3 hierarchical incremental index (stale cleanup, propagation, embedding, edge cases) |
@@ -922,7 +923,7 @@ Implement scoped tag tracking, cross-reference following, and update the search 
 | ----- | -------- | --------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------- |
 | [META-1](docs/features/META-1-implement-scoped-tag-tracking-in-chunker-and-storage.md) | Done | Implement scoped tag tracking in chunker and storage | M | Tags inherited from note frontmatter + inline tags per node scope. Store in `node_tags`. Queryable: "find all nodes tagged X under topic Y". Depends on HIER-5 (chunker), STOR-2 (node_tags table). |
 | [META-2](docs/features/META-2-implement-cross-reference-tracking-and-retrieval-expansion.md) | Done | Implement cross-reference tracking and retrieval expansion | M | Parse wikilinks during chunking (uses HIER-3), store in `node_cross_refs`. During retrieval, optionally follow cross-references to expand context with related material. Depends on HIER-3, HIER-5, STOR-2 (node_cross_refs table), RET-3. |
-| META-3 | Not Started | Update SearchView for hierarchical result display | M | Show heading trail, parent summary context, and surrounding content in search result cards. Update `SearchResult` type to use `HierarchicalSearchResult`. Depends on RET-1, RET-2, RET-3. |
+| [META-3](docs/features/META-3-update-searchview-for-hierarchical-result-display.md) | Done | Update SearchView for hierarchical result display | M | Show heading trail, parent summary context, and surrounding content in search result cards. Update `SearchResult` type to use `HierarchicalSearchResult`. Depends on RET-1, RET-2, RET-3. |
 
 ### Epic 17: User-Facing Authoring Guide
 

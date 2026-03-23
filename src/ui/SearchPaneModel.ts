@@ -1,6 +1,6 @@
 import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
 import { createRuntimeLogger } from "../logging/runtimeLogger";
-import type { SearchRequest, SearchResult } from "../types";
+import type { HierarchicalSearchResult, SearchRequest } from "../types";
 
 export const SEARCH_TOP_K_DEFAULT = 8;
 export const SEARCH_TOP_K_MIN = 1;
@@ -18,14 +18,14 @@ export interface SearchQualityControls {
 export interface SearchPaneState {
   query: string;
   status: SearchPaneStatus;
-  results: SearchResult[];
+  results: HierarchicalSearchResult[];
   controls: SearchQualityControls;
   errorMessage?: string;
 }
 
 interface SearchPaneModelDeps {
-  runSearch: (request: SearchRequest) => Promise<SearchResult[]>;
-  openResult: (result: SearchResult) => Promise<void>;
+  runSearch: (request: SearchRequest) => Promise<HierarchicalSearchResult[]>;
+  openResult: (result: HierarchicalSearchResult) => Promise<void>;
   notify: (message: string) => void;
   defaults?: Partial<SearchQualityControls>;
 }
@@ -111,7 +111,7 @@ export class SearchPaneModel {
     });
   }
 
-  public async search(queryInput?: string): Promise<SearchResult[]> {
+  public async search(queryInput?: string): Promise<HierarchicalSearchResult[]> {
     const operationLogger = logger.withOperation();
     const normalizedQuery = (queryInput ?? this.state.query).trim();
     if (normalizedQuery.length === 0) {
@@ -186,7 +186,7 @@ export class SearchPaneModel {
     }
   }
 
-  public async searchFromSelection(selection: string): Promise<SearchResult[]> {
+  public async searchFromSelection(selection: string): Promise<HierarchicalSearchResult[]> {
     const normalizedSelection = selection.trim();
     if (normalizedSelection.length === 0) {
       this.updateState({
@@ -200,14 +200,15 @@ export class SearchPaneModel {
     return this.search(normalizedSelection);
   }
 
-  public async openResult(result: SearchResult): Promise<void> {
+  public async openResult(result: HierarchicalSearchResult): Promise<void> {
     const operationLogger = logger.withOperation();
+    const headingLabel = result.headingTrail.join(" > ");
     operationLogger.info({
       event: "search.pane.open_result.start",
       message: "Opening search result from pane.",
       context: {
         notePath: result.notePath,
-        heading: result.heading
+        heading: headingLabel
       }
     });
     try {
@@ -217,14 +218,14 @@ export class SearchPaneModel {
         message: "Opened search result from pane.",
         context: {
           notePath: result.notePath,
-          heading: result.heading
+          heading: headingLabel
         }
       });
     } catch (error: unknown) {
       const normalized = normalizeRuntimeError(error, {
         operation: "SearchPaneModel.openResult",
         notePath: result.notePath,
-        heading: result.heading
+        heading: headingLabel
       });
       operationLogger.error({
         event: "search.pane.open_result.failed",
