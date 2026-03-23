@@ -44,6 +44,51 @@ describe("indexing progress integration", () => {
     await harness.runOnunload();
   });
 
+  it("emits incremental stage-level progress snapshots in expected order (Crawl → Chunk → Store → Summarize → Embed → Finalize)", async () => {
+    const harness = createPluginTestHarness();
+    seedVault(harness);
+    await harness.runOnload();
+
+    const runtime = await harness.ensureRuntimeServices();
+
+    await runtime.indexingService.reindexVault();
+
+    harness.appHarness.setVaultMarkdownFiles([
+      {
+        path: "notes/one.md",
+        markdown: "# One\n\nAlpha paragraph updated",
+        mtime: 30
+      },
+      {
+        path: "notes/two.md",
+        markdown: "# Two\n\nBeta paragraph",
+        mtime: 20
+      }
+    ]);
+
+    const incrementalSnapshots: JobSnapshot[] = [];
+    await runtime.indexingService.indexChanges({
+      onProgress: (snapshot) => {
+        incrementalSnapshots.push(snapshot);
+      }
+    });
+
+    const labels = incrementalSnapshots.map((s) => s.progress.label);
+    const stageOrder = ["Crawl", "Chunk", "Store", "Summarize", "Embed", "Finalize"];
+    for (const stage of stageOrder) {
+      expect(labels.some((l) => l.includes(stage))).toBe(true);
+    }
+    const stageIndices = stageOrder.map((stage) =>
+      labels.findIndex((l) => l.includes(stage))
+    );
+    for (let i = 1; i < stageIndices.length; i++) {
+      expect(stageIndices[i]).toBeGreaterThan(stageIndices[i - 1]);
+    }
+    expect(incrementalSnapshots[incrementalSnapshots.length - 1]?.status).toBe("succeeded");
+
+    await harness.runOnunload();
+  });
+
   it("blocks duplicate concurrent indexing jobs for both entry points", async () => {
     const harness = createPluginTestHarness();
     seedVault(harness);

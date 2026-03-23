@@ -644,6 +644,8 @@ export class IndexingService implements IndexingServiceContract {
     const diff = computeIncrementalDiff(previousManifest.notes, currentFingerprints);
     const notesToReindex = this.selectChangedNotes(params.noteInputs, diff);
     const notePathsToDelete = [...new Set([...diff.deleted.map((entry) => entry.notePath), ...notesToReindex.map((entry) => entry.notePath)])];
+    const hasChanges = diff.created.length > 0 || diff.updated.length > 0 || diff.deleted.length > 0;
+    const hasCreatedOrUpdated = diff.created.length > 0 || diff.updated.length > 0;
 
     await this.emitProgress(
       createSnapshot({
@@ -661,6 +663,27 @@ export class IndexingService implements IndexingServiceContract {
 
     const chunks = notesToReindex.flatMap((input) => this.chunkNoteForIndexing(input));
 
+    // --- Hierarchical pipeline: collect existing node IDs, delete stale data, build trees ---
+    const existingNodeIds: string[] = [];
+    let hierarchicalResults: HierarchicalChunkerResult[] = [];
+
+    if (hasChanges) {
+      for (const notePath of diff.updated.map((e) => e.notePath)) {
+        const existingNodes = await this.deps.hierarchicalStore.getNodesByNotePath(notePath);
+        for (const node of existingNodes) {
+          existingNodeIds.push(node.nodeId);
+        }
+      }
+
+      for (const notePath of notePathsToDelete) {
+        await this.deps.hierarchicalStore.deleteByNotePath(notePath);
+      }
+
+      if (hasCreatedOrUpdated) {
+        hierarchicalResults = notesToReindex.map((input) => buildDocumentTree(input));
+      }
+    }
+
     await this.emitProgress(
       createSnapshot({
         id: params.jobId,
@@ -668,12 +691,79 @@ export class IndexingService implements IndexingServiceContract {
         status: "running",
         startedAt: params.startedAt,
         completed: 0,
-        total: chunks.length,
+        total: hierarchicalResults.length,
+        label: `${params.commandLabel} · Store`,
+        detail: hierarchicalResults.length === 0
+          ? "No changed trees to store."
+          : `Storing ${hierarchicalResults.length} document trees.`
+      }),
+      params.options
+    );
+
+    if (hierarchicalResults.length > 0) {
+      await this.storeHierarchicalTrees(hierarchicalResults);
+    }
+
+    // --- Hierarchical pipeline: incremental summary propagation ---
+    const newNodeIds: string[] = [];
+    for (const result of hierarchicalResults) {
+      for (const node of result.tree.nodes.values()) {
+        newNodeIds.push(node.nodeId);
+      }
+    }
+    const changedNodeIds = [...existingNodeIds, ...newNodeIds];
+
+    await this.emitProgress(
+      createSnapshot({
+        id: params.jobId,
+        type: params.jobType,
+        status: "running",
+        startedAt: params.startedAt,
+        completed: 0,
+        total: changedNodeIds.length,
+        label: `${params.commandLabel} · Summarize`,
+        detail: changedNodeIds.length === 0
+          ? "No changed nodes require summary propagation."
+          : `Propagating summaries for ${changedNodeIds.length} changed nodes.`
+      }),
+      params.options
+    );
+
+    if (changedNodeIds.length > 0) {
+      try {
+        await this.deps.summaryService.propagateSummariesForChangedNodes(changedNodeIds);
+      } catch (error: unknown) {
+        this.logger.log({
+          level: "warn",
+          event: "indexing.incremental.summary_propagation_failed",
+          message: "Incremental summary propagation failed; continuing with embedding.",
+          context: {
+            operation: "IndexingService.runIncrementalIndex",
+            changedNodeCount: changedNodeIds.length,
+            error: error instanceof Error ? error.message : String(error)
+          }
+        });
+      }
+    }
+
+    // --- Hierarchical pipeline: embed changed nodes ---
+    const embeddableNodes = hierarchicalResults.length > 0
+      ? await this.collectEmbeddableNodes(hierarchicalResults)
+      : [];
+
+    await this.emitProgress(
+      createSnapshot({
+        id: params.jobId,
+        type: params.jobType,
+        status: "running",
+        startedAt: params.startedAt,
+        completed: 0,
+        total: embeddableNodes.length + chunks.length,
         label: `${params.commandLabel} · Embed`,
         detail:
-          chunks.length === 0
+          embeddableNodes.length === 0 && chunks.length === 0
             ? "No changed chunks require embedding."
-            : `Embedding ${chunks.length} chunks from changed notes.`
+            : `Embedding ${embeddableNodes.length} nodes and ${chunks.length} flat chunks.`
       }),
       params.options
     );
@@ -681,6 +771,10 @@ export class IndexingService implements IndexingServiceContract {
     const vectors = await this.embedChunkContent(chunks);
     await this.deps.vectorStoreRepository.deleteByNotePaths(notePathsToDelete);
     await this.deps.vectorStoreRepository.upsertFromChunks(chunks, vectors);
+
+    if (embeddableNodes.length > 0) {
+      await this.embedHierarchicalNodes(embeddableNodes);
+    }
 
     await this.emitProgress(
       createSnapshot({
