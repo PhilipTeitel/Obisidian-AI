@@ -153,6 +153,8 @@ This document locks **implementation requirements** for replacing JSON-backed hi
 | Prior incorrect locations | Vault path, plugin `storage/`, `saveData` for index |
 | Vault isolation | One DB file per vault; no shared global path; privacy (§1.6, §2.4) |
 
+**Implementation plan:** [docs/plans/sqlite-vector-store-implementation-plan.md](../plans/sqlite-vector-store-implementation-plan.md) (phases, dependencies, definition of done). **Backlog:** README Epic 19. **Stories:** [VEC-0](../features/VEC-0-spike-wa-sqlite-sqlite-vec-obsidian-electron-bundle.md)–[VEC-6](../features/VEC-6-tooling-and-user-documentation.md).
+
 ---
 
 *Last updated: per-vault privacy isolation for configurable path and all index data.*
