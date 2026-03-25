@@ -13,15 +13,18 @@
     "query:store": "node scripts/query-store.mjs",
     "query:counts": "node scripts/query-store.mjs counts",
     "query:node": "node scripts/query-store.mjs node",
-    "query:sample": "node scripts/query-store.mjs sample"
+    "query:sample": "node scripts/query-store.mjs sample",
+    "spike:vec0": "node scripts/vec0-spike.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.4.0",
     "@typescript-eslint/eslint-plugin": "^8.42.0",
     "@typescript-eslint/parser": "^8.42.0",
+    "better-sqlite3": "^12.8.0",
     "esbuild": "^0.25.9",
     "eslint": "^9.35.0",
     "obsidian": "^1.8.10",
+    "sqlite-vec": "^0.1.7",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }
