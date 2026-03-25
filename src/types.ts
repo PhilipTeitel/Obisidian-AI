@@ -262,6 +262,8 @@ export interface ObsidianAISettings {
   matchedContentBudget: number;
   siblingContextBudget: number;
   parentSummaryBudget: number;
+  /** Per-vault absolute path to this vault’s `.sqlite3` store; empty/omitted uses the default under the user home directory. */
+  vectorStoreAbsolutePath?: string;
 }
 
 export type RuntimeLogContextValue = string | number | boolean | null | undefined;

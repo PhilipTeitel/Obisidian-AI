@@ -1,6 +1,6 @@
 import { MVP_PROVIDER_IDS, type ObsidianAISettings } from "./types";
 
-export const SETTINGS_SCHEMA_VERSION = 1;
+export const SETTINGS_SCHEMA_VERSION = 2;
 
 export interface PersistedSettingsData extends Partial<ObsidianAISettings> {
   settingsVersion?: number;
@@ -54,6 +54,14 @@ const normalizeLogLevel = (
   fallback: ObsidianAISettings["logLevel"]
 ): ObsidianAISettings["logLevel"] => {
   return isLogLevel(value) ? value : fallback;
+};
+
+const normalizeOptionalTrimmedString = (value: unknown): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 };
 
 const uniqueStrings = (values: string[]): string[] => {
@@ -139,7 +147,11 @@ export const normalizeSettingsSnapshot = (
     summaryMaxTokens: toPositiveInteger(source.summaryMaxTokens, defaults.summaryMaxTokens),
     matchedContentBudget: toPositiveInteger(source.matchedContentBudget, defaults.matchedContentBudget),
     siblingContextBudget: toPositiveInteger(source.siblingContextBudget, defaults.siblingContextBudget),
-    parentSummaryBudget: toPositiveInteger(source.parentSummaryBudget, defaults.parentSummaryBudget)
+    parentSummaryBudget: toPositiveInteger(source.parentSummaryBudget, defaults.parentSummaryBudget),
+    vectorStoreAbsolutePath:
+      source.vectorStoreAbsolutePath === undefined
+        ? defaults.vectorStoreAbsolutePath
+        : normalizeOptionalTrimmedString(source.vectorStoreAbsolutePath)
   };
 };
 

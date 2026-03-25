@@ -69,4 +69,22 @@ describe("plugin settings integration", () => {
 
     await harness.runOnunload();
   });
+
+  it("persists per_vault_vectorStoreAbsolutePath_in_settings_envelope", async () => {
+    const harness = createPluginTestHarness();
+    await harness.runOnload();
+
+    harness.plugin.settings.vectorStoreAbsolutePath = "/tmp/obsidian-ai-test.sqlite3";
+    await harness.plugin.saveSettings();
+
+    const persisted = await harness.plugin.loadData();
+    expect(isRecord(persisted)).toBe(true);
+    if (!isRecord(persisted) || !isRecord(persisted.settings)) {
+      throw new Error("Expected persisted settings envelope.");
+    }
+    expect(persisted.settings.vectorStoreAbsolutePath).toBe("/tmp/obsidian-ai-test.sqlite3");
+    expect(persisted.settings.settingsVersion).toBe(SETTINGS_SCHEMA_VERSION);
+
+    await harness.runOnunload();
+  });
 });

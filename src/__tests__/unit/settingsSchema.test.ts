@@ -75,4 +75,31 @@ describe("settingsSchema", () => {
     const persisted = serializeSettingsForPersistence(normalized);
     expect(persisted.logLevel).toBe("debug");
   });
+
+  it("normalizes vectorStoreAbsolutePath trim_and_empty_string", () => {
+    const withOverride = normalizeSettingsSnapshot(
+      {
+        vectorStoreAbsolutePath: "  /data/v.sqlite3  "
+      },
+      DEFAULT_SETTINGS
+    );
+    expect(withOverride.vectorStoreAbsolutePath).toBe("/data/v.sqlite3");
+
+    const cleared = normalizeSettingsSnapshot(
+      {
+        vectorStoreAbsolutePath: "   "
+      },
+      DEFAULT_SETTINGS
+    );
+    expect(cleared.vectorStoreAbsolutePath).toBeUndefined();
+  });
+
+  it("migrates settingsVersion_1_to_current", () => {
+    const migrated = migratePersistedSettings({
+      settingsVersion: 1,
+      chatTimeout: 11111
+    });
+    expect(migrated.settingsVersion).toBe(SETTINGS_SCHEMA_VERSION);
+    expect(migrated.chatTimeout).toBe(11111);
+  });
 });

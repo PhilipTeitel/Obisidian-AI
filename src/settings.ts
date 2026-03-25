@@ -1,6 +1,32 @@
 import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { PluginSecretStore } from "./secrets/PluginSecretStore";
+import {
+  isAbsoluteVectorStorePath,
+  resolveVectorStoreDatabasePath
+} from "./storage/resolveVectorStoreDatabasePath";
 import { MVP_PROVIDER_IDS, type MVPProviderId, type ObsidianAISettings, type RuntimeLogLevel } from "./types";
+
+/** Vault identity inputs for `resolveVectorStoreDatabasePath` (desktop: adapter base path; else vault root path). */
+export const getVaultVectorStoreContext = (app: App): { vaultName: string; vaultPath: string } => {
+  const vaultName = typeof app.vault.getName === "function" ? app.vault.getName() : "";
+  const adapter = app.vault.adapter as { getBasePath?: () => string };
+  if (typeof adapter.getBasePath === "function") {
+    try {
+      const base = adapter.getBasePath();
+      if (typeof base === "string" && base.length > 0) {
+        return { vaultName, vaultPath: base };
+      }
+    } catch {
+      // ignore: tests or minimal adapters may not support base path
+    }
+  }
+  if (typeof app.vault.getRoot === "function") {
+    const root = app.vault.getRoot();
+    const vaultPath = root && typeof root.path === "string" ? root.path : "";
+    return { vaultName, vaultPath };
+  }
+  return { vaultName, vaultPath: "" };
+};
 
 type SettingsHostPlugin = Plugin & {
   settings: ObsidianAISettings;
@@ -241,6 +267,41 @@ export class ObsidianAISettingTab extends PluginSettingTab {
               this.plugin.settings.chatTimeout = parsedValue;
               await this.plugin.saveSettings();
             }
+          });
+      });
+
+    containerEl.createEl("h3", { text: "Vector store (SQLite)" });
+
+    const { vaultName, vaultPath } = getVaultVectorStoreContext(this.app);
+    const defaultVectorPath = resolveVectorStoreDatabasePath({
+      vaultName,
+      vaultPath,
+      vectorStoreAbsolutePathOverride: undefined
+    });
+
+    containerEl.createEl("p", {
+      cls: "setting-item-description",
+      text: `Default database path for this vault: ${defaultVectorPath}. Each vault has its own file; settings here apply only to the vault that is currently open.`
+    });
+
+    new Setting(containerEl)
+      .setName("Vector database file (absolute path, optional)")
+      .setDesc(
+        "Override the full path to this vault’s `.sqlite3` vector index. Leave empty to use the default. Use an absolute path (for example a POSIX path starting with /, or on Windows a drive letter or UNC path). There is no global setting shared across vaults."
+      )
+      .addText((text) => {
+        text
+          .setPlaceholder("Empty = default path above")
+          .setValue(this.plugin.settings.vectorStoreAbsolutePath ?? "")
+          .onChange(async (value) => {
+            const trimmed = value.trim();
+            if (trimmed.length > 0 && !isAbsoluteVectorStorePath(trimmed)) {
+              new Notice("Vector database path must be a full absolute path.");
+              text.setValue(this.plugin.settings.vectorStoreAbsolutePath ?? "");
+              return;
+            }
+            this.plugin.settings.vectorStoreAbsolutePath = trimmed.length > 0 ? trimmed : undefined;
+            await this.plugin.saveSettings();
           });
       });
 
