@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-ai-mvp",
+  "name": "Obsidian AI MVP",
+  "version": "0.0.1",
+  "minAppVersion": "1.5.0",
+  "description": "Minimal plugin scaffold for Obsidian AI MVP.",
+  "author": "Obsidian AI MVP Contributors",
+  "authorUrl": "",
+  "isDesktopOnly": true
+}
