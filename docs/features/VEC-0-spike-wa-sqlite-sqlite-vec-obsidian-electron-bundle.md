@@ -20,7 +20,7 @@ No production wiring into `SqliteVecRepository` is required in VEC-0; that is VE
 
 **Scope clarity:** The historical title mentioned “Obsidian/Electron bundle”; **delivered scope** is **Node-only** (`better-sqlite3` + `sqlite-vec` in **`scripts/`**). The **shipped plugin** must remain **WASM-only / zero native addons** per [ADR-001](../decisions/ADR-001-sqlite-vec-stack.md).
 
-**Outcome:** [ADR-001](../decisions/ADR-001-sqlite-vec-stack.md) records **better-sqlite3 + sqlite-vec** for Node proof/tooling; **Obsidian WASM integration deferred to VEC-2**. Proof: `npm run spike:vec0` → [`scripts/vec0-spike.mjs`](../../scripts/vec0-spike.mjs).
+**Outcome:** [ADR-001](../decisions/ADR-001-sqlite-vec-stack.md) records **better-sqlite3 + sqlite-vec** for Node proof/tooling; **Obsidian WASM integration deferred to VEC-2**. Proof: `npm run spike:vec0` → [`scripts/vec0-spike.mjs`](../../scripts/vec0-spike.mjs) (default DB: `{userHome}/.obsidian-ai/vec0-spike-proof.sqlite3`; optional `--out`).
 
 ---
 
@@ -73,7 +73,7 @@ Exact paths are intentionally flexible until the spike completes.
 
 ### Phase B: Technical proof
 
-- [x] **B1** — Proof opens/creates a `.sqlite3` file at a **non-vault** absolute path
+- [x] **B1** — Proof opens/creates a `.sqlite3` file at a **non-vault** absolute path (default: `{userHome}/.obsidian-ai/` per prompt 05 §2.1, same parent dir as production)
 - [x] **B2** — Proof loads **sqlite-vec** and creates a `vec0` table compatible with hierarchical `node_embeddings` intent (node id, embedding type, float vector of fixed dimension matching [vectorStoreSchema.ts](../../src/storage/vectorStoreSchema.ts) or documented deviation)
 - [x] **B3** — Proof runs at least one **vector search** API supported by sqlite-vec (KNN / ANN as per extension docs), not pure JS cosine over the full table
 - [x] **B4** — Proof closes DB cleanly (no handle leak in long-running dev scenario)
@@ -109,7 +109,7 @@ Exact paths are intentionally flexible until the spike completes.
 3. Write ADR + proof commands in README or story footer
 4. Hand off to VEC-2 owner with copy-paste build snippet
 
-**Verify locally:** `npm run spike:vec0` (requires devDependencies install including platform `sqlite-vec-*` optional package). `npm run build && npm run test`.
+**Verify locally:** `npm run spike:vec0` (requires devDependencies install including platform `sqlite-vec-*` optional package; creates/opens default file under `~/.obsidian-ai/`). `npm run build && npm run test`.
 
 ---
 

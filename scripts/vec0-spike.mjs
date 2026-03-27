@@ -8,14 +8,17 @@
  *   npm run spike:vec0
  *   node scripts/vec0-spike.mjs [--out /absolute/path/to/proof.sqlite3]
  *
+ * Default DB path: {userHome}/.obsidian-ai/vec0-spike-proof.sqlite3 (prompt 05 §2.1 parent dir;
+ * still outside any vault). --out may be relative; it is resolved against cwd.
+ *
  * @see docs/decisions/ADR-001-sqlite-vec-stack.md
  */
 
 import Database from "better-sqlite3";
 import * as sqliteVec from "sqlite-vec";
 import { mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
 const EMBEDDING_DIM = 1536;
 
 function parseOutFlag() {
@@ -27,10 +30,20 @@ function parseOutFlag() {
 }
 
 const customOut = parseOutFlag();
-const dbPath =
-  customOut ?? join(tmpdir(), "obsidian-ai-vec0-spike", "vec0-proof.sqlite3");
+const dbPath = customOut
+  ? resolve(customOut)
+  : join(homedir(), ".obsidian-ai", "vec0-spike-proof.sqlite3");
 
-mkdirSync(dirname(dbPath), { recursive: true });
+try {
+  mkdirSync(dirname(dbPath), { recursive: true });
+} catch (err) {
+  if (err && (err.code === "EPERM" || err.code === "EACCES")) {
+    console.error(
+      `VEC-0: cannot create ${dirname(dbPath)}. Pass --out with a writable absolute path (e.g. under $TMPDIR).`
+    );
+  }
+  throw err;
+}
 
 console.log(`VEC-0 spike: opening ${dbPath}`);
 

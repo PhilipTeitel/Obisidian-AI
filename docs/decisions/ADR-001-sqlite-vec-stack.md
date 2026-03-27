@@ -6,7 +6,7 @@ Accepted (spike complete — 2026-03-24)
 
 ## Context
 
-[docs/prompts/05-SQLITE-vector-store-implementation.md](../prompts/05-SQLITE-vector-store-implementation.md) requires a real SQLite database with **sqlite-vec** (`vec0`) for hierarchical embeddings, file paths **outside the vault**, and lazy init in the plugin ([implementation plan Phase 0](../plans/sqlite-vector-store-implementation.md)).
+[docs/prompts/05-SQLITE-vector-store-implementation.md](../prompts/05-SQLITE-vector-store-implementation.md) requires a real SQLite database with **sqlite-vec** (`vec0`) for hierarchical embeddings, file paths **outside the vault**, and lazy init in the plugin ([implementation plan Phase 0](../plans/sqlite-vector-store-implementation-plan.md)).
 
 Obsidian plugins are bundled with **esbuild** as **`platform: "browser"`** ([esbuild.config.mjs](../../esbuild.config.mjs)); runtime is Electron/Chromium, not Node.
 
@@ -23,7 +23,7 @@ The **distributed Obsidian plugin** (everything Obsidian loads: `main.js`, any c
 
 ## Decision
 
-1. **Proof / tooling (Node):** Use **[better-sqlite3](https://github.com/WiseLibs/better-sqlite3)** + **[sqlite-vec](https://www.npmjs.com/package/sqlite-vec)** (`sqliteVec.load(db)`), with platform-specific loadable libraries pulled via npm `optionalDependencies` (`sqlite-vec-darwin-arm64`, etc.). This stack is used for **VEC-0 proof**, **developer scripts** (e.g. [`scripts/vec0-spike.mjs`](../../scripts/vec0-spike.mjs)), and future **`query-store`-style** tooling that must load sqlite-vec (prompt 05 §7.1 Option 1).
+1. **Proof / tooling (Node):** Use **[better-sqlite3](https://github.com/WiseLibs/better-sqlite3)** + **[sqlite-vec](https://www.npmjs.com/package/sqlite-vec)** (`sqliteVec.load(db)`), with platform-specific loadable libraries pulled via npm `optionalDependencies` (`sqlite-vec-darwin-arm64`, etc.). This stack is used for **VEC-0 proof**, **developer scripts** (e.g. [`scripts/vec0-spike.mjs`](../../scripts/vec0-spike.mjs)), and future **`query-store`-style** tooling that must load sqlite-vec (prompt 05 §7.1 Option 1). The spike **defaults** to creating/opening `vec0-spike-proof.sqlite3` under **`{userHome}/.obsidian-ai/`** (same parent directory rule as prompt 05 §2.1), not under the vault or system temp.
 
 2. **Production plugin runtime (Obsidian):** **Not implemented in VEC-0.** The next step (**VEC-2**) is to integrate a **WASM SQLite** build that supports **sqlite-vec in the browser/Electron renderer** (same upstream project documents WASM support). The exact package and esbuild asset pipeline will follow the same upstream (`asg017/sqlite-vec`) guidance used in Node.
 
@@ -44,6 +44,10 @@ The **distributed Obsidian plugin** (everything Obsidian loads: `main.js`, any c
 | **Main plugin bundle** | Keep `esbuild` entry as today; **do not** mark `better-sqlite3` or `sqlite-vec` as non-external for `main.js` — they are **Node-only** and must not be pulled into the browser bundle. ESLint **`no-restricted-imports`** on `src/**/*.ts` and **`npm run check:shipped-native`** after build enforce this. |
 | **WASM / assets** | VEC-2 will add a **separate** mechanism: copy `.wasm` + worker glue from the chosen wa-sqlite/sqlite-vec release, or use a documented CDN-less bundle path; configure esbuild `loader` / `publicPath` / `assetNames` as required by the chosen package. |
 | **optionalDependencies** | `sqlite-vec` platform packages must remain installable on maintainer/CI machines **for scripts/CI only**; they are **not** part of the shipped plugin artifact. Document OS matrix (darwin/linux arm64/x64, windows x64). |
+
+## Explicit non-decisions
+
+**VEC-0 does not** pick the final npm package names for **wa-SQLite** in the renderer, prove **WASM** sqlite-vec load inside Obsidian, or change **esbuild** asset wiring—that is **VEC-2+**. **VEC-0** only proves **vec0** + **KNN** under **Node** at a path consistent with prompt 05’s default parent directory (`os.homedir()/.obsidian-ai/`), so migration SQL and search patterns are trustworthy before WASM work.
 
 ## Alternatives considered
 

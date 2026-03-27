@@ -35,14 +35,14 @@ This plan implements [docs/prompts/05-SQLITE-vector-store-implementation.md](../
 
 ### Phase 0 — Spike (blocking)
 
-**Goal:** Choose concrete **wa-sqlite + sqlite-vec** integration that runs inside the Obsidian/Electron plugin bundle and can read/write a file at an absolute path.
+**Goal:** Lock **sqlite-vec** SQL semantics (`vec0` DDL, KNN / `MATCH` usage) and **schema alignment** with migration 003 under **Node** (`better-sqlite3` + npm `sqlite-vec`). **In-bundle wa-SQLite + sqlite-vec** in the Obsidian renderer is **VEC-2**, not Phase 0 ([ADR-001](../decisions/ADR-001-sqlite-vec-stack.md), [VEC-0](../features/VEC-0-spike-wa-sqlite-sqlite-vec-obsidian-electron-bundle.md)).
 
 **Outputs:**
 
-- Decision record: package(s), how the extension is loaded, esbuild/external rules, desktop matrix (macOS / Windows / Linux).
-- Proof: open DB at a temp path, `CREATE` migration slice, insert/select one row into a `vec0` table, run one vector query.
+- Decision record: Node proof stack, shipped-plugin constraint (WASM only, no native addons), esbuild/external rules for `main.js`, desktop dev matrix for optional `sqlite-vec-*` packages.
+- Proof: open/create `.sqlite3` under **`{userHome}/.obsidian-ai/`** (same default parent as prompt 05 §2.1) or `--out`; `vec0` matching `vectorStoreSchema` migration 003; insert rows; one sqlite-vec vector query; clean close.
 
-**Exit criteria:** Implementers agree the spike path satisfies §4.4 and file I/O outside the vault.
+**Exit criteria:** Implementers agree the Node proof satisfies §4.4 (vector search via sqlite-vec, not JS full-scan) and file I/O **outside the vault**; VEC-2 owner has a clear WASM follow-up.
 
 ---
 
