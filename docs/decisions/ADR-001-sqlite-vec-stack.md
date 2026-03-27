@@ -10,6 +10,17 @@ Accepted (spike complete — 2026-03-24)
 
 Obsidian plugins are bundled with **esbuild** as **`platform: "browser"`** ([esbuild.config.mjs](../../esbuild.config.mjs)); runtime is Electron/Chromium, not Node.
 
+## Product constraint (shipped plugin)
+
+The **distributed Obsidian plugin** (everything Obsidian loads: `main.js`, any chunks, workers, `.wasm`, CSS) must:
+
+- **Not** ship, load, or depend on **`*.node`** or any other **native addon** (`.so`, `.dylib`, `.dll`, etc.).
+- **Not** require end users to have **platform-specific `node_modules` trees** (optional native deps, postinstall compiles, etc.) for the plugin to run after a normal Community Plugins install.
+
+**WASM** (wa-SQLite + sqlite-vec in the Electron renderer) is the **only** permitted in-process SQLite + vector extension stack for **production plugin runtime**.
+
+**Exception:** Code under **`scripts/`** (and any future **Node-only** CLIs or packages not bundled into `main.js`) **may** use **better-sqlite3**, **sqlite-vec** platform packages, and other native tooling for development, spikes, migrations rehearsal, and CI.
+
 ## Decision
 
 1. **Proof / tooling (Node):** Use **[better-sqlite3](https://github.com/WiseLibs/better-sqlite3)** + **[sqlite-vec](https://www.npmjs.com/package/sqlite-vec)** (`sqliteVec.load(db)`), with platform-specific loadable libraries pulled via npm `optionalDependencies` (`sqlite-vec-darwin-arm64`, etc.). This stack is used for **VEC-0 proof**, **developer scripts** (e.g. [`scripts/vec0-spike.mjs`](../../scripts/vec0-spike.mjs)), and future **`query-store`-style** tooling that must load sqlite-vec (prompt 05 §7.1 Option 1).
@@ -30,9 +41,9 @@ Obsidian plugins are bundled with **esbuild** as **`platform: "browser"`** ([esb
 
 | Topic | Guidance |
 |-------|-----------|
-| **Main plugin bundle** | Keep `esbuild` entry as today; **do not** mark `better-sqlite3` or `sqlite-vec` as non-external for `main.js` — they are **Node-only** and must not be pulled into the browser bundle. |
+| **Main plugin bundle** | Keep `esbuild` entry as today; **do not** mark `better-sqlite3` or `sqlite-vec` as non-external for `main.js` — they are **Node-only** and must not be pulled into the browser bundle. ESLint **`no-restricted-imports`** on `src/**/*.ts` and **`npm run check:shipped-native`** after build enforce this. |
 | **WASM / assets** | VEC-2 will add a **separate** mechanism: copy `.wasm` + worker glue from the chosen wa-sqlite/sqlite-vec release, or use a documented CDN-less bundle path; configure esbuild `loader` / `publicPath` / `assetNames` as required by the chosen package. |
-| **optionalDependencies** | `sqlite-vec` platform packages must remain installable on maintainer/CI machines; document OS matrix (darwin/linux arm64/x64, windows x64). |
+| **optionalDependencies** | `sqlite-vec` platform packages must remain installable on maintainer/CI machines **for scripts/CI only**; they are **not** part of the shipped plugin artifact. Document OS matrix (darwin/linux arm64/x64, windows x64). |
 
 ## Alternatives considered
 

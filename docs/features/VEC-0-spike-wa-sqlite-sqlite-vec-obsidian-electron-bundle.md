@@ -1,6 +1,6 @@
-# VEC-0: Spike — wa-SQLite + sqlite-vec in Obsidian/Electron bundle
+# VEC-0: Spike — sqlite-vec semantics and schema (Node proof; WASM deferred)
 
-**Story**: Prove that a chosen **wa-SQLite + sqlite-vec** stack can be bundled with the plugin build, load the sqlite-vec extension, and execute `vec0` DDL plus a minimal vector query against a database file at an **absolute path outside the vault**.
+**Story**: Time-boxed **Node.js** proof that **sqlite-vec** loads, **`vec0` DDL** matches migration 003 intent, and a minimal **KNN** query runs against a database at an **absolute path outside the vault**. **Bundling wa-SQLite + sqlite-vec inside Obsidian** is **out of scope** for VEC-0 and is **first validated in VEC-2** (see [ADR-001](../decisions/ADR-001-sqlite-vec-stack.md)).
 **Epic**: Epic 19 — Native SQLite + sqlite-vec Store (prompt 05)
 **Size**: Medium
 **Status**: Done
@@ -12,11 +12,13 @@
 
 ## 1. Summary
 
-Epic 19 is blocked on a **technical decision**: which WASM/native SQLite + sqlite-vec integration works inside Obsidian’s Electron renderer (or agreed host context), bundles cleanly with **esbuild**, and supports **file-backed** databases at user-controlled absolute paths (see prompt 05 §2–3).
+Epic 19 needs confidence in **sqlite-vec SQL shape**, **vec0** behavior, and **schema alignment** before investing in **WASM** inside Obsidian. VEC-0 **does not** prove that wa-SQLite runs in the Electron renderer; that is **VEC-2** (lazy DB + extension load in the **WASM** stack).
 
-This spike produces a **short decision record** (ADR or `docs/` note) and a **minimal proof** (script or tiny in-repo harness): open DB → create virtual table compatible with migration 003’s `node_embeddings` shape → insert one row → run one sqlite-vec **KNN** (or documented ANN) query → close.
+This spike produces a **short decision record** (ADR or `docs/` note) and a **minimal Node proof** under [`scripts/vec0-spike.mjs`](../../scripts/vec0-spike.mjs): open DB → create virtual table compatible with migration 003’s `node_embeddings` shape → insert one row → run one sqlite-vec **KNN** (or documented ANN) query → close.
 
 No production wiring into `SqliteVecRepository` is required in VEC-0; that is VEC-2–VEC-4.
+
+**Scope clarity:** The historical title mentioned “Obsidian/Electron bundle”; **delivered scope** is **Node-only** (`better-sqlite3` + `sqlite-vec` in **`scripts/`**). The **shipped plugin** must remain **WASM-only / zero native addons** per [ADR-001](../decisions/ADR-001-sqlite-vec-stack.md).
 
 **Outcome:** [ADR-001](../decisions/ADR-001-sqlite-vec-stack.md) records **better-sqlite3 + sqlite-vec** for Node proof/tooling; **Obsidian WASM integration deferred to VEC-2**. Proof: `npm run spike:vec0` → [`scripts/vec0-spike.mjs`](../../scripts/vec0-spike.mjs).
 
@@ -33,7 +35,7 @@ N/A — internal R&D and build validation.
 | Deliverable | Description |
 |-------------|-------------|
 | **Decision record** | Selected packages/repos, rationale, Obsidian version assumptions, desktop OS matrix (macOS / Windows / Linux). |
-| **Build notes** | esbuild `external` / asset copy / WASM loading steps that downstream stories must follow. |
+| **Build notes** | esbuild `external` / asset copy / WASM loading steps for **VEC-2+** (VEC-0 did not change esbuild). |
 | **Proof artifact** | Runnable minimal example (may live under `scripts/` or a dev-only entry) demonstrating vec0 + query on disk **outside** a vault path. |
 | **Explicit non-decisions** | What was rejected and why (one paragraph). |
 

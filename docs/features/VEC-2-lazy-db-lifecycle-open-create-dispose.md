@@ -14,10 +14,12 @@
 
 Prompt 05 §3: **no heavy DB work at plugin load**; open migrations + sqlite-vec on **first operation** that needs the hierarchical store.
 
+VEC-2 is the **first story that must run inside Obsidian desktop**: the database layer uses **WASM SQLite + sqlite-vec** in the renderer only. The **shipped plugin** must remain **free of native Node addons** (`*.node`, bundled `.dylib`/`.so`/`.dll` in the release layout). Node-only proof from VEC-0 does not substitute for this validation ([ADR-001](../decisions/ADR-001-sqlite-vec-stack.md)).
+
 VEC-2 delivers:
 
 - A small module (suggested: `src/storage/sqlite/…`) owning connection lifecycle.
-- **Lazy open**: first call that needs the DB triggers create-parent-dir, open file, load extension per VEC-0 ADR.
+- **Lazy open**: first call that needs the DB triggers create-parent-dir, open file, load **sqlite-vec via the WASM stack** (not better-sqlite3 / npm `sqlite-vec` native).
 - **`dispose()`**: close connection, clear singleton/state so plugin unload does not leak.
 - **Path input**: absolute path from **VEC-1** `resolveVectorStoreDatabasePath` (passed into repository or factory at runtime).
 
@@ -45,7 +47,7 @@ export async function openVectorStoreDatabaseLazy(
 ): Promise<SqliteDatabaseHandle>;
 ```
 
-Exact shape follows VEC-0 spike.
+Exact shape follows the **WASM** integration chosen for Obsidian (VEC-0 validated SQL semantics under Node only).
 
 ---
 
@@ -82,9 +84,9 @@ No new panes. Optional: settings “Test path” button is **out of scope** unle
 - [ ] **A2** — First hierarchical store operation triggers directory create for default parent when using default path (`.obsidian-ai`)
 - [ ] **A3** — Opening uses **absolute** path from VEC-1 resolver only
 
-### Phase B: sqlite-vec
+### Phase B: sqlite-vec (WASM)
 
-- [ ] **B1** — sqlite-vec extension loaded per VEC-0 ADR before any `vec0` DDL runs (VEC-3 may run DDL; order documented)
+- [ ] **B1** — sqlite-vec is loaded through the **WASM** SQLite build (not Node `sqlite-vec` / better-sqlite3) before any `vec0` DDL runs (VEC-3 may run DDL; order documented)
 - [ ] **B2** — Failure to load extension surfaces normalized error with user-actionable message
 
 ### Phase C: Lifecycle
@@ -95,6 +97,12 @@ No new panes. Optional: settings “Test path” button is **out of scope** unle
 ### Phase Z: Quality gates
 
 - [ ] **Z1** — `npm run typecheck && npm run build && npm run test && npm run lint`
+
+### Phase D: In-Obsidian validation and shippable artifact
+
+- [ ] **D1** — **Manual smoke:** Install the built plugin in **Obsidian desktop** (minimum app version per manifest); confirm lazy open, sqlite-vec load, and at least one DB touch path without console errors related to WASM or CSP
+- [ ] **D2** — **Community-style install:** Document or verify that the release folder (e.g. `main.js` + `manifest.json` + styles + any `.wasm`/worker assets **you intend to ship**) works when copied into `.obsidian/plugins/<id>/` **without** running `npm install` or shipping `node_modules`
+- [ ] **D3** — **`npm run build`** passes **`check:shipped-native`**; release instructions state that shipped zips must not add native binaries beside the plugin (only WASM + JS + static assets)
 
 ---
 
@@ -120,7 +128,7 @@ No new panes. Optional: settings “Test path” button is **out of scope** unle
 2. Wire `SqliteVecRepository` to call opener on first use (stub methods OK until VEC-4)
 3. Wire `dispose()` to close
 4. Add logging events: `storage.sqlite.open.started/completed`, `storage.sqlite.dispose`
-5. Tests: mock FS / driver where WASM not in CI; document manual smoke
+5. Tests: mock FS / driver where WASM not in CI; **Phase D** manual smoke in Obsidian is required for acceptance
 
 ---
 

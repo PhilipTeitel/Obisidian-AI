@@ -223,6 +223,11 @@ flowchart TD
 | Testing             | Vitest                          | Fast TS-native test runner; works well with esbuild projects                                                                                                                                                   |
 | Linting             | ESLint                          | Standard for TypeScript projects                                                                                                                                                                               |
 
+### Runtime boundary (Obsidian vs Node)
+
+Everything Obsidian loads from the plugin package (**`main.js`**, bundled assets, **`.wasm`**, styles) must run **without native Node addons** (`*.node` and similar). The vector store uses **wa-SQLite + sqlite-vec over WASM** in the renderer; end users must **not** depend on compiling or installing platform-specific **`node_modules`** for the plugin to work.
+
+**Node-only tooling** (**`scripts/`**, devDependencies such as **better-sqlite3** / **sqlite-vec** for spikes and inspection) is allowed **only** outside the shipped bundle. See [ADR-001](docs/decisions/ADR-001-sqlite-vec-stack.md) and `npm run check:shipped-native` after `npm run build`.
 
 ## Key Design Decisions
 
@@ -671,7 +676,8 @@ The display names and command IDs in this table match the values registered by t
 | Command              | Description                                           |
 | -------------------- | ----------------------------------------------------- |
 | `npm run dev`        | Build with esbuild in watch mode                      |
-| `npm run build`      | Production build that emits `main.js`                 |
+| `npm run build`      | Production build that emits `main.js` and runs `check:shipped-native` |
+| `npm run check:shipped-native` | Fail if `main.js` or `obsidian-plugin/` (excluding `node_modules`) contains native-addon markers |
 | `npm run lint`       | Run ESLint on TypeScript source and config            |
 | `npm run test`       | Run Vitest test suite                                 |
 | `npm run test:scale` | Run REL-2 scale validation integration scenarios only |

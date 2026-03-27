@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node esbuild.config.mjs --watch",
-    "build": "node esbuild.config.mjs --production",
+    "build": "node esbuild.config.mjs --production && node scripts/check-shipped-native.mjs",
+    "check:shipped-native": "node scripts/check-shipped-native.mjs",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint \"src/**/*.ts\" \"vitest.config.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
