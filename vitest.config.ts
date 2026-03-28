@@ -11,6 +11,9 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/__tests__/**/*.test.ts"],
-    setupFiles: ["src/__tests__/setup/mockObsidianModule.ts"]
+    setupFiles: [
+      "src/__tests__/setup/mockObsidianModule.ts",
+      "src/__tests__/setup/mockVectorStoreWasm.ts"
+    ]
   }
 });

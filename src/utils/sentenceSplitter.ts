@@ -73,7 +73,7 @@ function restorePlaceholders(
     );
   }
 
-  restored = restored.replaceAll(ELLIPSIS_PLACEHOLDER, "...");
+  restored = restored.split(ELLIPSIS_PLACEHOLDER).join("...");
 
   return restored;
 }

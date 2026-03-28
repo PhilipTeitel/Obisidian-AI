@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node esbuild.config.mjs --watch",
-    "build": "node esbuild.config.mjs --production && node scripts/check-shipped-native.mjs",
+    "dev": "node scripts/prepare-obsidian-plugin-artifacts.mjs && node esbuild.config.mjs --watch",
+    "build": "node esbuild.config.mjs --production && node scripts/prepare-obsidian-plugin-artifacts.mjs --require-main && node scripts/check-shipped-native.mjs",
     "check:shipped-native": "node scripts/check-shipped-native.mjs",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint \"src/**/*.ts\" \"vitest.config.ts\"",
     "typecheck": "tsc --noEmit",
@@ -21,12 +21,13 @@
     "@types/node": "^24.4.0",
     "@typescript-eslint/eslint-plugin": "^8.42.0",
     "@typescript-eslint/parser": "^8.42.0",
-    "better-sqlite3": "^12.8.0",
     "esbuild": "^0.25.9",
     "eslint": "^9.35.0",
     "obsidian": "^1.8.10",
-    "sqlite-vec": "^0.1.7",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "sqlite-vec-wasm-demo": "^0.1.7"
   }
 }

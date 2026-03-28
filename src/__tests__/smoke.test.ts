@@ -1,5 +1,6 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { bootstrapRuntimeServices } from "../bootstrap/bootstrapRuntimeServices";
+import { openVectorStoreDatabaseLazy } from "../storage/sqlite/openVectorStoreDatabase";
 import { CHAT_VIEW_TYPE, COMMAND_IDS, COMMAND_NAMES, SEARCH_VIEW_TYPE } from "../constants";
 import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
 import { DEFAULT_SETTINGS, snapshotSettings } from "../settings";
@@ -46,12 +47,25 @@ const createSettingsSnapshot = (): ObsidianAISettings => {
 
 const createRuntimeContext = (): RuntimeBootstrapContext => {
   let pluginData: unknown = null;
+  const plugin = {
+    manifest: { id: "obsidian-ai-mvp" },
+    loadData: async () => pluginData,
+    saveData: async (data: unknown) => {
+      pluginData = data;
+    }
+  };
+  const app = {
+    vault: {
+      configDir: "/tmp/obsidian-ai-mvp-smoke/.obsidian",
+      getName: () => "SmokeVault",
+      adapter: {
+        getBasePath: () => "/tmp/obsidian-ai-mvp-smoke"
+      }
+    }
+  };
   return {
-    app: {} as RuntimeBootstrapContext["app"],
-    plugin: {
-      loadData: async () => pluginData,
-      saveData: async (data: unknown) => { pluginData = data; }
-    } as unknown as RuntimeBootstrapContext["plugin"],
+    app: app as unknown as RuntimeBootstrapContext["app"],
+    plugin: plugin as unknown as RuntimeBootstrapContext["plugin"],
     getSettings: () => createSettingsSnapshot(),
     notify: () => undefined
   };
@@ -238,7 +252,12 @@ describe("plugin shell smoke test", () => {
   });
 
   it("bootstraps runtime services in deterministic order", async () => {
+    const wasmOpen = vi.mocked(openVectorStoreDatabaseLazy);
+    wasmOpen.mockClear();
+
     const firstRuntime = await bootstrapRuntimeServices(createRuntimeContext());
+    expect(wasmOpen).not.toHaveBeenCalled();
+
     const secondRuntime = await bootstrapRuntimeServices(createRuntimeContext());
 
     expect(firstRuntime.initializationOrder).toEqual([...RUNTIME_SERVICE_CONSTRUCTION_ORDER]);

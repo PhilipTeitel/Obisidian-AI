@@ -275,7 +275,7 @@ describe("runtime service unit behavior", () => {
             return path === "notes/allowed.md" ? { path } : null;
           }
         }
-      } as RuntimeBootstrapContext["app"],
+      } as unknown as RuntimeBootstrapContext["app"],
       getSettings: () => settings,
       notify: (message: string) => {
         notifications.push(message);

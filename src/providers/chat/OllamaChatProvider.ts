@@ -79,6 +79,10 @@ export class OllamaChatProvider implements ChatProvider {
       timeoutMs
     );
 
+    if (!response.body) {
+      throw new Error("Ollama chat stream response has no body.");
+    }
+
     let doneEmitted = false;
     for await (const eventPayload of streamNdjsonObjects(response.body)) {
       if (!isRecord(eventPayload)) {

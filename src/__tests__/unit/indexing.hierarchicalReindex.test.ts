@@ -397,7 +397,6 @@ describe("hierarchical reindex pipeline", () => {
   });
 
   it("D4_embedding_error_recovery — embedding error includes recovery action", async () => {
-    const { store } = createMockHierarchicalStore();
     const summaryMap = new Map<string, SummaryRecord>();
     const { store: storeWithSummaries } = createMockHierarchicalStore(summaryMap);
 

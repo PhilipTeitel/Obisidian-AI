@@ -16,7 +16,10 @@ import { IndexManifestStore } from "../services/indexing/IndexManifestStore";
 import { SearchService } from "../services/SearchService";
 import { SummaryService } from "../services/SummaryService";
 import { ServiceContainer, type NamedRuntimeService } from "../services/ServiceContainer";
+import { getVaultVectorStoreContext } from "../settings";
 import { LocalVectorStoreRepository } from "../storage/LocalVectorStoreRepository";
+import { resolveObsidianPluginInstallPath } from "../storage/resolveObsidianPluginInstallPath";
+import { resolveVectorStoreDatabasePath } from "../storage/resolveVectorStoreDatabasePath";
 import { SqliteVecRepository } from "../storage/SqliteVecRepository";
 import type {
   NormalizedRuntimeError,
@@ -102,7 +105,13 @@ export const bootstrapRuntimeServices = async (
   });
   const hierarchicalStore = new SqliteVecRepository({
     plugin: context.plugin,
-    pluginId
+    pluginId,
+    getVectorStoreAbsolutePath: () =>
+      resolveVectorStoreDatabasePath({
+        ...getVaultVectorStoreContext(context.app),
+        vectorStoreAbsolutePathOverride: context.getSettings().vectorStoreAbsolutePath
+      }),
+    getSqliteWasmAssetDir: () => resolveObsidianPluginInstallPath(context.app, pluginId)
   });
 
   providerRegistry.registerEmbeddingProvider(
@@ -270,6 +279,23 @@ export const bootstrapRuntimeServices = async (
     };
   } catch (error: unknown) {
     await disposePartial(initializedServices);
+    try {
+      await hierarchicalStore.dispose();
+    } catch (disposeError: unknown) {
+      const normalizedDispose = normalizeRuntimeError(disposeError, {
+        operation: "bootstrapRuntimeServices",
+        phase: "dispose",
+        service: "hierarchicalStore"
+      });
+      logger.log({
+        level: "error",
+        event: "runtime.hierarchical_store.dispose_failed",
+        message: "Failed to dispose hierarchical store after bootstrap failure.",
+        domain: normalizedDispose.domain,
+        context: { operation: "bootstrapRuntimeServices", phase: "dispose" },
+        error: normalizedDispose
+      });
+    }
     const normalized = isNormalizedRuntimeError(error)
       ? error
       : normalizeRuntimeError(error, {

@@ -3,7 +3,7 @@
 **Story**: Introduce a **database access layer** that opens (or creates) the per-vault `.sqlite3` file on **first use** of hierarchical storage, ensures parent directory `.obsidian-ai` exists, loads **sqlite-vec**, and **closes** on service dispose. Align with REL-1 lazy initialization (prompt 05 §3).
 **Epic**: Epic 19 — Native SQLite + sqlite-vec Store (prompt 05)
 **Size**: Medium
-**Status**: Not Started
+**Status**: In Progress
 
 **Requirements**: [docs/prompts/05-SQLITE-vector-store-implementation.md](../prompts/05-SQLITE-vector-store-implementation.md) — §3 lazy init, §2.1 create directory, §1.6 one DB per vault
 **Plan**: [docs/plans/sqlite-vector-store-implementation-plan.md](../plans/sqlite-vector-store-implementation-plan.md) — Phase 2
@@ -80,29 +80,29 @@ No new panes. Optional: settings “Test path” button is **out of scope** unle
 
 ### Phase A: Lazy open
 
-- [ ] **A1** — No file open or WASM sqlite init during `bootstrapRuntimeServices` **before** first hierarchical store operation (verify via log or test spy)
-- [ ] **A2** — First hierarchical store operation triggers directory create for default parent when using default path (`.obsidian-ai`)
-- [ ] **A3** — Opening uses **absolute** path from VEC-1 resolver only
+- [x] **A1** — No file open or WASM sqlite init during `bootstrapRuntimeServices` **before** first hierarchical store operation (verify via log or test spy)
+- [x] **A2** — First hierarchical store operation triggers directory create for default parent when using default path (`.obsidian-ai`)
+- [x] **A3** — Opening uses **absolute** path from VEC-1 resolver only
 
 ### Phase B: sqlite-vec (WASM)
 
-- [ ] **B1** — sqlite-vec is loaded through the **WASM** SQLite build (not Node `sqlite-vec` / better-sqlite3) before any `vec0` DDL runs (VEC-3 may run DDL; order documented)
-- [ ] **B2** — Failure to load extension surfaces normalized error with user-actionable message
+- [x] **B1** — sqlite-vec is loaded through the **WASM** SQLite build (not Node `sqlite-vec` / better-sqlite3) before any `vec0` DDL runs (VEC-3 may run DDL; order documented)
+- [x] **B2** — Failure to load extension surfaces normalized error with user-actionable message
 
 ### Phase C: Lifecycle
 
-- [ ] **C1** — `dispose()` on hierarchical store closes DB and subsequent operations fail fast or no-op per project convention
-- [ ] **C2** — Re-opening after dispose in same session behaves as documented (usually: plugin reload only)
+- [x] **C1** — `dispose()` on hierarchical store closes DB and subsequent operations fail fast or no-op per project convention
+- [x] **C2** — Re-opening after dispose in same session behaves as documented (usually: plugin reload only)
 
 ### Phase Z: Quality gates
 
-- [ ] **Z1** — `npm run typecheck && npm run build && npm run test && npm run lint`
+- [x] **Z1** — `npm run typecheck && npm run build && npm run test && npm run lint`
 
 ### Phase D: In-Obsidian validation and shippable artifact
 
 - [ ] **D1** — **Manual smoke:** Install the built plugin in **Obsidian desktop** (minimum app version per manifest); confirm lazy open, sqlite-vec load, and at least one DB touch path without console errors related to WASM or CSP
-- [ ] **D2** — **Community-style install:** Document or verify that the release folder (e.g. `main.js` + `manifest.json` + styles + any `.wasm`/worker assets **you intend to ship**) works when copied into `.obsidian/plugins/<id>/` **without** running `npm install` or shipping `node_modules`
-- [ ] **D3** — **`npm run build`** passes **`check:shipped-native`**; release instructions state that shipped zips must not add native binaries beside the plugin (only WASM + JS + static assets)
+- [x] **D2** — **Community-style install:** Document or verify that the release folder (e.g. `main.js` + `manifest.json` + styles + any `.wasm`/worker assets **you intend to ship**) works when copied into `.obsidian/plugins/<id>/` **without** running `npm install` or shipping `node_modules`
+- [x] **D3** — **`npm run build`** passes **`check:shipped-native`**; release instructions state that shipped zips must not add native binaries beside the plugin (only WASM + JS + static assets)
 
 ---
 

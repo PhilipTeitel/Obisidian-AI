@@ -85,6 +85,10 @@ export class OpenAIChatProvider implements ChatProvider {
       timeoutMs
     );
 
+    if (!response.body) {
+      throw new Error("OpenAI chat stream response has no body.");
+    }
+
     let doneEmitted = false;
     for await (const dataLine of streamSseDataLines(response.body)) {
       if (dataLine === "[DONE]") {

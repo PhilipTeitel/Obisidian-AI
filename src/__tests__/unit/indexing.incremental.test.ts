@@ -358,7 +358,7 @@ describe("incremental indexing workflow", () => {
     await service.init();
     const snapshot = await service.indexChanges({
       onProgress: (nextSnapshot) => {
-        progressDetails.push(nextSnapshot.progress.detail);
+        progressDetails.push(nextSnapshot.progress.detail ?? "");
       }
     });
 

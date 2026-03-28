@@ -1,5 +1,4 @@
 import type {
-  DocumentNode,
   EmbeddingServiceContract,
   EmbeddingVector,
   HierarchicalSearchRequest,

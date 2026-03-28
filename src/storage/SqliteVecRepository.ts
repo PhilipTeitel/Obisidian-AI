@@ -1,4 +1,11 @@
+import { normalizeRuntimeError } from "../errors/normalizeRuntimeError";
 import { createRuntimeLogger } from "../logging/runtimeLogger";
+import {
+  noopOpenVectorStoreDatabase,
+  openVectorStoreDatabaseLazy,
+  type OpenVectorStoreDatabaseOptions,
+  type SqliteDatabaseHandle
+} from "./sqlite/openVectorStoreDatabase";
 import type {
   CrossReference,
   DocumentNode,
@@ -18,6 +25,11 @@ const logger = createRuntimeLogger("SqliteVecRepository");
 export interface SqliteVecRepositoryDeps {
   plugin: RuntimeBootstrapContext["plugin"];
   pluginId: string;
+  getVectorStoreAbsolutePath?: () => string;
+  getSqliteWasmAssetDir?: () => string;
+  openVectorStoreDatabase?: (
+    options: OpenVectorStoreDatabaseOptions
+  ) => Promise<SqliteDatabaseHandle>;
 }
 
 interface StoredEmbedding {
@@ -63,6 +75,11 @@ const cosineSimilarity = (a: EmbeddingVector, b: EmbeddingVector): number | null
 
 export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeServiceLifecycle {
   private readonly plugin: RuntimeBootstrapContext["plugin"];
+  private readonly getVectorStoreAbsolutePath: () => string;
+  private readonly getSqliteWasmAssetDir: () => string;
+  private readonly openVectorStoreDatabase: (
+    options: OpenVectorStoreDatabaseOptions
+  ) => Promise<SqliteDatabaseHandle>;
   private nodes = new Map<string, DocumentNode>();
   private children = new Map<string, ChildEntry[]>();
   private summaries = new Map<string, SummaryRecord>();
@@ -70,12 +87,24 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   private tags = new Map<string, string[]>();
   private crossRefs = new Map<string, CrossReference[]>();
   private initialized = false;
+  private disposed = false;
+  private vectorDbHandle: SqliteDatabaseHandle | null = null;
+  private vectorDbOpenPromise: Promise<void> | null = null;
 
   public constructor(deps: SqliteVecRepositoryDeps) {
     this.plugin = deps.plugin;
+    const canUseRealOpener =
+      typeof deps.getVectorStoreAbsolutePath === "function" &&
+      typeof deps.getSqliteWasmAssetDir === "function";
+    this.getVectorStoreAbsolutePath = deps.getVectorStoreAbsolutePath ?? (() => "");
+    this.getSqliteWasmAssetDir = deps.getSqliteWasmAssetDir ?? (() => "");
+    this.openVectorStoreDatabase =
+      deps.openVectorStoreDatabase ??
+      (canUseRealOpener ? openVectorStoreDatabaseLazy : noopOpenVectorStoreDatabase);
   }
 
   public async init(): Promise<void> {
+    this.ensureNotDisposed();
     const startedAt = Date.now();
     await this.loadState();
     this.initialized = true;
@@ -87,13 +116,72 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async dispose(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+    this.vectorDbOpenPromise = null;
+    if (this.vectorDbHandle) {
+      try {
+        await this.vectorDbHandle.close();
+      } catch (error: unknown) {
+        const normalized = normalizeRuntimeError(error, {
+          operation: "SqliteVecRepository",
+          phase: "vector_db_close"
+        });
+        logger.log({
+          level: "error",
+          event: "storage.hierarchical.vector_db.close_failed",
+          message: "Failed to close vector store WASM database.",
+          domain: normalized.domain,
+          context: { operation: "SqliteVecRepository" },
+          error: normalized
+        });
+      }
+      this.vectorDbHandle = null;
+    }
     logger.info({
       event: "storage.hierarchical.dispose.completed",
       message: "Hierarchical store disposed."
     });
   }
 
+  private ensureNotDisposed(): void {
+    if (!this.disposed) {
+      return;
+    }
+    throw normalizeRuntimeError(new Error("Hierarchical store has been disposed."), {
+      operation: "SqliteVecRepository",
+      phase: "access_after_dispose",
+      domainHint: "runtime"
+    });
+  }
+
+  private async ensureVectorDbOpen(): Promise<void> {
+    this.ensureNotDisposed();
+    if (this.vectorDbHandle) {
+      return;
+    }
+    if (!this.vectorDbOpenPromise) {
+      this.vectorDbOpenPromise = (async () => {
+        this.vectorDbHandle = await this.openVectorStoreDatabase({
+          absoluteDbPath: this.getVectorStoreAbsolutePath(),
+          sqliteWasmAssetDir: this.getSqliteWasmAssetDir()
+        });
+      })();
+    }
+    try {
+      await this.vectorDbOpenPromise;
+    } catch (error: unknown) {
+      this.vectorDbHandle = null;
+      throw error;
+    } finally {
+      this.vectorDbOpenPromise = null;
+    }
+  }
+
   public async upsertNodeTree(tree: DocumentTree): Promise<void> {
+    await this.ensureVectorDbOpen();
     const operationLogger = logger.withOperation();
     const startedAt = Date.now();
     const notePath = tree.root.notePath;
@@ -128,6 +216,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async deleteByNotePath(notePath: string): Promise<void> {
+    await this.ensureVectorDbOpen();
     const operationLogger = logger.withOperation();
     const startedAt = Date.now();
     const removedCount = this.removeByNotePath(notePath);
@@ -141,11 +230,13 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async getNode(nodeId: string): Promise<DocumentNode | null> {
+    await this.ensureVectorDbOpen();
     const node = this.nodes.get(nodeId);
     return node ? { ...node } : null;
   }
 
   public async getChildren(nodeId: string): Promise<DocumentNode[]> {
+    await this.ensureVectorDbOpen();
     const entries = this.children.get(nodeId);
     if (!entries || entries.length === 0) {
       return [];
@@ -162,8 +253,9 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async getAncestorChain(nodeId: string): Promise<DocumentNode[]> {
+    await this.ensureVectorDbOpen();
     const chain: DocumentNode[] = [];
-    let current = this.nodes.get(nodeId);
+    const current = this.nodes.get(nodeId);
     if (!current) {
       return chain;
     }
@@ -181,6 +273,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async getSiblings(nodeId: string): Promise<DocumentNode[]> {
+    await this.ensureVectorDbOpen();
     const node = this.nodes.get(nodeId);
     if (!node) {
       return [];
@@ -204,6 +297,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async getNodesByNotePath(notePath: string): Promise<DocumentNode[]> {
+    await this.ensureVectorDbOpen();
     const result: DocumentNode[] = [];
     for (const node of this.nodes.values()) {
       if (node.notePath === notePath) {
@@ -217,6 +311,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
     vector: EmbeddingVector,
     topK: number
   ): Promise<NodeMatch[]> {
+    await this.ensureVectorDbOpen();
     const operationLogger = logger.withOperation();
     const startedAt = Date.now();
 
@@ -235,6 +330,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
     topK: number,
     parentId?: string
   ): Promise<NodeMatch[]> {
+    await this.ensureVectorDbOpen();
     const operationLogger = logger.withOperation();
     const startedAt = Date.now();
 
@@ -280,6 +376,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async upsertSummary(nodeId: string, summary: SummaryRecord): Promise<void> {
+    await this.ensureVectorDbOpen();
     this.summaries.set(nodeId, { ...summary });
     await this.persistState();
 
@@ -291,6 +388,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async getSummary(nodeId: string): Promise<SummaryRecord | null> {
+    await this.ensureVectorDbOpen();
     const summary = this.summaries.get(nodeId);
     return summary ? { ...summary } : null;
   }
@@ -300,6 +398,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
     embeddingType: EmbeddingType,
     vector: EmbeddingVector
   ): Promise<void> {
+    await this.ensureVectorDbOpen();
     this.embeddings = this.embeddings.filter(
       (e) => !(e.nodeId === nodeId && e.embeddingType === embeddingType)
     );
@@ -318,6 +417,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async upsertTags(nodeId: string, tags: string[]): Promise<void> {
+    await this.ensureVectorDbOpen();
     this.tags.set(nodeId, [...tags]);
     await this.persistState();
 
@@ -329,6 +429,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async getNodesByTag(tag: string, parentId?: string): Promise<DocumentNode[]> {
+    await this.ensureVectorDbOpen();
     const normalizedTag = tag.trim().toLowerCase();
     if (!normalizedTag) {
       return [];
@@ -382,6 +483,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async upsertCrossReferences(refs: CrossReference[]): Promise<void> {
+    await this.ensureVectorDbOpen();
     for (const ref of refs) {
       const existing = this.crossRefs.get(ref.sourceNodeId) ?? [];
       existing.push({ ...ref });
@@ -397,6 +499,7 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async getCrossReferences(nodeId: string): Promise<CrossReference[]> {
+    await this.ensureVectorDbOpen();
     const refs = this.crossRefs.get(nodeId);
     return refs ? refs.map((r) => ({ ...r })) : [];
   }

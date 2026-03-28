@@ -1,5 +1,10 @@
 node_modules/
 main.js
+obsidian-plugin/main.js
+sqlite3.mjs
+sqlite3.wasm
+obsidian-plugin/sqlite3.mjs
+obsidian-plugin/sqlite3.wasm
 coverage/
 dist/
 .DS_Store

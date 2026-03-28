@@ -134,15 +134,11 @@ describe("indexing progress integration", () => {
     await duplicateIncrementalPromise;
 
     expect(duplicateReindexError).toBeInstanceOf(Error);
-    if (!duplicateReindexError) {
-      throw new Error("Expected duplicate reindex error.");
-    }
-    expect(duplicateReindexError.message).toContain("already running");
+    const reindexErr = duplicateReindexError as unknown as Error;
+    expect(reindexErr.message).toContain("already running");
     expect(duplicateIncrementalError).toBeInstanceOf(Error);
-    if (!duplicateIncrementalError) {
-      throw new Error("Expected duplicate incremental error.");
-    }
-    expect(duplicateIncrementalError.message).toContain("already running");
+    const incrementalErr = duplicateIncrementalError as unknown as Error;
+    expect(incrementalErr.message).toContain("already running");
 
     await harness.runOnunload();
   });

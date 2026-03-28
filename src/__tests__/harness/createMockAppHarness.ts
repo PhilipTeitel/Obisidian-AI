@@ -153,6 +153,11 @@ export const createMockAppHarness = (): MockAppHarness => {
   };
 
   const vault = {
+    getName: (): string => "MockVault",
+    configDir: "/tmp/obsidian-ai-mvp-mock-vault/.obsidian",
+    adapter: {
+      getBasePath: (): string => "/tmp/obsidian-ai-mvp-mock-vault"
+    },
     getMarkdownFiles: (): MockVaultMarkdownFile[] => {
       return [...markdownFiles];
     },

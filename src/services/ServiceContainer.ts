@@ -122,6 +122,30 @@ export class ServiceContainer implements RuntimeServices {
       .map((name) => ({ name, service: servicesByName[name] }));
 
     const failures = await disposeRuntimeServices(orderedEntries);
+
+    const hierarchicalLifecycle = this.hierarchicalStore as unknown as RuntimeServiceLifecycle;
+    try {
+      await hierarchicalLifecycle.dispose();
+    } catch (error: unknown) {
+      const normalized = normalizeRuntimeError(error, {
+        operation: "runtimeServices.dispose",
+        phase: "dispose",
+        service: "hierarchicalStore"
+      });
+      logger.log({
+        level: "error",
+        event: "runtime.service.dispose_failed",
+        message: "Failed to dispose hierarchical store.",
+        domain: normalized.domain,
+        context: {
+          operation: "runtimeServices.dispose",
+          phase: "dispose",
+          service: "hierarchicalStore"
+        },
+        error: normalized
+      });
+    }
+
     if (failures.length > 0) {
       logger.log({
         level: "warn",

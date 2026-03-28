@@ -46,7 +46,7 @@ const createHarness = (settings: ObsidianAISettings, existingPaths: string[] = [
         return existing.has(path) ? { path } : null;
       }
     }
-  } as RuntimeBootstrapContext["app"];
+  } as unknown as RuntimeBootstrapContext["app"];
 
   return {
     service: new AgentService({

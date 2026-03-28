@@ -227,7 +227,7 @@ flowchart TD
 
 Everything Obsidian loads from the plugin package (**`main.js`**, bundled assets, **`.wasm`**, styles) must run **without native Node addons** (`*.node` and similar). The vector store uses **wa-SQLite + sqlite-vec over WASM** in the renderer; end users must **not** depend on compiling or installing platform-specific **`node_modules`** for the plugin to work.
 
-**Node-only tooling** (**`scripts/`**, devDependencies such as **better-sqlite3** / **sqlite-vec** for spikes and inspection) is allowed **only** outside the shipped bundle. See [ADR-001](docs/decisions/ADR-001-sqlite-vec-stack.md) and `npm run check:shipped-native` after `npm run build`.
+**Node-only tooling** (**`scripts/`**) may use native stacks **only** outside the shipped bundle. The default `npm install` does **not** include **better-sqlite3** / **sqlite-vec** (optional compile); install them only to run `npm run spike:vec0`. See [ADR-001](docs/decisions/ADR-001-sqlite-vec-stack.md) and `npm run check:shipped-native` after `npm run build`.
 
 ## Key Design Decisions
 
@@ -626,6 +626,8 @@ npm install
 npm run build
 ```
 
+`npm run build` runs **`scripts/prepare-obsidian-plugin-artifacts.mjs`**, which copies **sqlite3.mjs** and **sqlite3.wasm** (names include the digit **3**, from `sqlite-vec-wasm-demo`) into the repo root and **obsidian-plugin/**, and copies **main.js** into **obsidian-plugin/** so that directory is a full drop-in. A Community Plugins–style install must ship those files (no `node_modules`); do not add native `*.node` binaries.
+
 ### 3. Install into Obsidian vault for development
 
 Copy or symlink the build output into your test vault:
@@ -636,6 +638,8 @@ mkdir -p /path/to/vault/.obsidian/plugins/obsidian-ai-mvp
 
 # Symlink build artifacts
 ln -s "$(pwd)/main.js" /path/to/vault/.obsidian/plugins/obsidian-ai-mvp/main.js
+ln -s "$(pwd)/sqlite3.mjs" /path/to/vault/.obsidian/plugins/obsidian-ai-mvp/sqlite3.mjs
+ln -s "$(pwd)/sqlite3.wasm" /path/to/vault/.obsidian/plugins/obsidian-ai-mvp/sqlite3.wasm
 ln -s "$(pwd)/manifest.json" /path/to/vault/.obsidian/plugins/obsidian-ai-mvp/manifest.json
 ln -s "$(pwd)/versions.json" /path/to/vault/.obsidian/plugins/obsidian-ai-mvp/versions.json
 ```
@@ -676,7 +680,7 @@ The display names and command IDs in this table match the values registered by t
 | Command              | Description                                           |
 | -------------------- | ----------------------------------------------------- |
 | `npm run dev`        | Build with esbuild in watch mode                      |
-| `npm run build`      | Production build that emits `main.js` and runs `check:shipped-native` |
+| `npm run build`      | Production build: esbuild → `main.js`, then `prepare-obsidian-plugin-artifacts.mjs` (WASM + sync `main.js` into `obsidian-plugin/`), `check:shipped-native` |
 | `npm run check:shipped-native` | Fail if `main.js` or `obsidian-plugin/` (excluding `node_modules`) contains native-addon markers |
 | `npm run lint`       | Run ESLint on TypeScript source and config            |
 | `npm run test`       | Run Vitest test suite                                 |

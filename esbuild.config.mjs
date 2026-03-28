@@ -1,4 +1,9 @@
 import esbuild from "esbuild";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const args = new Set(process.argv.slice(2));
 const isWatch = args.has("--watch");
@@ -10,7 +15,7 @@ const context = await esbuild.context({
   format: "cjs",
   platform: "browser",
   target: "es2020",
-  external: ["obsidian", "crypto", "os", "path"],
+  external: ["obsidian", "crypto", "fs", "os", "path", "url"],
   outfile: "main.js",
   sourcemap: isProduction ? false : "inline",
   logLevel: "info"
@@ -21,4 +26,7 @@ if (isWatch) {
 } else {
   await context.rebuild();
   await context.dispose();
+  const out = path.join(__dirname, "main.js");
+  const { size } = fs.statSync(out);
+  console.log(`esbuild: wrote ${out} (${size} bytes)`);
 }

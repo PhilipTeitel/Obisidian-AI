@@ -63,7 +63,7 @@ describe("OpenAIChatProvider", () => {
     expect(events).toEqual([{ type: "done", finishReason: "stop" }]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.openai.com/v1/chat/completions");
     expect(init.method).toBe("POST");
     expect(init.headers).toEqual({

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SqliteVecRepository } from "../../storage/SqliteVecRepository";
 import type {
   CrossReference,
@@ -96,6 +96,30 @@ describe("STOR-2: SqliteVecRepository", () => {
       const repo = createRepo();
       await expect(repo.init()).resolves.toBeUndefined();
       await expect(repo.dispose()).resolves.toBeUndefined();
+    });
+
+    it("VEC-2 — init does not open WASM DB; first store op opens once; dispose blocks further ops", async () => {
+      const openVectorStoreDatabase = vi.fn(async () => ({
+        close: vi.fn(async () => undefined)
+      }));
+      const plugin = createMemoryPlugin();
+      const repo = new SqliteVecRepository({
+        plugin: plugin as unknown as RuntimeBootstrapContext["plugin"],
+        pluginId: "obsidian-ai-mvp",
+        getVectorStoreAbsolutePath: () => "/tmp/vec-test.sqlite3",
+        getSqliteWasmAssetDir: () => "/tmp/wasm",
+        openVectorStoreDatabase
+      });
+      await repo.init();
+      expect(openVectorStoreDatabase).not.toHaveBeenCalled();
+      await repo.getNode("missing");
+      expect(openVectorStoreDatabase).toHaveBeenCalledTimes(1);
+      await repo.getNode("missing");
+      expect(openVectorStoreDatabase).toHaveBeenCalledTimes(1);
+      await repo.dispose();
+      await expect(repo.getNode("missing")).rejects.toMatchObject({
+        domain: "runtime"
+      });
     });
   });
 

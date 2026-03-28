@@ -8,9 +8,10 @@ import { MVP_PROVIDER_IDS, type MVPProviderId, type ObsidianAISettings, type Run
 
 /** Vault identity inputs for `resolveVectorStoreDatabasePath` (desktop: adapter base path; else vault root path). */
 export const getVaultVectorStoreContext = (app: App): { vaultName: string; vaultPath: string } => {
-  const vaultName = typeof app.vault.getName === "function" ? app.vault.getName() : "";
-  const adapter = app.vault.adapter as { getBasePath?: () => string };
-  if (typeof adapter.getBasePath === "function") {
+  const vaultName =
+    app.vault && typeof app.vault.getName === "function" ? app.vault.getName() : "";
+  const adapter = app.vault?.adapter as { getBasePath?: () => string } | undefined;
+  if (adapter && typeof adapter.getBasePath === "function") {
     try {
       const base = adapter.getBasePath();
       if (typeof base === "string" && base.length > 0) {
@@ -20,7 +21,7 @@ export const getVaultVectorStoreContext = (app: App): { vaultName: string; vault
       // ignore: tests or minimal adapters may not support base path
     }
   }
-  if (typeof app.vault.getRoot === "function") {
+  if (app.vault && typeof app.vault.getRoot === "function") {
     const root = app.vault.getRoot();
     const vaultPath = root && typeof root.path === "string" ? root.path : "";
     return { vaultName, vaultPath };

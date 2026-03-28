@@ -158,7 +158,7 @@ describe("INTG-1: Bootstrap integration — SummaryService, ContextAssemblyServi
         agentService: trackingService("agentService") as unknown as AgentServiceContract,
         chatService: trackingService("chatService") as unknown as ChatServiceContract,
         indexingService: trackingService("indexingService") as unknown as IndexingServiceContract,
-        hierarchicalStore: createMockHierarchicalStore(),
+        hierarchicalStore: trackingService("hierarchicalStore") as unknown as HierarchicalStoreContract,
         disposeOrder: [...RUNTIME_SERVICE_CONSTRUCTION_ORDER]
       });
 
@@ -172,10 +172,13 @@ describe("INTG-1: Bootstrap integration — SummaryService, ContextAssemblyServi
       expect(disposeCalls).toContain("agentService");
       expect(disposeCalls).toContain("chatService");
       expect(disposeCalls).toContain("indexingService");
+      expect(disposeCalls).toContain("hierarchicalStore");
 
       const indexingIdx = disposeCalls.indexOf("indexingService");
       const providerIdx = disposeCalls.indexOf("providerRegistry");
+      const hierarchicalIdx = disposeCalls.indexOf("hierarchicalStore");
       expect(indexingIdx).toBeLessThan(providerIdx);
+      expect(hierarchicalIdx).toBeGreaterThan(providerIdx);
     });
   });
 

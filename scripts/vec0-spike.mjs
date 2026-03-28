@@ -3,6 +3,10 @@
  * VEC-0 proof: sqlite-vec vec0 + KNN on a file-backed DB outside any vault.
  *
  * Uses better-sqlite3 + sqlite-vec (Node). Not bundled into the Obsidian main.js bundle.
+ * Those packages are optional: they are not in the default `package.json` so `npm install`
+ * can succeed without a native toolchain. Install them only when running this spike:
+ *
+ *   npm install --save-dev better-sqlite3 sqlite-vec
  *
  * Usage:
  *   npm run spike:vec0
@@ -14,11 +18,10 @@
  * @see docs/decisions/ADR-001-sqlite-vec-stack.md
  */
 
-import Database from "better-sqlite3";
-import * as sqliteVec from "sqlite-vec";
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
+
 const EMBEDDING_DIM = 1536;
 
 function parseOutFlag() {
@@ -29,35 +32,50 @@ function parseOutFlag() {
   return process.argv[idx + 1];
 }
 
-const customOut = parseOutFlag();
-const dbPath = customOut
-  ? resolve(customOut)
-  : join(homedir(), ".obsidian-ai", "vec0-spike-proof.sqlite3");
-
-try {
-  mkdirSync(dirname(dbPath), { recursive: true });
-} catch (err) {
-  if (err && (err.code === "EPERM" || err.code === "EACCES")) {
+async function main() {
+  let Database;
+  let sqliteVec;
+  try {
+    Database = (await import("better-sqlite3")).default;
+    sqliteVec = await import("sqlite-vec");
+  } catch {
     console.error(
-      `VEC-0: cannot create ${dirname(dbPath)}. Pass --out with a writable absolute path (e.g. under $TMPDIR).`
+      "VEC-0 spike: missing optional native packages (better-sqlite3, sqlite-vec).\n" +
+        "They are not required to build the Obsidian plugin. To run this spike only, install:\n" +
+        "  npm install --save-dev better-sqlite3 sqlite-vec\n"
     );
+    process.exit(1);
   }
-  throw err;
-}
 
-console.log(`VEC-0 spike: opening ${dbPath}`);
+  const customOut = parseOutFlag();
+  const dbPath = customOut
+    ? resolve(customOut)
+    : join(homedir(), ".obsidian-ai", "vec0-spike-proof.sqlite3");
 
-const db = new Database(dbPath);
+  try {
+    mkdirSync(dirname(dbPath), { recursive: true });
+  } catch (err) {
+    if (err && (err.code === "EPERM" || err.code === "EACCES")) {
+      console.error(
+        `VEC-0: cannot create ${dirname(dbPath)}. Pass --out with a writable absolute path (e.g. under $TMPDIR).`
+      );
+    }
+    throw err;
+  }
 
-try {
-  sqliteVec.load(db);
+  console.log(`VEC-0 spike: opening ${dbPath}`);
 
-  const { vec_version: vecVersion } = db.prepare("SELECT vec_version() AS vec_version").get();
-  console.log(`sqlite-vec vec_version=${vecVersion}`);
+  const db = new Database(dbPath);
 
-  db.exec(`DROP TABLE IF EXISTS node_embeddings;`);
+  try {
+    sqliteVec.load(db);
 
-  db.exec(`
+    const { vec_version: vecVersion } = db.prepare("SELECT vec_version() AS vec_version").get();
+    console.log(`sqlite-vec vec_version=${vecVersion}`);
+
+    db.exec(`DROP TABLE IF EXISTS node_embeddings;`);
+
+    db.exec(`
     CREATE VIRTUAL TABLE node_embeddings USING vec0(
       node_id TEXT PRIMARY KEY,
       embedding_type TEXT NOT NULL,
@@ -65,21 +83,21 @@ try {
     );
   `);
 
-  const insert = db.prepare(
-    `INSERT INTO node_embeddings (node_id, embedding_type, embedding) VALUES (?, ?, ?)`
-  );
+    const insert = db.prepare(
+      `INSERT INTO node_embeddings (node_id, embedding_type, embedding) VALUES (?, ?, ?)`
+    );
 
-  const zeros = new Float32Array(EMBEDDING_DIM);
-  const accent = new Float32Array(EMBEDDING_DIM);
-  accent[0] = 1;
+    const zeros = new Float32Array(EMBEDDING_DIM);
+    const accent = new Float32Array(EMBEDDING_DIM);
+    accent[0] = 1;
 
-  insert.run("node-zero", "summary", zeros);
-  insert.run("node-accent", "content", accent);
+    insert.run("node-zero", "summary", zeros);
+    insert.run("node-accent", "content", accent);
 
-  const query = new Float32Array(EMBEDDING_DIM);
-  query[0] = 0.95;
+    const query = new Float32Array(EMBEDDING_DIM);
+    query[0] = 0.95;
 
-  const knn = db.prepare(`
+    const knn = db.prepare(`
     SELECT node_id, embedding_type, distance
     FROM node_embeddings
     WHERE embedding MATCH ?
@@ -87,20 +105,26 @@ try {
     ORDER BY distance
   `);
 
-  const rows = knn.all(query);
+    const rows = knn.all(query);
 
-  if (rows.length !== 2) {
-    throw new Error(`Expected 2 KNN rows, got ${rows.length}`);
+    if (rows.length !== 2) {
+      throw new Error(`Expected 2 KNN rows, got ${rows.length}`);
+    }
+
+    const top = rows[0];
+    if (top.node_id !== "node-accent") {
+      throw new Error(`Expected closest row node-accent, got ${top.node_id}`);
+    }
+
+    console.log("KNN (sqlite-vec MATCH, not JS cosine scan):");
+    console.table(rows);
+    console.log("VEC-0 spike: OK");
+  } finally {
+    db.close();
   }
-
-  const top = rows[0];
-  if (top.node_id !== "node-accent") {
-    throw new Error(`Expected closest row node-accent, got ${top.node_id}`);
-  }
-
-  console.log("KNN (sqlite-vec MATCH, not JS cosine scan):");
-  console.table(rows);
-  console.log("VEC-0 spike: OK");
-} finally {
-  db.close();
 }
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

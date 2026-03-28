@@ -112,7 +112,7 @@ describe("ChatPaneModel", () => {
   });
 
   it("B1_cancels_active_stream", async () => {
-    let resolveGate: (() => void) | null = null;
+    let resolveGate!: () => void;
     const gate = new Promise<void>((resolve) => {
       resolveGate = resolve;
     });
@@ -143,7 +143,7 @@ describe("ChatPaneModel", () => {
     const sendPromise = model.send("cancel me");
     await streamingStarted;
     expect(model.cancelStreaming()).toBe(true);
-    resolveGate?.();
+    resolveGate();
     await sendPromise;
 
     const turn = model.getState().turns[0];
