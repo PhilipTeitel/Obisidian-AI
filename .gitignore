@@ -5,6 +5,7 @@ sqlite3.mjs
 sqlite3.wasm
 obsidian-plugin/sqlite3.mjs
 obsidian-plugin/sqlite3.wasm
+obsidian-plugin/data.json
 coverage/
 dist/
 .DS_Store
