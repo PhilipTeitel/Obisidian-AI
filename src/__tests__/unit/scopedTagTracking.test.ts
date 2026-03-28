@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { MemoryHierarchicalStore } from "../helpers/memoryHierarchicalStore";
 import { buildDocumentTree } from "../../utils/chunker";
 import { SqliteVecRepository } from "../../storage/SqliteVecRepository";
 import type { ChunkerInput, DocumentNode, HierarchicalStoreContract } from "../../types";
@@ -25,7 +26,11 @@ describe("META-1: Scoped Tag Tracking", () => {
 
   beforeEach(async () => {
     const plugin = createMockPlugin();
-    store = new SqliteVecRepository({ plugin: plugin as never, pluginId: "test" });
+    store = new SqliteVecRepository({
+      plugin: plugin as never,
+      pluginId: "test",
+      hierarchicalTestBackend: new MemoryHierarchicalStore()
+    });
     await store.init();
   });
 

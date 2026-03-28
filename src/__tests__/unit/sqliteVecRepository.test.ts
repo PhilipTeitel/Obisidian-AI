@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { MemoryHierarchicalStore } from "../helpers/memoryHierarchicalStore";
 import { SqliteVecRepository } from "../../storage/SqliteVecRepository";
+import type { SqliteDatabaseHandle } from "../../storage/sqlite/openVectorStoreDatabase";
 import type {
   CrossReference,
   DocumentNode,
@@ -56,11 +58,13 @@ const createTree = (
   return { root, nodes };
 };
 
-const createRepo = (initialData: unknown = null) => {
-  const plugin = createMemoryPlugin(initialData);
+const createRepo = (sharedMemory?: MemoryHierarchicalStore) => {
+  const plugin = createMemoryPlugin();
+  const memory = sharedMemory ?? new MemoryHierarchicalStore();
   return new SqliteVecRepository({
     plugin: plugin as unknown as RuntimeBootstrapContext["plugin"],
-    pluginId: "obsidian-ai-mvp"
+    pluginId: "obsidian-ai-mvp",
+    hierarchicalTestBackend: memory
   });
 };
 
@@ -99,9 +103,26 @@ describe("STOR-2: SqliteVecRepository", () => {
     });
 
     it("VEC-2 — init does not open WASM DB; first store op opens once; dispose blocks further ops", async () => {
-      const openVectorStoreDatabase = vi.fn(async () => ({
-        close: vi.fn(async () => undefined)
-      }));
+      type StubDb = {
+        exec: ReturnType<typeof vi.fn>;
+        selectValue: ReturnType<typeof vi.fn>;
+        selectObjects: ReturnType<typeof vi.fn>;
+        transaction: ReturnType<typeof vi.fn>;
+        close: ReturnType<typeof vi.fn>;
+      };
+      const openVectorStoreDatabase = vi.fn(
+        async (): Promise<SqliteDatabaseHandle> => {
+          const h: StubDb = {
+            exec: vi.fn(),
+            selectValue: vi.fn(),
+            selectObjects: vi.fn(() => []),
+            transaction: vi.fn(),
+            close: vi.fn(async () => undefined)
+          };
+          h.transaction.mockImplementation(<T>(cb: (db: StubDb) => T) => cb(h));
+          return h as unknown as SqliteDatabaseHandle;
+        }
+      );
       const plugin = createMemoryPlugin();
       const repo = new SqliteVecRepository({
         plugin: plugin as unknown as RuntimeBootstrapContext["plugin"],
@@ -120,6 +141,27 @@ describe("STOR-2: SqliteVecRepository", () => {
       await expect(repo.getNode("missing")).rejects.toMatchObject({
         domain: "runtime"
       });
+    });
+
+    it("A2 — hierarchical index is not persisted via plugin.saveData / loadData", async () => {
+      const plugin = createMemoryPlugin();
+      const saveData = vi.spyOn(plugin, "saveData");
+      const repo = new SqliteVecRepository({
+        plugin: plugin as unknown as RuntimeBootstrapContext["plugin"],
+        pluginId: "obsidian-ai-mvp",
+        hierarchicalTestBackend: new MemoryHierarchicalStore()
+      });
+      await repo.init();
+      const tree = createTree({ nodeId: "root-1" });
+      await repo.upsertNodeTree(tree);
+      await repo.upsertSummary("root-1", {
+        nodeId: "root-1",
+        summary: "s",
+        modelUsed: "m",
+        promptVersion: "v1",
+        generatedAt: 1
+      });
+      expect(saveData).not.toHaveBeenCalled();
     });
   });
 
@@ -540,11 +582,13 @@ describe("STOR-2: SqliteVecRepository", () => {
       await repo.dispose();
     });
 
-    it("persists state across init cycles", async () => {
+    it("persists state when two repository instances share the same test memory backend", async () => {
       const plugin = createMemoryPlugin();
+      const shared = new MemoryHierarchicalStore();
       const repo1 = new SqliteVecRepository({
         plugin: plugin as unknown as RuntimeBootstrapContext["plugin"],
-        pluginId: "obsidian-ai-mvp"
+        pluginId: "obsidian-ai-mvp",
+        hierarchicalTestBackend: shared
       });
       await repo1.init();
 
@@ -560,7 +604,8 @@ describe("STOR-2: SqliteVecRepository", () => {
 
       const repo2 = new SqliteVecRepository({
         plugin: plugin as unknown as RuntimeBootstrapContext["plugin"],
-        pluginId: "obsidian-ai-mvp"
+        pluginId: "obsidian-ai-mvp",
+        hierarchicalTestBackend: shared
       });
       await repo2.init();
 

@@ -5,7 +5,8 @@
  * 1. Copies SQLite WASM glue from sqlite-vec-wasm-demo (filenames are **sqlite3.mjs** and
  *    **sqlite3.wasm** — the digit 3, i.e. SQLite 3 / Emscripten bundle — not "sqlite.mjs").
  * 2. Patches sqlite3.mjs: renderer Node guard, locateFile (blob load), bigIntEnabled (no Module.HEAPU64 probe).
- * 3. Copies main.js into obsidian-plugin/ so that folder is a complete drop-in release.
+ * 3. Copies main.js, manifest.json, and optional styles.css / versions.json into obsidian-plugin/
+ *    so that folder is a complete drop-in release.
  *
  * @see docs/features/VEC-2-lazy-db-lifecycle-open-create-dispose.md and ADR-001.
  */
@@ -108,6 +109,19 @@ for (const destRoot of wasmTargets) {
   }
 }
 
+const copyRootFileToPlugin = (filename, { required = false } = {}) => {
+  const from = path.join(root, filename);
+  const to = path.join(pluginDir, filename);
+  if (!fs.existsSync(from)) {
+    if (required) {
+      throw new Error(`prepare-obsidian-plugin-artifacts: missing required file ${from}`);
+    }
+    return false;
+  }
+  fs.copyFileSync(from, to);
+  return true;
+};
+
 const mainSrc = path.join(root, "main.js");
 const mainDest = path.join(pluginDir, "main.js");
 if (fs.existsSync(mainSrc)) {
@@ -122,9 +136,23 @@ if (fs.existsSync(mainSrc)) {
   );
 }
 
+copyRootFileToPlugin("manifest.json", { required: true });
+if (copyRootFileToPlugin("styles.css")) {
+  /* optional */
+}
+if (copyRootFileToPlugin("versions.json")) {
+  /* optional */
+}
+
+const extraParts = [];
+if (fs.existsSync(mainSrc)) extraParts.push("main.js");
+extraParts.push("manifest.json");
+if (fs.existsSync(path.join(root, "styles.css"))) extraParts.push("styles.css");
+if (fs.existsSync(path.join(root, "versions.json"))) extraParts.push("versions.json");
+
 console.log(
   "prepare-obsidian-plugin-artifacts: sqlite3.mjs + sqlite3.wasm → repo root + obsidian-plugin/" +
-    (fs.existsSync(mainSrc) ? "; main.js → obsidian-plugin/main.js" : "")
+    (extraParts.length > 0 ? `; ${extraParts.join(", ")} → obsidian-plugin/` : "")
 );
 console.log(
   "  (WASM files are named sqlite3.* — with a 3 — matching the upstream sqlite-vec-wasm-demo package.)"

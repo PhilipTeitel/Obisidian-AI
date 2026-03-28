@@ -14,13 +14,16 @@ import type {
   EmbeddingVector,
   HierarchicalStoreContract,
   NodeMatch,
+  NodeType,
   RuntimeBootstrapContext,
   RuntimeServiceLifecycle,
   SummaryRecord
 } from "../types";
 
-const HIERARCHICAL_STORE_KEY = "hierarchicalStore";
 const logger = createRuntimeLogger("SqliteVecRepository");
+
+/** sqlite-vec vec0 column width in migration 003. */
+const VEC_DIMENSION = 1536;
 
 export interface SqliteVecRepositoryDeps {
   plugin: RuntimeBootstrapContext["plugin"];
@@ -30,69 +33,111 @@ export interface SqliteVecRepositoryDeps {
   openVectorStoreDatabase?: (
     options: OpenVectorStoreDatabaseOptions
   ) => Promise<SqliteDatabaseHandle>;
+  /**
+   * Vitest-only: Node cannot load the browser WASM bundle; tests delegate to this in-memory store.
+   * Never set in Obsidian bootstrap.
+   */
+  hierarchicalTestBackend?: HierarchicalStoreContract & RuntimeServiceLifecycle;
 }
 
-interface StoredEmbedding {
-  nodeId: string;
-  embeddingType: EmbeddingType;
-  vector: EmbeddingVector;
-}
+type StoreDb = SqliteDatabaseHandle;
 
-interface ChildEntry {
-  childId: string;
-  sortOrder: number;
-}
-
-interface PersistedHierarchicalState {
-  nodes: Array<[string, DocumentNode]>;
-  children: Array<[string, ChildEntry[]]>;
-  summaries: Array<[string, SummaryRecord]>;
-  embeddings: StoredEmbedding[];
-  tags: Array<[string, string[]]>;
-  crossRefs: Array<[string, CrossReference[]]>;
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
-
-const computeMagnitude = (values: number[]): number => {
-  const mag = Math.sqrt(values.reduce((sum, v) => sum + v * v, 0));
-  return Number.isFinite(mag) ? mag : 0;
+const clampTopK = (topK: number): number => {
+  const k = Math.floor(topK);
+  if (!Number.isFinite(k) || k < 1) {
+    return 1;
+  }
+  return Math.min(k, 500);
 };
 
-const cosineSimilarity = (a: EmbeddingVector, b: EmbeddingVector): number | null => {
-  if (a.dimensions !== b.dimensions || a.values.length !== b.values.length) {
-    return null;
+const padEmbeddingToVec = (vector: EmbeddingVector): Float32Array => {
+  const out = new Float32Array(VEC_DIMENSION);
+  const src = vector.values;
+  const n = Math.min(src.length, VEC_DIMENSION);
+  for (let i = 0; i < n; i += 1) {
+    out[i] = src[i]!;
   }
-  const magA = computeMagnitude(a.values);
-  const magB = computeMagnitude(b.values);
-  if (magA === 0 || magB === 0) {
-    return null;
-  }
-  const dot = a.values.reduce((sum, v, i) => sum + v * b.values[i], 0);
-  return dot / (magA * magB);
+  return out;
 };
+
+/**
+ * sqlite3 WASM `Stmt.bind()` only allows Uint8Array / Int8Array / ArrayBuffer for blobs.
+ * `Float32Array` is rejected as `typeof "object"` → "Unsupported bind() argument type: object".
+ * sqlite-vec still receives the same little-endian float32 bytes.
+ */
+const float32VecAsSqliteBlob = (vec: Float32Array): Uint8Array =>
+  new Uint8Array(vec.buffer, vec.byteOffset, vec.byteLength);
+
+const distanceToScore = (distance: unknown): number => {
+  const d = typeof distance === "number" ? distance : Number(distance);
+  if (!Number.isFinite(d)) {
+    return 0;
+  }
+  return 1 / (1 + d);
+};
+
+const parseHeadingTrail = (raw: unknown): string[] => {
+  if (typeof raw !== "string" || raw.length === 0) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+const normalizeTagsForStore = (tags: string[]): string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const t of tags) {
+    const n = t.trim().toLowerCase();
+    if (n.length === 0 || seen.has(n)) {
+      continue;
+    }
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
+};
+
+const rowToNode = (
+  row: Record<string, unknown>,
+  childIds: string[],
+  tags: string[]
+): DocumentNode => ({
+  nodeId: String(row.node_id),
+  parentId: row.parent_id === null || row.parent_id === undefined ? null : String(row.parent_id),
+  childIds,
+  notePath: String(row.note_path),
+  noteTitle: String(row.note_title),
+  headingTrail: parseHeadingTrail(row.heading_trail),
+  depth: Number(row.depth),
+  nodeType: String(row.node_type) as NodeType,
+  content: String(row.content),
+  sequenceIndex: Number(row.sequence_index),
+  tags,
+  contentHash: String(row.content_hash),
+  updatedAt: Number(row.updated_at)
+});
 
 export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeServiceLifecycle {
+  /** Passed through from bootstrap; hierarchical data lives in SQLite, not plugin data. */
   private readonly plugin: RuntimeBootstrapContext["plugin"];
+  private readonly testBackend: (HierarchicalStoreContract & RuntimeServiceLifecycle) | null;
   private readonly getVectorStoreAbsolutePath: () => string;
   private readonly getSqliteWasmAssetDir: () => string;
   private readonly openVectorStoreDatabase: (
     options: OpenVectorStoreDatabaseOptions
   ) => Promise<SqliteDatabaseHandle>;
-  private nodes = new Map<string, DocumentNode>();
-  private children = new Map<string, ChildEntry[]>();
-  private summaries = new Map<string, SummaryRecord>();
-  private embeddings: StoredEmbedding[] = [];
-  private tags = new Map<string, string[]>();
-  private crossRefs = new Map<string, CrossReference[]>();
-  private initialized = false;
   private disposed = false;
   private vectorDbHandle: SqliteDatabaseHandle | null = null;
   private vectorDbOpenPromise: Promise<void> | null = null;
 
   public constructor(deps: SqliteVecRepositoryDeps) {
     this.plugin = deps.plugin;
+    this.testBackend = deps.hierarchicalTestBackend ?? null;
     const canUseRealOpener =
       typeof deps.getVectorStoreAbsolutePath === "function" &&
       typeof deps.getSqliteWasmAssetDir === "function";
@@ -106,12 +151,16 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   public async init(): Promise<void> {
     this.ensureNotDisposed();
     const startedAt = Date.now();
-    await this.loadState();
-    this.initialized = true;
+    if (this.testBackend) {
+      await this.testBackend.init();
+    }
     logger.info({
       event: "storage.hierarchical.init.completed",
       message: "Hierarchical store initialized.",
-      context: { nodeCount: this.nodes.size, elapsedMs: Date.now() - startedAt }
+      context: {
+        mode: this.testBackend ? "test_backend" : "sqlite",
+        elapsedMs: Date.now() - startedAt
+      }
     });
   }
 
@@ -121,6 +170,10 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
     }
     this.disposed = true;
     this.vectorDbOpenPromise = null;
+    if (this.testBackend) {
+      await this.testBackend.dispose();
+      return;
+    }
     if (this.vectorDbHandle) {
       try {
         await this.vectorDbHandle.close();
@@ -158,6 +211,9 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   private async ensureVectorDbOpen(): Promise<void> {
+    if (this.testBackend) {
+      return;
+    }
     this.ensureNotDisposed();
     if (this.vectorDbHandle) {
       return;
@@ -180,29 +236,87 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
     }
   }
 
+  private requireDb(): StoreDb {
+    const h = this.vectorDbHandle;
+    if (!h) {
+      throw normalizeRuntimeError(new Error("Vector database is not open."), {
+        operation: "SqliteVecRepository",
+        phase: "db_missing",
+        domainHint: "storage"
+      });
+    }
+    return h;
+  }
+
+  private loadNode(db: StoreDb, nodeId: string): DocumentNode | null {
+    const rows = db.selectObjects(
+      `SELECT node_id, parent_id, note_path, note_title, heading_trail, depth, node_type, content, sequence_index, content_hash, updated_at
+       FROM nodes WHERE node_id = ?`,
+      [nodeId]
+    );
+    if (rows.length === 0) {
+      return null;
+    }
+    const childRows = db.selectObjects(
+      `SELECT child_id FROM node_children WHERE parent_id = ? ORDER BY sort_order ASC, child_id ASC`,
+      [nodeId]
+    );
+    const tagRows = db.selectObjects(
+      `SELECT tag FROM node_tags WHERE node_id = ? ORDER BY tag ASC`,
+      [nodeId]
+    );
+    return rowToNode(
+      rows[0]!,
+      childRows.map((r) => String(r.child_id)),
+      tagRows.map((r) => String(r.tag))
+    );
+  }
+
   public async upsertNodeTree(tree: DocumentTree): Promise<void> {
+    if (this.testBackend) {
+      return this.testBackend.upsertNodeTree(tree);
+    }
     await this.ensureVectorDbOpen();
+    const db = this.requireDb();
     const operationLogger = logger.withOperation();
     const startedAt = Date.now();
     const notePath = tree.root.notePath;
 
-    this.removeByNotePath(notePath);
+    const orderedNodes = [...tree.nodes.values()].sort((a, b) => a.depth - b.depth);
 
-    for (const [nodeId, node] of tree.nodes) {
-      this.nodes.set(nodeId, { ...node });
-    }
+    db.transaction((tx) => {
+      tx.exec({ sql: "DELETE FROM nodes WHERE note_path = ?", bind: [notePath] });
 
-    for (const [, node] of tree.nodes) {
-      if (node.childIds.length > 0) {
-        const entries: ChildEntry[] = node.childIds.map((childId, index) => ({
-          childId,
-          sortOrder: index
-        }));
-        this.children.set(node.nodeId, entries);
+      for (const node of orderedNodes) {
+        tx.exec({
+          sql: `INSERT INTO nodes (
+            node_id, parent_id, note_path, note_title, heading_trail, depth, node_type, content, sequence_index, content_hash, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          bind: [
+            node.nodeId,
+            node.parentId,
+            node.notePath,
+            node.noteTitle,
+            JSON.stringify(node.headingTrail),
+            node.depth,
+            node.nodeType,
+            node.content,
+            node.sequenceIndex,
+            node.contentHash,
+            node.updatedAt
+          ]
+        });
       }
-    }
 
-    await this.persistState();
+      for (const node of orderedNodes) {
+        node.childIds.forEach((childId, index) => {
+          tx.exec({
+            sql: "INSERT INTO node_children (parent_id, child_id, sort_order) VALUES (?, ?, ?)",
+            bind: [node.nodeId, childId, index]
+          });
+        });
+      }
+    });
 
     operationLogger.info({
       event: "storage.hierarchical.upsert_tree.completed",
@@ -216,111 +330,183 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async deleteByNotePath(notePath: string): Promise<void> {
+    if (this.testBackend) {
+      return this.testBackend.deleteByNotePath(notePath);
+    }
     await this.ensureVectorDbOpen();
+    const db = this.requireDb();
     const operationLogger = logger.withOperation();
     const startedAt = Date.now();
-    const removedCount = this.removeByNotePath(notePath);
-    await this.persistState();
+
+    const before = db.selectValue(
+      "SELECT COUNT(*) FROM nodes WHERE note_path = ?",
+      notePath
+    );
+    const removedNodeCount = typeof before === "number" ? before : Number(before);
+
+    db.transaction((tx) => {
+      tx.exec({ sql: "DELETE FROM nodes WHERE note_path = ?", bind: [notePath] });
+    });
 
     operationLogger.info({
       event: "storage.hierarchical.delete_by_note_path.completed",
       message: "Deleted nodes by note path.",
-      context: { notePath, removedNodeCount: removedCount, elapsedMs: Date.now() - startedAt }
+      context: { notePath, removedNodeCount, elapsedMs: Date.now() - startedAt }
     });
   }
 
   public async getNode(nodeId: string): Promise<DocumentNode | null> {
+    if (this.testBackend) {
+      return this.testBackend.getNode(nodeId);
+    }
     await this.ensureVectorDbOpen();
-    const node = this.nodes.get(nodeId);
-    return node ? { ...node } : null;
+    const node = this.loadNode(this.requireDb(), nodeId);
+    return node ? { ...node, childIds: [...node.childIds], headingTrail: [...node.headingTrail], tags: [...node.tags] } : null;
   }
 
   public async getChildren(nodeId: string): Promise<DocumentNode[]> {
-    await this.ensureVectorDbOpen();
-    const entries = this.children.get(nodeId);
-    if (!entries || entries.length === 0) {
-      return [];
+    if (this.testBackend) {
+      return this.testBackend.getChildren(nodeId);
     }
-    const sorted = [...entries].sort((a, b) => a.sortOrder - b.sortOrder);
+    await this.ensureVectorDbOpen();
+    const db = this.requireDb();
+    const rows = db.selectObjects(
+      `SELECT n.node_id, n.parent_id, n.note_path, n.note_title, n.heading_trail, n.depth, n.node_type, n.content, n.sequence_index, n.content_hash, n.updated_at
+       FROM nodes n
+       INNER JOIN node_children nc ON nc.child_id = n.node_id
+       WHERE nc.parent_id = ?
+       ORDER BY nc.sort_order ASC, n.node_id ASC`,
+      [nodeId]
+    );
     const result: DocumentNode[] = [];
-    for (const entry of sorted) {
-      const child = this.nodes.get(entry.childId);
-      if (child) {
-        result.push({ ...child });
-      }
+    for (const row of rows) {
+      const id = String(row.node_id);
+      const childRows = db.selectObjects(
+        `SELECT child_id FROM node_children WHERE parent_id = ? ORDER BY sort_order ASC, child_id ASC`,
+        [id]
+      );
+      const tagRows = db.selectObjects(`SELECT tag FROM node_tags WHERE node_id = ? ORDER BY tag ASC`, [id]);
+      const node = rowToNode(
+        row,
+        childRows.map((r) => String(r.child_id)),
+        tagRows.map((r) => String(r.tag))
+      );
+      result.push({
+        ...node,
+        childIds: [...node.childIds],
+        headingTrail: [...node.headingTrail],
+        tags: [...node.tags]
+      });
     }
     return result;
   }
 
   public async getAncestorChain(nodeId: string): Promise<DocumentNode[]> {
+    if (this.testBackend) {
+      return this.testBackend.getAncestorChain(nodeId);
+    }
     await this.ensureVectorDbOpen();
+    const db = this.requireDb();
     const chain: DocumentNode[] = [];
-    const current = this.nodes.get(nodeId);
-    if (!current) {
+    const start = this.loadNode(db, nodeId);
+    if (!start) {
       return chain;
     }
-
-    let parentId = current.parentId;
+    let parentId = start.parentId;
     while (parentId !== null) {
-      const parent = this.nodes.get(parentId);
+      const parent = this.loadNode(db, parentId);
       if (!parent) {
         break;
       }
-      chain.push({ ...parent });
+      chain.push({
+        ...parent,
+        childIds: [...parent.childIds],
+        headingTrail: [...parent.headingTrail],
+        tags: [...parent.tags]
+      });
       parentId = parent.parentId;
     }
     return chain;
   }
 
   public async getSiblings(nodeId: string): Promise<DocumentNode[]> {
+    if (this.testBackend) {
+      return this.testBackend.getSiblings(nodeId);
+    }
     await this.ensureVectorDbOpen();
-    const node = this.nodes.get(nodeId);
+    const db = this.requireDb();
+    const node = this.loadNode(db, nodeId);
     if (!node) {
       return [];
     }
     if (node.parentId === null) {
-      return [{ ...node }];
+      return [
+        {
+          ...node,
+          childIds: [...node.childIds],
+          headingTrail: [...node.headingTrail],
+          tags: [...node.tags]
+        }
+      ];
     }
-    const parentEntries = this.children.get(node.parentId);
-    if (!parentEntries) {
-      return [{ ...node }];
-    }
-    const sorted = [...parentEntries].sort((a, b) => a.sortOrder - b.sortOrder);
-    const result: DocumentNode[] = [];
-    for (const entry of sorted) {
-      const sibling = this.nodes.get(entry.childId);
-      if (sibling) {
-        result.push({ ...sibling });
-      }
-    }
-    return result;
+    return this.getChildren(node.parentId);
   }
 
   public async getNodesByNotePath(notePath: string): Promise<DocumentNode[]> {
+    if (this.testBackend) {
+      return this.testBackend.getNodesByNotePath(notePath);
+    }
     await this.ensureVectorDbOpen();
+    const db = this.requireDb();
+    const rows = db.selectObjects(
+      `SELECT node_id FROM nodes WHERE note_path = ? ORDER BY depth ASC, sequence_index ASC, node_id ASC`,
+      [notePath]
+    );
     const result: DocumentNode[] = [];
-    for (const node of this.nodes.values()) {
-      if (node.notePath === notePath) {
-        result.push({ ...node });
+    for (const row of rows) {
+      const n = this.loadNode(db, String(row.node_id));
+      if (n) {
+        result.push({
+          ...n,
+          childIds: [...n.childIds],
+          headingTrail: [...n.headingTrail],
+          tags: [...n.tags]
+        });
       }
     }
     return result;
   }
 
-  public async searchSummaryEmbeddings(
-    vector: EmbeddingVector,
-    topK: number
-  ): Promise<NodeMatch[]> {
+  public async searchSummaryEmbeddings(vector: EmbeddingVector, topK: number): Promise<NodeMatch[]> {
+    if (this.testBackend) {
+      return this.testBackend.searchSummaryEmbeddings(vector, topK);
+    }
     await this.ensureVectorDbOpen();
+    const db = this.requireDb();
     const operationLogger = logger.withOperation();
     const startedAt = Date.now();
+    const k = clampTopK(topK);
+    const queryBlob = float32VecAsSqliteBlob(padEmbeddingToVec(vector));
 
-    const matches = this.searchEmbeddingsByType(vector, topK, "summary");
+    const rows = db.selectObjects(
+      `SELECT node_id, distance FROM node_embeddings
+       WHERE embedding MATCH ?
+         AND k = ${k}
+         AND embedding_type = 'summary'
+       ORDER BY distance ASC, node_id ASC`,
+      [queryBlob]
+    );
+
+    const matches: NodeMatch[] = rows.map((row) => ({
+      nodeId: String(row.node_id),
+      score: distanceToScore(row.distance),
+      embeddingType: "summary" as const
+    }));
 
     operationLogger.debug({
       event: "storage.hierarchical.search_summary.completed",
-      message: "Searched summary embeddings.",
-      context: { topK, resultCount: matches.length, elapsedMs: Date.now() - startedAt }
+      message: "Searched summary embeddings (sqlite-vec).",
+      context: { topK: k, resultCount: matches.length, elapsedMs: Date.now() - startedAt }
     });
     return matches;
   }
@@ -330,55 +516,68 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
     topK: number,
     parentId?: string
   ): Promise<NodeMatch[]> {
+    if (this.testBackend) {
+      return this.testBackend.searchContentEmbeddings(vector, topK, parentId);
+    }
     await this.ensureVectorDbOpen();
+    const db = this.requireDb();
     const operationLogger = logger.withOperation();
     const startedAt = Date.now();
+    const k = clampTopK(topK);
+    const queryBlob = float32VecAsSqliteBlob(padEmbeddingToVec(vector));
 
-    const candidates = parentId
-      ? this.embeddings.filter((e) => {
-          if (e.embeddingType !== "content") return false;
-          const node = this.nodes.get(e.nodeId);
-          return node !== undefined && node.parentId === parentId;
-        })
-      : this.embeddings.filter((e) => e.embeddingType === "content");
+    const rows =
+      parentId === undefined
+        ? db.selectObjects(
+            `SELECT node_id, distance FROM node_embeddings
+             WHERE embedding MATCH ?
+               AND k = ${k}
+               AND embedding_type = 'content'
+             ORDER BY distance ASC, node_id ASC`,
+            [queryBlob]
+          )
+        : db.selectObjects(
+            `SELECT ne.node_id AS node_id, ne.distance AS distance
+             FROM node_embeddings AS ne
+             INNER JOIN nodes AS n ON n.node_id = ne.node_id
+             WHERE ne.embedding MATCH ?
+               AND k = ${k}
+               AND ne.embedding_type = 'content'
+               AND n.parent_id = ?
+             ORDER BY distance ASC, node_id ASC`,
+            [queryBlob, parentId]
+          );
 
-    const scored: NodeMatch[] = [];
-    for (const candidate of candidates) {
-      const score = cosineSimilarity(vector, candidate.vector);
-      if (score !== null) {
-        scored.push({
-          nodeId: candidate.nodeId,
-          score,
-          embeddingType: "content"
-        });
-      }
-    }
-
-    scored.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.nodeId.localeCompare(b.nodeId);
-    });
-
-    const results = scored.slice(0, topK);
+    const matches: NodeMatch[] = rows.map((row) => ({
+      nodeId: String(row.node_id),
+      score: distanceToScore(row.distance),
+      embeddingType: "content" as const
+    }));
 
     operationLogger.debug({
       event: "storage.hierarchical.search_content.completed",
-      message: "Searched content embeddings.",
+      message: "Searched content embeddings (sqlite-vec).",
       context: {
-        topK,
+        topK: k,
         parentId: parentId ?? null,
-        candidateCount: candidates.length,
-        resultCount: results.length,
+        resultCount: matches.length,
         elapsedMs: Date.now() - startedAt
       }
     });
-    return results;
+    return matches;
   }
 
   public async upsertSummary(nodeId: string, summary: SummaryRecord): Promise<void> {
+    if (this.testBackend) {
+      return this.testBackend.upsertSummary(nodeId, summary);
+    }
     await this.ensureVectorDbOpen();
-    this.summaries.set(nodeId, { ...summary });
-    await this.persistState();
+    const db = this.requireDb();
+    db.exec({
+      sql: `INSERT OR REPLACE INTO node_summaries (node_id, summary, model_used, prompt_version, generated_at)
+            VALUES (?, ?, ?, ?, ?)`,
+      bind: [nodeId, summary.summary, summary.modelUsed, summary.promptVersion, summary.generatedAt]
+    });
 
     logger.debug({
       event: "storage.hierarchical.upsert_summary.completed",
@@ -388,9 +587,26 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async getSummary(nodeId: string): Promise<SummaryRecord | null> {
+    if (this.testBackend) {
+      return this.testBackend.getSummary(nodeId);
+    }
     await this.ensureVectorDbOpen();
-    const summary = this.summaries.get(nodeId);
-    return summary ? { ...summary } : null;
+    const db = this.requireDb();
+    const rows = db.selectObjects(
+      `SELECT node_id, summary, model_used, prompt_version, generated_at FROM node_summaries WHERE node_id = ?`,
+      [nodeId]
+    );
+    if (rows.length === 0) {
+      return null;
+    }
+    const row = rows[0]!;
+    return {
+      nodeId: String(row.node_id),
+      summary: String(row.summary),
+      modelUsed: String(row.model_used),
+      promptVersion: String(row.prompt_version),
+      generatedAt: Number(row.generated_at)
+    };
   }
 
   public async upsertEmbedding(
@@ -398,98 +614,113 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
     embeddingType: EmbeddingType,
     vector: EmbeddingVector
   ): Promise<void> {
+    if (this.testBackend) {
+      return this.testBackend.upsertEmbedding(nodeId, embeddingType, vector);
+    }
     await this.ensureVectorDbOpen();
-    this.embeddings = this.embeddings.filter(
-      (e) => !(e.nodeId === nodeId && e.embeddingType === embeddingType)
-    );
-    this.embeddings.push({
-      nodeId,
-      embeddingType,
-      vector: { values: [...vector.values], dimensions: vector.dimensions }
+    const db = this.requireDb();
+    const embeddingBlob = float32VecAsSqliteBlob(padEmbeddingToVec(vector));
+    db.exec({
+      sql: `INSERT OR REPLACE INTO node_embeddings (node_id, embedding_type, embedding) VALUES (?, ?, ?)`,
+      bind: [nodeId, embeddingType, embeddingBlob]
     });
-    await this.persistState();
 
     logger.debug({
       event: "storage.hierarchical.upsert_embedding.completed",
       message: "Upserted node embedding.",
-      context: { nodeId, embeddingType, dimensions: vector.dimensions }
+      context: { nodeId, embeddingType, dimensions: VEC_DIMENSION }
     });
   }
 
   public async upsertTags(nodeId: string, tags: string[]): Promise<void> {
+    if (this.testBackend) {
+      return this.testBackend.upsertTags(nodeId, tags);
+    }
     await this.ensureVectorDbOpen();
-    this.tags.set(nodeId, [...tags]);
-    await this.persistState();
+    const db = this.requireDb();
+    const normalized = normalizeTagsForStore(tags);
+    db.transaction((tx) => {
+      tx.exec({ sql: "DELETE FROM node_tags WHERE node_id = ?", bind: [nodeId] });
+      for (const tag of normalized) {
+        tx.exec({
+          sql: "INSERT OR REPLACE INTO node_tags (node_id, tag) VALUES (?, ?)",
+          bind: [nodeId, tag]
+        });
+      }
+    });
 
     logger.debug({
       event: "storage.hierarchical.upsert_tags.completed",
       message: "Upserted node tags.",
-      context: { nodeId, tagCount: tags.length }
+      context: { nodeId, tagCount: normalized.length }
     });
   }
 
   public async getNodesByTag(tag: string, parentId?: string): Promise<DocumentNode[]> {
+    if (this.testBackend) {
+      return this.testBackend.getNodesByTag(tag, parentId);
+    }
     await this.ensureVectorDbOpen();
+    const db = this.requireDb();
     const normalizedTag = tag.trim().toLowerCase();
     if (!normalizedTag) {
       return [];
     }
 
-    const matchingNodeIds: string[] = [];
-    for (const [nodeId, nodeTags] of this.tags) {
-      if (nodeTags.includes(normalizedTag)) {
-        matchingNodeIds.push(nodeId);
-      }
-    }
+    const rows =
+      parentId === undefined
+        ? db.selectObjects(
+            `SELECT n.node_id AS node_id
+             FROM nodes n
+             INNER JOIN node_tags t ON t.node_id = n.node_id
+             WHERE t.tag = ?
+             ORDER BY n.node_id ASC`,
+            [normalizedTag]
+          )
+        : db.selectObjects(
+            `WITH RECURSIVE descendants(nid) AS (
+               SELECT child_id FROM node_children WHERE parent_id = ?
+               UNION ALL
+               SELECT nc.child_id FROM node_children nc
+               INNER JOIN descendants d ON nc.parent_id = d.nid
+             )
+             SELECT n.node_id AS node_id
+             FROM nodes n
+             INNER JOIN node_tags t ON t.node_id = n.node_id
+             WHERE t.tag = ? AND n.node_id IN (SELECT nid FROM descendants)
+             ORDER BY n.node_id ASC`,
+            [parentId, normalizedTag]
+          );
 
-    if (parentId === undefined) {
-      const result: DocumentNode[] = [];
-      for (const nodeId of matchingNodeIds) {
-        const node = this.nodes.get(nodeId);
-        if (node) {
-          result.push({ ...node });
-        }
-      }
-      return result;
-    }
-
-    const descendantIds = this.collectDescendantIds(parentId);
     const result: DocumentNode[] = [];
-    for (const nodeId of matchingNodeIds) {
-      if (descendantIds.has(nodeId)) {
-        const node = this.nodes.get(nodeId);
-        if (node) {
-          result.push({ ...node });
-        }
+    for (const row of rows) {
+      const n = this.loadNode(db, String(row.node_id));
+      if (n) {
+        result.push({
+          ...n,
+          childIds: [...n.childIds],
+          headingTrail: [...n.headingTrail],
+          tags: [...n.tags]
+        });
       }
     }
     return result;
   }
 
-  private collectDescendantIds(parentId: string): Set<string> {
-    const descendants = new Set<string>();
-    const queue = [parentId];
-    while (queue.length > 0) {
-      const current = queue.shift() as string;
-      const entries = this.children.get(current);
-      if (entries) {
-        for (const entry of entries) {
-          descendants.add(entry.childId);
-          queue.push(entry.childId);
-        }
-      }
-    }
-    return descendants;
-  }
-
   public async upsertCrossReferences(refs: CrossReference[]): Promise<void> {
-    await this.ensureVectorDbOpen();
-    for (const ref of refs) {
-      const existing = this.crossRefs.get(ref.sourceNodeId) ?? [];
-      existing.push({ ...ref });
-      this.crossRefs.set(ref.sourceNodeId, existing);
+    if (this.testBackend) {
+      return this.testBackend.upsertCrossReferences(refs);
     }
-    await this.persistState();
+    await this.ensureVectorDbOpen();
+    const db = this.requireDb();
+    db.transaction((tx) => {
+      for (const ref of refs) {
+        tx.exec({
+          sql: `INSERT INTO node_cross_refs (source_node_id, target_path, target_display) VALUES (?, ?, ?)`,
+          bind: [ref.sourceNodeId, ref.targetPath, ref.targetDisplay]
+        });
+      }
+    });
 
     logger.debug({
       event: "storage.hierarchical.upsert_cross_refs.completed",
@@ -499,156 +730,23 @@ export class SqliteVecRepository implements HierarchicalStoreContract, RuntimeSe
   }
 
   public async getCrossReferences(nodeId: string): Promise<CrossReference[]> {
+    if (this.testBackend) {
+      return this.testBackend.getCrossReferences(nodeId);
+    }
     await this.ensureVectorDbOpen();
-    const refs = this.crossRefs.get(nodeId);
-    return refs ? refs.map((r) => ({ ...r })) : [];
-  }
-
-  private searchEmbeddingsByType(
-    vector: EmbeddingVector,
-    topK: number,
-    type: EmbeddingType
-  ): NodeMatch[] {
-    const candidates = this.embeddings.filter((e) => e.embeddingType === type);
-    const scored: NodeMatch[] = [];
-
-    for (const candidate of candidates) {
-      const score = cosineSimilarity(vector, candidate.vector);
-      if (score !== null) {
-        scored.push({
-          nodeId: candidate.nodeId,
-          score,
-          embeddingType: type
-        });
-      }
-    }
-
-    scored.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.nodeId.localeCompare(b.nodeId);
-    });
-
-    return scored.slice(0, topK);
-  }
-
-  private removeByNotePath(notePath: string): number {
-    const nodeIdsToRemove: string[] = [];
-    for (const [nodeId, node] of this.nodes) {
-      if (node.notePath === notePath) {
-        nodeIdsToRemove.push(nodeId);
-      }
-    }
-
-    for (const nodeId of nodeIdsToRemove) {
-      this.nodes.delete(nodeId);
-      this.children.delete(nodeId);
-      this.summaries.delete(nodeId);
-      this.tags.delete(nodeId);
-      this.crossRefs.delete(nodeId);
-    }
-
-    const removedSet = new Set(nodeIdsToRemove);
-    this.embeddings = this.embeddings.filter((e) => !removedSet.has(e.nodeId));
-
-    for (const [parentId, entries] of this.children) {
-      const filtered = entries.filter((e) => !removedSet.has(e.childId));
-      if (filtered.length === 0) {
-        this.children.delete(parentId);
-      } else {
-        this.children.set(parentId, filtered);
-      }
-    }
-
-    return nodeIdsToRemove.length;
-  }
-
-  private async loadState(): Promise<void> {
-    const startedAt = Date.now();
-    const rawRoot = await this.plugin.loadData();
-    if (!isRecord(rawRoot)) {
-      logger.info({
-        event: "storage.hierarchical.load.baseline",
-        message: "No persisted hierarchical state found; starting with empty state.",
-        context: { elapsedMs: Date.now() - startedAt }
-      });
-      return;
-    }
-
-    const rawState = rawRoot[HIERARCHICAL_STORE_KEY];
-    if (!isRecord(rawState)) {
-      logger.info({
-        event: "storage.hierarchical.load.baseline",
-        message: "No persisted hierarchical state found; starting with empty state.",
-        context: { elapsedMs: Date.now() - startedAt }
-      });
-      return;
-    }
-
-    try {
-      const state = rawState as unknown as PersistedHierarchicalState;
-
-      if (Array.isArray(state.nodes)) {
-        this.nodes = new Map(state.nodes);
-      }
-      if (Array.isArray(state.children)) {
-        this.children = new Map(state.children);
-      }
-      if (Array.isArray(state.summaries)) {
-        this.summaries = new Map(state.summaries);
-      }
-      if (Array.isArray(state.embeddings)) {
-        this.embeddings = state.embeddings;
-      }
-      if (Array.isArray(state.tags)) {
-        this.tags = new Map(state.tags);
-      }
-      if (Array.isArray(state.crossRefs)) {
-        this.crossRefs = new Map(state.crossRefs);
-      }
-
-      logger.info({
-        event: "storage.hierarchical.load.completed",
-        message: "Loaded persisted hierarchical state.",
-        context: {
-          nodeCount: this.nodes.size,
-          embeddingCount: this.embeddings.length,
-          summaryCount: this.summaries.size,
-          elapsedMs: Date.now() - startedAt
-        }
-      });
-    } catch {
-      logger.warn({
-        event: "storage.hierarchical.load.parse_failed",
-        message: "Failed to parse persisted hierarchical state; starting with empty state.",
-        context: { elapsedMs: Date.now() - startedAt }
-      });
-    }
-  }
-
-  private async persistState(): Promise<void> {
-    const startedAt = Date.now();
-    const rawRoot = await this.plugin.loadData();
-    const root = isRecord(rawRoot) ? { ...rawRoot } : {};
-
-    const state: PersistedHierarchicalState = {
-      nodes: [...this.nodes.entries()],
-      children: [...this.children.entries()],
-      summaries: [...this.summaries.entries()],
-      embeddings: this.embeddings,
-      tags: [...this.tags.entries()],
-      crossRefs: [...this.crossRefs.entries()]
-    };
-
-    root[HIERARCHICAL_STORE_KEY] = state;
-    await this.plugin.saveData(root);
-
-    logger.debug({
-      event: "storage.hierarchical.persist.completed",
-      message: "Persisted hierarchical state.",
-      context: {
-        nodeCount: this.nodes.size,
-        elapsedMs: Date.now() - startedAt
-      }
-    });
+    const db = this.requireDb();
+    const rows = db.selectObjects(
+      `SELECT source_node_id, target_path, target_display FROM node_cross_refs
+       WHERE source_node_id = ? ORDER BY rowid ASC`,
+      [nodeId]
+    );
+    return rows.map((row) => ({
+      sourceNodeId: String(row.source_node_id),
+      targetPath: String(row.target_path),
+      targetDisplay:
+        row.target_display === null || row.target_display === undefined
+          ? null
+          : String(row.target_display)
+    }));
   }
 }

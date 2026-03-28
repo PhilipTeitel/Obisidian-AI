@@ -3,7 +3,7 @@
 **Story**: Replace the current JSON / `saveData` persistence and in-memory cosine search in [SqliteVecRepository](../../src/storage/SqliteVecRepository.ts) with **real SQL** and **sqlite-vec** operations implementing the full [HierarchicalStoreContract](../../src/types.ts). Remove `hierarchicalStore` key reads/writes from plugin data.
 **Epic**: Epic 19 — Native SQLite + sqlite-vec Store (prompt 05)
 **Size**: XL
-**Status**: Not Started
+**Status**: Done
 
 **Requirements**: [docs/prompts/05-SQLITE-vector-store-implementation.md](../prompts/05-SQLITE-vector-store-implementation.md) — §1, §4.2–4.4, §5 (no JSON import), §8 (no index in data.json)
 **Plan**: [docs/plans/sqlite-vector-store-implementation-plan.md](../plans/sqlite-vector-store-implementation-plan.md) — Phase 4
@@ -84,45 +84,45 @@ Map to existing STOR-2 tests where applicable; re-execute against **real** DB.
 
 ### Phase A: Lifecycle and no JSON index
 
-- [ ] **A1** — `SqliteVecRepository` still implements `HierarchicalStoreContract` + `RuntimeServiceLifecycle`
-- [ ] **A2** — `plugin.saveData` / `loadData` is **not** used for hierarchical index payload (verify by code search / test spy)
-- [ ] **A3** — `init()` remains lightweight per REL-1 + prompt 05 §3; heavy work on first DB use is acceptable if documented
+- [x] **A1** — `SqliteVecRepository` still implements `HierarchicalStoreContract` + `RuntimeServiceLifecycle`
+- [x] **A2** — `plugin.saveData` / `loadData` is **not** used for hierarchical index payload (verify by code search / test spy)
+- [x] **A3** — `init()` remains lightweight per REL-1 + prompt 05 §3; heavy work on first DB use is acceptable if documented
 
 ### Phase B: Node tree (STOR-2 parity)
 
-- [ ] **B1** — `upsertNodeTree` / `getNode` / `getNodesByNotePath` — same semantics as STOR-2 tests
-- [ ] **B2** — `upsertNodeTree` replaces prior note path data
-- [ ] **B3** — `deleteByNotePath` removes nodes, children, summaries, vec rows, tags, cross-refs for that note
+- [x] **B1** — `upsertNodeTree` / `getNode` / `getNodesByNotePath` — same semantics as STOR-2 tests
+- [x] **B2** — `upsertNodeTree` replaces prior note path data
+- [x] **B3** — `deleteByNotePath` removes nodes, children, summaries, vec rows, tags, cross-refs for that note
 
 ### Phase C: Traversal (STOR-2 parity)
 
-- [ ] **C1** — `getChildren` order matches `sort_order` / `sequenceIndex`
-- [ ] **C2** — `getAncestorChain` parent walk to root
-- [ ] **C3** — `getSiblings` includes self, ordered
+- [x] **C1** — `getChildren` order matches `sort_order` / `sequenceIndex`
+- [x] **C2** — `getAncestorChain` parent walk to root
+- [x] **C3** — `getSiblings` includes self, ordered
 
 ### Phase D: Vector search (updated — sqlite-vec)
 
-- [ ] **D1** — `searchSummaryEmbeddings` uses sqlite-vec against **summary** type only; top-K ordering matches extension distance semantics (document mapping to “score” if not cosine)
-- [ ] **D2** — `searchContentEmbeddings` uses sqlite-vec for **content** type; respects `parentId` filter when provided
-- [ ] **D3** — Search is **not** implemented as O(n) JS loop over all embeddings for production path (tests may use small n)
+- [x] **D1** — `searchSummaryEmbeddings` uses sqlite-vec against **summary** type only; top-K ordering matches extension distance semantics (document mapping to “score” if not cosine)
+- [x] **D2** — `searchContentEmbeddings` uses sqlite-vec for **content** type; respects `parentId` filter when provided
+- [x] **D3** — Search is **not** implemented as O(n) JS loop over all embeddings for production path (tests may use small n)
 
 ### Phase E: Summaries, tags, cross-refs (STOR-2 parity)
 
-- [ ] **E1** — `upsertSummary` / `getSummary`
-- [ ] **E2** — `upsertTags` + `getNodesByTag` if present on contract
-- [ ] **E3** — `upsertCrossReferences` / `getCrossReferences`
+- [x] **E1** — `upsertSummary` / `getSummary`
+- [x] **E2** — `upsertTags` + `getNodesByTag` if present on contract
+- [x] **E3** — `upsertCrossReferences` / `getCrossReferences`
 
 ### Phase F: Transactions
 
-- [ ] **F1** — `upsertNodeTree` and `deleteByNotePath` are **atomic** at SQL level (transaction or FK CASCADE documented)
+- [x] **F1** — `upsertNodeTree` and `deleteByNotePath` are **atomic** at SQL level (transaction or FK CASCADE documented)
 
 ### Phase G: Logging
 
-- [ ] **G1** — Structured logging retained for major operations (align with STOR-2 G1)
+- [x] **G1** — Structured logging retained for major operations (align with STOR-2 G1)
 
 ### Phase Z: Quality gates
 
-- [ ] **Z1** — `npm run typecheck && npm run build && npm run test && npm run lint`
+- [x] **Z1** — `npm run typecheck && npm run build && npm run test && npm run lint`
 
 ---
 

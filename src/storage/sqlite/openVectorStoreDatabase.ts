@@ -3,12 +3,14 @@ import path from "path";
 import { pathToFileURL } from "url";
 import { normalizeRuntimeError } from "../../errors/normalizeRuntimeError";
 import { createRuntimeLogger } from "../../logging/runtimeLogger";
+import type { VectorStoreMigrationDb } from "./runVectorStoreMigrations";
 import { runVectorStoreMigrations } from "./runVectorStoreMigrations";
 
 type Sqlite3Oo1Db = {
   close: () => void;
   exec: (sql: string | { sql: string; bind?: unknown }) => void;
   selectValue: (sql: string, bind?: unknown, asType?: unknown) => unknown;
+  selectObjects: (sql: string, bind?: unknown) => Record<string, unknown>[];
   transaction: <T>(callback: (db: Sqlite3Oo1Db) => T) => T;
 };
 
@@ -70,9 +72,14 @@ const loadSqlite3Module = async (
 
 const moduleLogger = createRuntimeLogger("openVectorStoreDatabase");
 
-export interface SqliteDatabaseHandle {
+/**
+ * Live vector-store session (exec / reads / transactions) plus async close.
+ * Matches sqlite3.oo1.DB surface used by migrations with {@link selectObjects} for row reads.
+ */
+export type SqliteDatabaseHandle = VectorStoreMigrationDb & {
+  selectObjects: (sql: string, bind?: unknown) => Record<string, unknown>[];
   close(): Promise<void>;
-}
+};
 
 export interface OpenVectorStoreDatabaseOptions {
   absoluteDbPath: string;
@@ -157,6 +164,7 @@ export const openVectorStoreDatabaseLazy = async (
   }
 
   const db = new sqlite3.oo1.DB(":memory:", "cw");
+  db.exec("PRAGMA foreign_keys = ON");
 
   try {
     const vecVersion = db.selectValue("select vec_version();");
@@ -211,7 +219,17 @@ export const openVectorStoreDatabaseLazy = async (
     context: { absoluteDbPath }
   });
 
+  const session: VectorStoreMigrationDb & {
+    selectObjects: (sql: string, bind?: unknown) => Record<string, unknown>[];
+  } = {
+    exec: db.exec.bind(db) as VectorStoreMigrationDb["exec"],
+    selectValue: db.selectValue.bind(db) as VectorStoreMigrationDb["selectValue"],
+    transaction: db.transaction.bind(db) as VectorStoreMigrationDb["transaction"],
+    selectObjects: (sql: string, bind?: unknown) => db.selectObjects(sql, bind)
+  };
+
   return {
+    ...session,
     close: async () => {
       moduleLogger.info({
         event: "storage.sqlite.dispose",
@@ -247,7 +265,22 @@ export const openVectorStoreDatabaseLazy = async (
   };
 };
 
+const noopAccess = (): never => {
+  throw normalizeRuntimeError(
+    new Error("Vector store database is not configured (missing vault path or WASM assets)."),
+    {
+      operation: "noopOpenVectorStoreDatabase",
+      phase: "access_before_open",
+      domainHint: "storage"
+    }
+  );
+};
+
 /** Test / minimal environments without vault paths — skips WASM and filesystem. */
 export const noopOpenVectorStoreDatabase = async (): Promise<SqliteDatabaseHandle> => ({
+  exec: noopAccess,
+  selectValue: noopAccess,
+  selectObjects: noopAccess,
+  transaction: noopAccess,
   close: async () => undefined
 });
