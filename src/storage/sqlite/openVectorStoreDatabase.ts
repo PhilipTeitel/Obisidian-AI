@@ -3,10 +3,13 @@ import path from "path";
 import { pathToFileURL } from "url";
 import { normalizeRuntimeError } from "../../errors/normalizeRuntimeError";
 import { createRuntimeLogger } from "../../logging/runtimeLogger";
+import { runVectorStoreMigrations } from "./runVectorStoreMigrations";
 
 type Sqlite3Oo1Db = {
   close: () => void;
-  selectValue: (sql: string) => unknown;
+  exec: (sql: string | { sql: string; bind?: unknown }) => void;
+  selectValue: (sql: string, bind?: unknown, asType?: unknown) => unknown;
+  transaction: <T>(callback: (db: Sqlite3Oo1Db) => T) => T;
 };
 
 type Sqlite3Module = {
@@ -90,9 +93,8 @@ const toError = (error: unknown): Error => {
  * Opens (or prepares) the per-vault vector database: ensures the parent directory exists,
  * loads sqlite-vec via the bundled sqlite-vec-wasm-demo SQLite WASM build, and returns a handle.
  *
- * The connection is currently in-memory with sqlite-vec loaded; non-empty databases are
- * serialized to `absoluteDbPath` on close. Full deserialize-on-open is deferred to VEC-3/4
- * when migrations and SQL-backed storage land.
+ * The connection is in-memory with sqlite-vec loaded; {@link runVectorStoreMigrations} runs
+ * on open. Non-empty databases are serialized to `absoluteDbPath` on close.
  */
 export const openVectorStoreDatabaseLazy = async (
   options: OpenVectorStoreDatabaseOptions
@@ -174,6 +176,28 @@ export const openVectorStoreDatabaseLazy = async (
       level: "error",
       event: "storage.sqlite.open.failed",
       message: "sqlite-vec failed vec_version() check.",
+      domain: withMessage.domain,
+      context: { absoluteDbPath },
+      error: withMessage
+    });
+    throw withMessage;
+  }
+
+  try {
+    await runVectorStoreMigrations(db);
+  } catch (error: unknown) {
+    db.close();
+    revokeBlobUrls?.();
+    const normalized = normalizeRuntimeError(toError(error), {
+      operation: "openVectorStoreDatabaseLazy",
+      phase: "vector_store_migrations",
+      domainHint: "storage"
+    });
+    const withMessage = { ...normalized, userMessage: WASM_USER_MESSAGE };
+    moduleLogger.log({
+      level: "error",
+      event: "storage.sqlite.open.failed",
+      message: "Vector store migrations failed.",
       domain: withMessage.domain,
       context: { absoluteDbPath },
       error: withMessage
