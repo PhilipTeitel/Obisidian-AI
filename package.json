@@ -1,0 +1,8 @@
+{
+  "name": "obsidian-ai-mvp",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Documentation foundation branch (requirements + ADRs). See README.md.",
+  "scripts": {}
+}
