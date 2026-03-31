@@ -2,6 +2,8 @@
 
 This branch (`docs-foundation`) is a **documentation-only baseline** for restarting implementation: rolled-up **requirements** and **architecture decision records (ADRs)**. It intentionally does not include application source, build config, or prior story-level design artifacts.
 
+The **`main`** branch README lists this branch under “Where’s the CODE?” as the clean start that consolidates prior learnings. **`main`** still holds the full plugin codebase, prompts, and comparison branches for historical reference.
+
 ## Contents
 
 | Path | Purpose |
