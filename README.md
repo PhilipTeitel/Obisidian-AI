@@ -109,6 +109,17 @@ Since one of the main objectives of this plugin was to explore the concepts of A
 - [docs/requirements/REQUIREMENTS.md](docs/requirements/REQUIREMENTS.md) — Canonical product and technical requirements (iteration 2)
 - [.cursor/plans/obsidian_ai_iteration_2_95fe6b8a.plan.md](.cursor/plans/obsidian_ai_iteration_2_95fe6b8a.plan.md) — Iteration 2 architectural plan and implementation phases
 
+**Architecture decisions (traceability for backlog alignment)**
+
+- [docs/decisions/ADR-001-wasm-sqlite-vec-shipped-plugin.md](docs/decisions/ADR-001-wasm-sqlite-vec-shipped-plugin.md) — Superseded by ADR-006; documents iteration 1 constraint context
+- [docs/decisions/ADR-002-hierarchical-document-model.md](docs/decisions/ADR-002-hierarchical-document-model.md) — Hierarchical tree and node types
+- [docs/decisions/ADR-003-phased-retrieval-strategy.md](docs/decisions/ADR-003-phased-retrieval-strategy.md) — Three-phase retrieval
+- [docs/decisions/ADR-004-per-vault-index-storage.md](docs/decisions/ADR-004-per-vault-index-storage.md) — Per-vault DB location and lazy init
+- [docs/decisions/ADR-005-provider-abstraction.md](docs/decisions/ADR-005-provider-abstraction.md) — Pluggable embedding and chat providers
+- [docs/decisions/ADR-006-sidecar-architecture.md](docs/decisions/ADR-006-sidecar-architecture.md) — Sidecar process and transport abstraction
+- [docs/decisions/ADR-007-queue-abstraction.md](docs/decisions/ADR-007-queue-abstraction.md) — Queue port and SQLite-backed in-process queue
+- [docs/decisions/ADR-008-idempotent-indexing-state-machine.md](docs/decisions/ADR-008-idempotent-indexing-state-machine.md) — Per-note job steps, retries, dead-letter
+
 ---
 
 ## High-Level Architecture
@@ -716,6 +727,7 @@ obsidian-ai-plugin/
 ├── scripts/
 │   └── query-store.mjs                      # Dev utility: inspect SQLite store
 ├── docs/
+│   ├── features/                            # Per-story specs (/plan-story)
 │   ├── decisions/                           # Architecture Decision Records
 │   │   ├── ADR-001-wasm-sqlite-vec-shipped-plugin.md   # SUPERSEDED
 │   │   ├── ADR-002-hierarchical-document-model.md      # Accepted
@@ -935,7 +947,121 @@ When using **HTTP transport**, these map to REST routes (`POST /index/full`, `GE
 
 ## Backlog Items
 
-Backlog will be populated by `/plan-project`.
+Stories are listed in a recommended dependency order within each epic. Run `/plan-story` per ID to add `docs/features/` specs and link the ID column when ready.
+
+### Epic 1: Scaffold, toolchain, and domain contracts
+
+Repository layout, builds, quality gates, and portable core boundaries per hexagonal architecture ([§1](#1-hexagonal-architecture-ports-and-adapters), [REQUIREMENTS §13](docs/requirements/REQUIREMENTS.md)).
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| [FND-1](docs/features/FND-1.md) | Not Started | Monorepo layout, `tsconfig` split, esbuild for plugin and sidecar, npm scripts | M    | Matches [Project Structure](#project-structure); no native code in plugin bundle |
+| [FND-2](docs/features/FND-2.md) | Not Started | ESLint, Prettier, Vitest config, CI-friendly `test` / `typecheck` / `lint` | S    | Align with [Available Scripts](#available-scripts) |
+| [FND-3](docs/features/FND-3.md) | Not Started | Core `ports/*` interfaces and `domain/types.ts`                     | M    | No Obsidian/SQLite imports in `src/core/` |
+
+### Epic 2: Hierarchical chunking and note metadata
+
+Parsing pipeline for [§4 hierarchical model](#4-hierarchical-document-model), [ADR-002](docs/decisions/ADR-002-hierarchical-document-model.md), and REQUIREMENTS §5.
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| CHK-1 | Not Started | Hierarchical chunker (headings, paragraphs, ordering, heading trails) | L    | Node types through `bullet`; `contentHash` per node |
+| CHK-2 | Not Started | Sentence-boundary splitting for embedding limits                    | M    | [§6](#6-sentence-splitting); reassembly via `siblingOrder` |
+| CHK-3 | Not Started | Bullet groups and nested bullets                                      | M    | [§7](#7-bullet-grouping) |
+| CHK-4 | Not Started | Wikilinks and markdown links → `cross_refs`                         | M    | [§12](#12-cross-references) |
+| CHK-5 | Not Started | Scoped tags (frontmatter on note, inline on enclosing nodes)          | M    | [§11](#11-scoped-tags) |
+
+### Epic 3: SQLite store, vectors, and indexing persistence
+
+`SqliteDocumentStore`, schema, sqlite-vec, per-vault paths ([ADR-004](docs/decisions/ADR-004-per-vault-index-storage.md)), queue and job tables ([ADR-007](docs/decisions/ADR-007-queue-abstraction.md), [ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)).
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| STO-1 | Not Started | SQLite migrations: `nodes`, `summaries`, `tags`, `cross_refs`, `note_meta`, `queue_items`, `job_steps` | M    | [§8 SQLite Schema](#8-sqlite-schema) |
+| STO-2 | Not Started | `vec0` virtual tables + `embedding_meta`; dimension aligned with settings | M    | `better-sqlite3` + `sqlite-vec` in sidecar only |
+| STO-3 | Not Started | `SqliteDocumentStore` implementing `IDocumentStore`                   | L    | CRUD, ANN search, ancestors/siblings, note meta |
+| QUE-1 | Not Started | `InProcessQueue` + `IQueuePort` with crash-safe `queue_items`         | M    | Configurable concurrency; ack/nack/dead-letter |
+| QUE-2 | Not Started | `job_steps` integration: idempotent steps, resume, retry cap          | L    | Emit step transitions for progress ([ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)) |
+
+### Epic 4: Index, summary, and embedding workflows
+
+Orchestration in core workflows; incremental behavior ([§13](#13-incremental-summaries), REQUIREMENTS §5).
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| WKF-1 | Not Started | `SummaryWorkflow` bottom-up LLM summaries                             | L    | Uses `IChatPort`; skip redundant work when hashes unchanged |
+| WKF-2 | Not Started | `IndexWorkflow` state machine: queue dequeue → parse → store → summarize → embed | L    | Wire `IQueuePort`, `IDocumentStore`, `IEmbeddingPort`, `IProgressPort` |
+| WKF-3 | Not Started | Incremental indexing: changed-note detection, partial embed/summary reuse | M    | Deleted notes: direct cleanup without full state machine |
+
+### Epic 5: Retrieval, search workflow, and chat workflow
+
+Three-phase search ([ADR-003](docs/decisions/ADR-003-phased-retrieval-strategy.md)), structured context ([§10](#10-structured-context-formatting)), RAG chat (REQUIREMENTS §6).
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| RET-1 | Not Started | `SearchWorkflow`: coarse summary ANN → drill-down content → assembly | L    | Same embedding space for query and vectors; expose `k` / result shape for plugin |
+| RET-2 | Not Started | Token budgets and structured snippet formatting                       | M    | Config fractions: matched / sibling / parent ([Plugin Settings](#plugin-settings)) |
+| RET-3 | Not Started | Tag-aware filtering in search (where index exposes tags)              | S    | REQUIREMENTS §5 tags; optional MVP tightening |
+| CHAT-1 | Not Started | `ChatWorkflow`: retrieve → assemble context → stream completion → sources | L    | Vault-only retrieval path; conversation history in payload |
+| CHAT-2 | Not Started | Chat cancel/timeout behavior end-to-end                               | S    | Configurable timeout; propagate cancel through transport |
+
+### Epic 6: Provider adapters
+
+OpenAI and Ollama behind ports ([ADR-005](docs/decisions/ADR-005-provider-abstraction.md), REQUIREMENTS §7).
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| PRV-1 | Not Started | `OpenAIEmbeddingAdapter` / `OllamaEmbeddingAdapter`                   | M    | Batch embed; API key optional in payload |
+| PRV-2 | Not Started | `OpenAIChatAdapter` / `OllamaChatAdapter` streaming                   | M    | Base URL and model from settings |
+
+### Epic 7: Sidecar server, routes, and observability
+
+Message router, protocol parity across transports ([ADR-006](docs/decisions/ADR-006-sidecar-architecture.md)), [§20](#20-logging-and-observability).
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| SRV-1 | Not Started | `server.ts` + route modules; stdio NDJSON framing                     | L    | Map message `type` to handlers; lazy DB open on first use |
+| SRV-2 | Not Started | HTTP adapter surface: REST + WebSocket progress; `127.0.0.1` + token | M    | Same payloads as stdio; [API Contract](#api-contract) |
+| SRV-3 | Not Started | `health` route and startup handshake fields (`dbReady`, uptime)       | S    | Plugin startup under 2s budget ([§15](#15-startup-performance)) |
+| SRV-4 | Not Started | Structured logging, `runId` / `jobId`, redaction policy             | M    | Pino sidecar; plugin logger compatible with Obsidian console |
+| SRV-5 | Not Started | `ProgressAdapter` / push path for `IndexProgressEvent`                | M    | Real-time slideout feed |
+
+### Epic 8: Plugin client, settings, secrets, and vault I/O
+
+Thin client: lifecycle, transport, settings, per-request secrets (REQUIREMENTS §2–3, §8).
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| PLG-1 | Not Started | `SidecarLifecycle`: spawn, async health, shutdown on unload           | M    | Sidecar binary path / packaged `dist/sidecar` |
+| PLG-2 | Not Started | `StdioTransportAdapter` (NDJSON)                                      | M    | Default transport |
+| PLG-3 | Not Started | `HttpTransportAdapter` (REST + WS, session token)                     | L    | Opt-in setting |
+| PLG-4 | Not Started | Settings tab: providers, folders, DB path, transport, budgets, queue | M    | Mirror [Plugin Settings](#plugin-settings) |
+| PLG-5 | Not Started | Obsidian `SecretStorage` read; pass secrets per message only          | S    | Never persist keys in sidecar |
+| PLG-6 | Not Started | Vault listing/reading for index commands; hash computation            | M    | `IVaultAccessPort` implementation in plugin |
+
+### Epic 9: Plugin UI, commands, and agent file operations
+
+Panes and command palette (REQUIREMENTS §3, §6, §10); agent writes ([§16](#16-agent-file-operations)).
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| UI-1  | Not Started | `SearchView`: query, results cards, navigation, selectable text       | L    | Reuse single pane instance |
+| UI-2  | Not Started | Semantic search selection command                                     | S    | Pre-fill from editor selection |
+| UI-3  | Not Started | `ChatView`: history, streaming, sources, copy, new conversation     | L    | Theme variables; bottom input |
+| UI-4  | Not Started | `ProgressSlideout`: per-note steps + aggregate + errors/dead-letter   | M    | Subscribe to progress stream |
+| UI-5  | Not Started | Commands: reindex vault, incremental index, open search/chat panes    | S    | Discoverable palette entries |
+| AGT-1 | Not Started | Agent create/update notes via Obsidian API; allowed folders + max size | M    | Distinct from `indexedFolders` |
+
+### Epic 10: Testing, authoring guide, and release hardening
+
+MVP quality bar (REQUIREMENTS §5 user docs, §9).
+
+| ID    | Status      | Story                                                                 | Size | Notes                                                                 |
+| ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
+| TST-1 | Not Started | Core unit tests with in-memory port fakes                             | M    | Chunker, workflows without SQLite/network |
+| TST-2 | Not Started | Integration tests: sidecar + SQLite + sqlite-vec                      | M    | Vitest `test:integration` |
+| DOC-1 | Not Started | Authoring-oriented guide (headings, bullets, tags, links)             | M    | REQUIREMENTS §5.9 |
+| DOC-2 | Not Started | User docs: DB location, sync warnings, uninstall/reindex recovery     | S    | REQUIREMENTS §8 |
 
 ---
 
