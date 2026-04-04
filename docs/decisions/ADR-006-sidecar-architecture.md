@@ -19,6 +19,7 @@ All infrastructure-heavy work — SQLite (native `better-sqlite3` + `sqlite-vec`
 ### 2. Thin plugin client
 
 The plugin `main.js` remains a **thin client** responsible for:
+
 - UI rendering (SearchView, ChatView, ProgressSlideout)
 - Obsidian API interactions (vault file reading, settings, secrets)
 - Sidecar lifecycle management (spawn, health check, shutdown)

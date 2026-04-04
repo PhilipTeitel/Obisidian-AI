@@ -154,7 +154,7 @@ Flat chunking of notes into tiny isolated snippets is **insufficient**: search a
 - **Input** is at the **bottom** of the pane, **multi-line**, with send/cancel affordances.
 - Styling should follow **Obsidian theme variables** so light and dark themes remain usable.
 
-*(Specific CSS class names, pixel values, and component structure are left to implementation.)*
+_(Specific CSS class names, pixel values, and component structure are left to implementation.)_
 
 ---
 

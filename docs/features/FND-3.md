@@ -19,13 +19,13 @@ Secrets are **not** a port: the plugin reads Obsidian SecretStorage and passes c
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-002-hierarchical-document-model.md](../../docs/decisions/ADR-002-hierarchical-document-model.md) | Node types, hierarchy, and document shape for `types.ts` and `IDocumentStore` surface. |
-| [docs/decisions/ADR-005-provider-abstraction.md](../../docs/decisions/ADR-005-provider-abstraction.md) | `IEmbeddingPort` and `IChatPort` boundaries; OpenAI/Ollama are adapters only. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../../docs/decisions/ADR-006-sidecar-architecture.md) | `ISidecarTransport` and split of concerns; vault access stays behind `IVaultAccessPort` on plugin side. |
-| [docs/decisions/ADR-007-queue-abstraction.md](../../docs/decisions/ADR-007-queue-abstraction.md) | `IQueuePort<T>` semantics: enqueue, dequeue, ack, nack, peek. |
-| [docs/decisions/ADR-008-idempotent-indexing-state-machine.md](../../docs/decisions/ADR-008-idempotent-indexing-state-machine.md) | Job step enums / progress correlation types for indexing (`jobId`, `runId`, step names). |
+| ADR                                                                                                                              | Why it binds this story                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [docs/decisions/ADR-002-hierarchical-document-model.md](../../docs/decisions/ADR-002-hierarchical-document-model.md)             | Node types, hierarchy, and document shape for `types.ts` and `IDocumentStore` surface.                  |
+| [docs/decisions/ADR-005-provider-abstraction.md](../../docs/decisions/ADR-005-provider-abstraction.md)                           | `IEmbeddingPort` and `IChatPort` boundaries; OpenAI/Ollama are adapters only.                           |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../../docs/decisions/ADR-006-sidecar-architecture.md)                           | `ISidecarTransport` and split of concerns; vault access stays behind `IVaultAccessPort` on plugin side. |
+| [docs/decisions/ADR-007-queue-abstraction.md](../../docs/decisions/ADR-007-queue-abstraction.md)                                 | `IQueuePort<T>` semantics: enqueue, dequeue, ack, nack, peek.                                           |
+| [docs/decisions/ADR-008-idempotent-indexing-state-machine.md](../../docs/decisions/ADR-008-idempotent-indexing-state-machine.md) | Job step enums / progress correlation types for indexing (`jobId`, `runId`, step names).                |
 
 ---
 
@@ -36,7 +36,7 @@ Secrets are **not** a port: the plugin reads Obsidian SecretStorage and passes c
 - [x] Section 4 (Binding constraints) is filled with 3–8 bullets copied or restated from those ADRs
 - [x] Phase Y (binding compliance) includes at least one criterion with **non-mock** evidence (static check, dependency manifest, integration/contract test, or script) where wrong-stack substitution is a risk
 
-*Planning note: Job step string unions in types must match ADR-008 and README schema naming; if a naming mismatch is found during implementation, update **this spec + ADR-008 + README** in one PR or escalate — do not silently diverge.*
+_Planning note: Job step string unions in types must match ADR-008 and README schema naming; if a naming mismatch is found during implementation, update **this spec + ADR-008 + README** in one PR or escalate — do not silently diverge._
 
 ---
 
@@ -52,7 +52,7 @@ Secrets are **not** a port: the plugin reads Obsidian SecretStorage and passes c
 
 ## 5. API Endpoints + Schemas
 
-No REST endpoints. **ISidecarTransport** and message envelope types may use TypeScript interfaces only; full wire protocol is deferred to SRV-* stories. This story may introduce a **minimal** `SidecarMessage` discriminated union stub if needed for typing `ISidecarTransport`, or keep transport methods generic (`send(request: unknown)`) **only if** accompanied by a TODO and a follow-up story ID in a code comment — **prefer** a narrow union of known MVP operations if types are stable per README [API Contract](../../README.md#api-contract).
+No REST endpoints. **ISidecarTransport** and message envelope types may use TypeScript interfaces only; full wire protocol is deferred to SRV-\* stories. This story may introduce a **minimal** `SidecarMessage` discriminated union stub if needed for typing `ISidecarTransport`, or keep transport methods generic (`send(request: unknown)`) **only if** accompanied by a TODO and a follow-up story ID in a code comment — **prefer** a narrow union of known MVP operations if types are stable per README [API Contract](../../README.md#api-contract).
 
 ```ts
 // Example shape (Implementer refines to match API Contract table):
@@ -90,24 +90,24 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/core/domain/types.ts` | `NodeType`, `DocumentNode` (or equivalent), hashes, IDs, tag/cross-ref shapes as needed for ports. |
-| 2 | `src/core/ports/IDocumentStore.ts` | CRUD + query surface for hierarchical store (method names align with later STO-3; can throw `not implemented` only in adapters, not in interface). |
-| 3 | `src/core/ports/IQueuePort.ts` | Generic queue port per ADR-007. |
-| 4 | `src/core/ports/IEmbeddingPort.ts` | Embed text → vectors + dimension metadata. |
-| 5 | `src/core/ports/IChatPort.ts` | Streaming chat; use `AsyncIterable` or callback type per team convention — document choice in file JSDoc. |
-| 6 | `src/core/ports/IVaultAccessPort.ts` | Read file content by vault-relative path; plugin-only implementation later. |
-| 7 | `src/core/ports/IProgressPort.ts` | Emit structured progress for UI (jobId, runId, step, note path). |
-| 8 | `src/core/ports/ISidecarTransport.ts` | Send/receive typed messages or generic envelope + serializer contract. |
-| 9 | `src/core/ports/index.ts` | Optional barrel export for adapters. |
+| #   | Path                                  | Purpose                                                                                                                                            |
+| --- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `src/core/domain/types.ts`            | `NodeType`, `DocumentNode` (or equivalent), hashes, IDs, tag/cross-ref shapes as needed for ports.                                                 |
+| 2   | `src/core/ports/IDocumentStore.ts`    | CRUD + query surface for hierarchical store (method names align with later STO-3; can throw `not implemented` only in adapters, not in interface). |
+| 3   | `src/core/ports/IQueuePort.ts`        | Generic queue port per ADR-007.                                                                                                                    |
+| 4   | `src/core/ports/IEmbeddingPort.ts`    | Embed text → vectors + dimension metadata.                                                                                                         |
+| 5   | `src/core/ports/IChatPort.ts`         | Streaming chat; use `AsyncIterable` or callback type per team convention — document choice in file JSDoc.                                          |
+| 6   | `src/core/ports/IVaultAccessPort.ts`  | Read file content by vault-relative path; plugin-only implementation later.                                                                        |
+| 7   | `src/core/ports/IProgressPort.ts`     | Emit structured progress for UI (jobId, runId, step, note path).                                                                                   |
+| 8   | `src/core/ports/ISidecarTransport.ts` | Send/receive typed messages or generic envelope + serializer contract.                                                                             |
+| 9   | `src/core/ports/index.ts`             | Optional barrel export for adapters.                                                                                                               |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|---------|
-| 1 | `eslint.config.mjs` (from FND-2) | Ensure `no-restricted-imports` for `src/core/**` lists forbidden modules (**Y1**). |
-| 2 | `tsconfig` includes | Ensure `src/core` resolves without pulling plugin/sidecar paths incorrectly. |
+| #   | Path                             | Change                                                                             |
+| --- | -------------------------------- | ---------------------------------------------------------------------------------- |
+| 1   | `eslint.config.mjs` (from FND-2) | Ensure `no-restricted-imports` for `src/core/**` lists forbidden modules (**Y1**). |
+| 2   | `tsconfig` includes              | Ensure `src/core` resolves without pulling plugin/sidecar paths incorrectly.       |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -124,7 +124,7 @@ Not applicable.
   - Verification: Compare to README schema and ADR-002.
   - Evidence: `src/core/domain/types.ts` + README excerpt in PR description
 
-- [ ] **A2** — `DocumentNode` (or equivalent core tree node) includes fields needed for hierarchical model: identity, parent/child relationship, `type`, ordering, heading trail, content, content hash — subset acceptable if PR documents fields deferred to CHK-* with explicit TODOs **only** where not needed for port signatures yet.
+- [ ] **A2** — `DocumentNode` (or equivalent core tree node) includes fields needed for hierarchical model: identity, parent/child relationship, `type`, ordering, heading trail, content, content hash — subset acceptable if PR documents fields deferred to CHK-\* with explicit TODOs **only** where not needed for port signatures yet.
   - Verification: Types compile; CHK-1 story can import without rewrite.
   - Evidence: `src/core/domain/types.ts` reviewed against ADR-002
 
@@ -174,11 +174,11 @@ Not applicable.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Over-specifying `ISidecarTransport` before SRV-1 | Start with minimal envelope; link follow-up to SRV-1 in JSDoc; align with README API Contract in same iteration. |
-| 2 | `IChatPort` streaming shape differs between OpenAI and Ollama | Use a provider-neutral stream chunk type (delta text + done flag). |
-| 3 | `IDocumentStore` too large for one story | Include CRUD/search method **signatures** stubbed in comments or `never`-returning placeholders are forbidden — use real async signatures with `Promise<>` return types only. |
+| #   | Risk / Tradeoff                                               | Mitigation                                                                                                                                                                    |
+| --- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Over-specifying `ISidecarTransport` before SRV-1              | Start with minimal envelope; link follow-up to SRV-1 in JSDoc; align with README API Contract in same iteration.                                                              |
+| 2   | `IChatPort` streaming shape differs between OpenAI and Ollama | Use a provider-neutral stream chunk type (delta text + done flag).                                                                                                            |
+| 3   | `IDocumentStore` too large for one story                      | Include CRUD/search method **signatures** stubbed in comments or `never`-returning placeholders are forbidden — use real async signatures with `Promise<>` return types only. |
 
 ---
 
@@ -194,4 +194,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-04 | Story: FND-3 | Epic: 1 — Scaffold, toolchain, and domain contracts*
+_Created: 2026-04-04 | Story: FND-3 | Epic: 1 — Scaffold, toolchain, and domain contracts_

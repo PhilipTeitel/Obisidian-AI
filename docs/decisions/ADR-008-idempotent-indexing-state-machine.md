@@ -32,15 +32,15 @@ Failed → Queued (retry, up to max retries).
 
 The `job_steps` table records:
 
-| Column | Description |
-|--------|-------------|
-| `job_id` | Unique job identifier (typically `<reindex-run-id>:<note-path>`) |
-| `note_path` | Vault-relative path of the note |
-| `current_step` | Current state in the state machine |
-| `content_hash` | SHA-256 hash of the note's raw content at enqueue time |
-| `retry_count` | Number of retries for the current step |
-| `error_message` | Last failure reason (null when not in Failed state) |
-| `updated_at` | Timestamp of last state transition |
+| Column          | Description                                                      |
+| --------------- | ---------------------------------------------------------------- |
+| `job_id`        | Unique job identifier (typically `<reindex-run-id>:<note-path>`) |
+| `note_path`     | Vault-relative path of the note                                  |
+| `current_step`  | Current state in the state machine                               |
+| `content_hash`  | SHA-256 hash of the note's raw content at enqueue time           |
+| `retry_count`   | Number of retries for the current step                           |
+| `error_message` | Last failure reason (null when not in Failed state)              |
+| `updated_at`    | Timestamp of last state transition                               |
 
 ### 2. Idempotency via content hash + step status
 

@@ -21,10 +21,10 @@ Canonical requirements: [REQUIREMENTS §12–§13](../../docs/requirements/REQUI
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-006-sidecar-architecture.md](../../docs/decisions/ADR-006-sidecar-architecture.md) | Heavy compute and native modules live in the sidecar; the plugin ships no native addons; vault filesystem stays plugin-side. |
-| [docs/decisions/ADR-001-wasm-sqlite-vec-shipped-plugin.md](../../docs/decisions/ADR-001-wasm-sqlite-vec-shipped-plugin.md) | **Superseded** context only — confirms why the plugin must not ship SQLite/native vector stacks. |
+| ADR                                                                                                                        | Why it binds this story                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../../docs/decisions/ADR-006-sidecar-architecture.md)                     | Heavy compute and native modules live in the sidecar; the plugin ships no native addons; vault filesystem stays plugin-side. |
+| [docs/decisions/ADR-001-wasm-sqlite-vec-shipped-plugin.md](../../docs/decisions/ADR-001-wasm-sqlite-vec-shipped-plugin.md) | **Superseded** context only — confirms why the plugin must not ship SQLite/native vector stacks.                             |
 
 ---
 
@@ -35,7 +35,7 @@ Canonical requirements: [REQUIREMENTS §12–§13](../../docs/requirements/REQUI
 - [x] Section 4 (Binding constraints) is filled with 3–8 bullets copied or restated from those ADRs
 - [x] Phase Y (binding compliance) includes at least one criterion with **non-mock** evidence (static check, dependency manifest, integration/contract test, or script) where wrong-stack substitution is a risk
 
-*Planning note: No **Tensions / conflicts** identified between README, REQUIREMENTS, and accepted ADRs for this story.*
+_Planning note: No **Tensions / conflicts** identified between README, REQUIREMENTS, and accepted ADRs for this story._
 
 ---
 
@@ -79,28 +79,28 @@ Not applicable — no UI in scope.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/plugin/main.ts` | Minimal plugin entry exporting a stub `Plugin` class (or equivalent) so esbuild has a real target. |
-| 2 | `src/core/.gitkeep` or `src/core/index.ts` | Placeholder so `src/core/` exists; optional barrel. |
-| 3 | `src/sidecar/server.ts` | Minimal sidecar entry (e.g. `console.log` or empty `main`) for esbuild/tsc target. |
-| 4 | `esbuild.config.mjs` | Plugin bundle: Obsidian-oriented format (IIFE or documented), outfile aligned with `manifest.json`. |
-| 5 | `esbuild.sidecar.mjs` | Sidecar bundle: Node platform, appropriate external list for future native deps. |
-| 6 | `tsconfig.json` | Base strict config; references or paths as needed. |
-| 7 | `tsconfig.sidecar.json` | Sidecar compilation boundaries (Node). |
-| 8 | `tsconfig.plugin.json` | Plugin compilation boundaries (DOM/lib appropriate to Obsidian/Electron renderer). |
-| 10 | `tsconfig.core.json` | **Deviation (Y4/B2):** Core-only program so `src/core/` typechecks without Obsidian types in scope; not listed in original touchpoints table. |
-| 9 | `scripts/verify-plugin-bundle.mjs` | **(binding)** Script that fails if plugin output contains forbidden substrings or patterns (e.g. `better-sqlite3`, `sqlite-vec`, `.node` require paths) — implementer defines exact checks. |
-| 11 | `scripts/check-source-boundaries.mjs` | **(evidence B2/Y3)** Cross-platform source scan; wired as `npm run check:boundaries`. |
-| 12 | `scripts/dev.mjs` | Runs plugin + sidecar esbuild watch in one process (matches README `dev`). |
+| #   | Path                                       | Purpose                                                                                                                                                                                     |
+| --- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `src/plugin/main.ts`                       | Minimal plugin entry exporting a stub `Plugin` class (or equivalent) so esbuild has a real target.                                                                                          |
+| 2   | `src/core/.gitkeep` or `src/core/index.ts` | Placeholder so `src/core/` exists; optional barrel.                                                                                                                                         |
+| 3   | `src/sidecar/server.ts`                    | Minimal sidecar entry (e.g. `console.log` or empty `main`) for esbuild/tsc target.                                                                                                          |
+| 4   | `esbuild.config.mjs`                       | Plugin bundle: Obsidian-oriented format (IIFE or documented), outfile aligned with `manifest.json`.                                                                                         |
+| 5   | `esbuild.sidecar.mjs`                      | Sidecar bundle: Node platform, appropriate external list for future native deps.                                                                                                            |
+| 6   | `tsconfig.json`                            | Base strict config; references or paths as needed.                                                                                                                                          |
+| 7   | `tsconfig.sidecar.json`                    | Sidecar compilation boundaries (Node).                                                                                                                                                      |
+| 8   | `tsconfig.plugin.json`                     | Plugin compilation boundaries (DOM/lib appropriate to Obsidian/Electron renderer).                                                                                                          |
+| 10  | `tsconfig.core.json`                       | **Deviation (Y4/B2):** Core-only program so `src/core/` typechecks without Obsidian types in scope; not listed in original touchpoints table.                                               |
+| 9   | `scripts/verify-plugin-bundle.mjs`         | **(binding)** Script that fails if plugin output contains forbidden substrings or patterns (e.g. `better-sqlite3`, `sqlite-vec`, `.node` require paths) — implementer defines exact checks. |
+| 11  | `scripts/check-source-boundaries.mjs`      | **(evidence B2/Y3)** Cross-platform source scan; wired as `npm run check:boundaries`.                                                                                                       |
+| 12  | `scripts/dev.mjs`                          | Runs plugin + sidecar esbuild watch in one process (matches README `dev`).                                                                                                                  |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|---------|
-| 1 | `package.json` | Add `build`, `build:plugin`, `build:sidecar` (or equivalent), dependencies: `typescript`, `esbuild`, `@types/node` as needed. |
-| 2 | `README.md` | [Available Scripts](../../README.md#available-scripts): document new scripts; keep backlog link to this file in Epic 1 table. |
-| 3 | `manifest.json` | Ensure `main` path matches plugin esbuild output if required. |
+| #   | Path            | Change                                                                                                                        |
+| --- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `package.json`  | Add `build`, `build:plugin`, `build:sidecar` (or equivalent), dependencies: `typescript`, `esbuild`, `@types/node` as needed. |
+| 2   | `README.md`     | [Available Scripts](../../README.md#available-scripts): document new scripts; keep backlog link to this file in Epic 1 table. |
+| 3   | `manifest.json` | Ensure `main` path matches plugin esbuild output if required.                                                                 |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -176,11 +176,11 @@ Not applicable — no UI in scope.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Single `package.json` makes it easy to accidentally import sidecar deps from plugin code. | `verify-plugin-bundle.mjs` + grep gates in **Y1**/**Y3**; ESLint `no-restricted-imports` in FND-2. |
-| 2 | Obsidian typings/version skew | Pin `obsidian` dev dependency to a documented minimum; document in README when raising floor. |
-| 3 | esbuild `platform` / `format` misconfiguration yields unloadable plugin | Cross-check with official Obsidian plugin sample and `manifest.json` `main`. |
+| #   | Risk / Tradeoff                                                                           | Mitigation                                                                                         |
+| --- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 1   | Single `package.json` makes it easy to accidentally import sidecar deps from plugin code. | `verify-plugin-bundle.mjs` + grep gates in **Y1**/**Y3**; ESLint `no-restricted-imports` in FND-2. |
+| 2   | Obsidian typings/version skew                                                             | Pin `obsidian` dev dependency to a documented minimum; document in README when raising floor.      |
+| 3   | esbuild `platform` / `format` misconfiguration yields unloadable plugin                   | Cross-check with official Obsidian plugin sample and `manifest.json` `main`.                       |
 
 ---
 
@@ -197,4 +197,4 @@ Not applicable — no UI in scope.
 
 ---
 
-*Created: 2026-04-04 | Story: FND-1 | Epic: 1 — Scaffold, toolchain, and domain contracts*
+_Created: 2026-04-04 | Story: FND-1 | Epic: 1 — Scaffold, toolchain, and domain contracts_
