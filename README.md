@@ -749,6 +749,8 @@ obsidian-ai-plugin/
 └── vitest.config.ts
 ```
 
+**FND-1 scaffold note:** The tree above is the **target** layout for iteration 2. As of [FND-1](docs/features/FND-1.md), only minimal sources exist under `src/plugin/` (`main.ts`), `src/core/` (`index.ts`), and `src/sidecar/` (`server.ts`); other paths are introduced by later backlog stories.
+
 ---
 
 ## Prerequisites
@@ -779,11 +781,14 @@ npm install
 # Build the plugin (main.js for Obsidian)
 npm run build:plugin
 
-# Build the sidecar (Node.js process)
+# Build the sidecar (Node.js esbuild bundle)
 npm run build:sidecar
 
 # Build both
 npm run build
+
+# Optional: verify plugin output has no sidecar-native markers (FND-1 gate)
+npm run verify:plugin-bundle
 ```
 
 ### 3. Install into an Obsidian vault
@@ -819,16 +824,24 @@ The dev script watches `src/` and rebuilds on change. For hot-reload in Obsidian
 |---------|-------------|
 | `npm run build` | Build plugin and sidecar for production |
 | `npm run build:plugin` | Build plugin `main.js` via esbuild |
-| `npm run build:sidecar` | Build sidecar bundle via tsc + esbuild |
+| `npm run build:sidecar` | Build sidecar bundle via esbuild (`dist/sidecar/server.js`) |
+| `npm run typecheck` | Type-check `src/core`, `src/plugin`, and `src/sidecar` (no emit) |
+| `npm run verify:plugin-bundle` | Fail if `main.js` contains forbidden native/SQLite stack markers (FND-1) |
+| `npm run check:boundaries` | Fail if `src/core` or `src/plugin` violate import boundaries (FND-1) |
+| `npm run smoke:sidecar` | Run built sidecar entry once (expects prior `build:sidecar`) |
 | `npm run dev` | Watch mode for both plugin and sidecar |
 | `npm run dev:plugin` | Watch mode for plugin only |
 | `npm run dev:sidecar` | Watch mode for sidecar only |
-| `npm run test` | Run all tests via Vitest |
-| `npm run test:unit` | Run unit tests only (core domain) |
-| `npm run test:integration` | Run integration tests (sidecar + SQLite) |
-| `npm run lint` | Run ESLint |
-| `npm run typecheck` | Type-check without emitting (tsc --noEmit) |
-| `npm run query-store` | Dev utility: inspect SQLite store contents |
+
+The following are **planned** in later stories (see [FND-2](docs/features/FND-2.md) and follow-ons): `npm run test`, `test:unit`, `test:integration`, `lint`, `query-store`.
+
+| Command | Description |
+|---------|-------------|
+| `npm run test` | Run all tests via Vitest *(FND-2+)* |
+| `npm run test:unit` | Run unit tests only (core domain) *(FND-2+)* |
+| `npm run test:integration` | Run integration tests (sidecar + SQLite) *(FND-2+)* |
+| `npm run lint` | Run ESLint *(FND-2+)* |
+| `npm run query-store` | Dev utility: inspect SQLite store contents *(later)* |
 
 ---
 
@@ -955,7 +968,7 @@ Repository layout, builds, quality gates, and portable core boundaries per hexag
 
 | ID    | Status      | Story                                                                 | Size | Notes                                                                 |
 | ----- | ----------- | --------------------------------------------------------------------- | ---- | --------------------------------------------------------------------- |
-| [FND-1](docs/features/FND-1.md) | Not Started | Monorepo layout, `tsconfig` split, esbuild for plugin and sidecar, npm scripts | M    | Matches [Project Structure](#project-structure); no native code in plugin bundle |
+| [FND-1](docs/features/FND-1.md) | Complete | Monorepo layout, `tsconfig` split, esbuild for plugin and sidecar, npm scripts | M    | Matches [Project Structure](#project-structure); no native code in plugin bundle |
 | [FND-2](docs/features/FND-2.md) | Not Started | ESLint, Prettier, Vitest config, CI-friendly `test` / `typecheck` / `lint` | S    | Align with [Available Scripts](#available-scripts) |
 | [FND-3](docs/features/FND-3.md) | Not Started | Core `ports/*` interfaces and `domain/types.ts`                     | M    | No Obsidian/SQLite imports in `src/core/` |
 

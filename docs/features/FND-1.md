@@ -3,7 +3,7 @@
 **Story**: Establish the repository layout, split TypeScript projects, dual esbuild pipelines (plugin + sidecar), and npm scripts so CI and developers can build both artifacts deterministically.
 **Epic**: 1 — Scaffold, toolchain, and domain contracts
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -89,7 +89,10 @@ Not applicable — no UI in scope.
 | 6 | `tsconfig.json` | Base strict config; references or paths as needed. |
 | 7 | `tsconfig.sidecar.json` | Sidecar compilation boundaries (Node). |
 | 8 | `tsconfig.plugin.json` | Plugin compilation boundaries (DOM/lib appropriate to Obsidian/Electron renderer). |
+| 10 | `tsconfig.core.json` | **Deviation (Y4/B2):** Core-only program so `src/core/` typechecks without Obsidian types in scope; not listed in original touchpoints table. |
 | 9 | `scripts/verify-plugin-bundle.mjs` | **(binding)** Script that fails if plugin output contains forbidden substrings or patterns (e.g. `better-sqlite3`, `sqlite-vec`, `.node` require paths) — implementer defines exact checks. |
+| 11 | `scripts/check-source-boundaries.mjs` | **(evidence B2/Y3)** Cross-platform source scan; wired as `npm run check:boundaries`. |
+| 12 | `scripts/dev.mjs` | Runs plugin + sidecar esbuild watch in one process (matches README `dev`). |
 
 ### Files to MODIFY
 
@@ -110,63 +113,64 @@ Not applicable — no UI in scope.
 
 ### Phase A: Repository layout
 
-- [ ] **A1** — `src/plugin/`, `src/core/`, and `src/sidecar/` exist with at least one TypeScript source file each that participates in `npm run build`.
+- [x] **A1** — `src/plugin/`, `src/core/`, and `src/sidecar/` exist with at least one TypeScript source file each that participates in `npm run build`.
   - Verification: Directory listing and successful compile of all three roots.
   - Evidence: `package.json` scripts and CI/local log showing three outputs or unified build touching all three.
 
-- [ ] **A2** — README [Project structure](../../README.md#project-structure) matches the implemented layout, or this story document’s **File Touchpoints** section documents any intentional deviation.
+- [x] **A2** — README [Project structure](../../README.md#project-structure) matches the implemented layout, or this story document’s **File Touchpoints** section documents any intentional deviation.
   - Verification: Diff review between tree and README diagram.
   - Evidence: `docs/features/FND-1.md` (this file) + README section updated in same PR.
 
 ### Phase B: TypeScript split
 
-- [ ] **B1** — Separate tsconfig projects (or composite) exist for plugin and sidecar such that sidecar can use Node types without forcing them into the plugin program.
+- [x] **B1** — Separate tsconfig projects (or composite) exist for plugin and sidecar such that sidecar can use Node types without forcing them into the plugin program.
   - Verification: `npx tsc -p tsconfig.plugin.json --noEmit` and `npx tsc -p tsconfig.sidecar.json --noEmit` both succeed (names may vary if documented).
   - Evidence: `tsconfig.plugin.json`, `tsconfig.sidecar.json` (vitest/tsc CLI in CI).
 
-- [ ] **B2** — `src/core/` is included in a project that does not list Obsidian or `better-sqlite3` as types/imports in its default graph (no accidental `obsidian` import in core).
+- [x] **B2** — `src/core/` is included in a project that does not list Obsidian or `better-sqlite3` as types/imports in its default graph (no accidental `obsidian` import in core).
   - Verification: Grep `src/core` for `from 'obsidian'` and `better-sqlite3` — zero results.
-  - Evidence: `rg "from 'obsidian'|better-sqlite3" src/core` exit 1 (no matches) in CI script or documented manual step.
+  - Evidence: `npm run check:boundaries` (or `rg "from 'obsidian'|better-sqlite3" src/core` exit 1) in CI or local.
 
 ### Phase C: esbuild outputs
 
-- [ ] **C1** — Plugin esbuild produces the file referenced by `manifest.json` (`main` field) and the file loads in Obsidian when symlinked or copied to a test vault (smoke: no immediate load error).
+- [x] **C1** — Plugin esbuild produces the file referenced by `manifest.json` (`main` field) and the file loads in Obsidian when symlinked or copied to a test vault (smoke: no immediate load error).
   - Verification: Build artifact exists; optional manual Obsidian smoke.
   - Evidence: `esbuild.config.mjs` outfile + `manifest.json` cross-check script or documented checklist.
 
-- [ ] **C2** — Sidecar esbuild produces a Node-runnable entry (e.g. `node dist/sidecar/...js` exits 0 or runs stub).
+- [x] **C2** — Sidecar esbuild produces a Node-runnable entry (e.g. `node dist/sidecar/...js` exits 0 or runs stub).
   - Verification: Run built artifact with Node ≥ 18.
   - Evidence: `package.json` script `build:sidecar` + one-line smoke in `scripts/` or CI log.
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** Plugin bundle verification script passes: forbidden native/SQLite stack strings absent from plugin output (per section 4 **Y1**).
+- [x] **Y1** — **(binding)** Plugin bundle verification script passes: forbidden native/SQLite stack strings absent from plugin output (per section 4 **Y1**).
   - Verification: `node scripts/verify-plugin-bundle.mjs` exits 0 after `npm run build`.
   - Evidence: `scripts/verify-plugin-bundle.mjs(npm run verify:plugin-bundle)` — add `verify:plugin-bundle` npm script if not aliased.
 
-- [ ] **Y2** — **(binding)** `package.json` `engines.node` is set to `>=18` (or documented equivalent enforcement) for the sidecar consumer.
+- [x] **Y2** — **(binding)** `package.json` `engines.node` is set to `>=18` (or documented equivalent enforcement) for the sidecar consumer.
   - Verification: Read `package.json`.
   - Evidence: `package.json` lists `"engines": { "node": ">=18" }`.
 
-- [ ] **Y3** — **(binding)** Plugin `package.json` dependencies do not list `better-sqlite3` or `sqlite-vec` as runtime deps of the plugin artifact path (they may appear only as sidecar deps if using a single package.json — then they must not be imported from `src/plugin/`).
+- [x] **Y3** — **(binding)** Plugin `package.json` dependencies do not list `better-sqlite3` or `sqlite-vec` as runtime deps of the plugin artifact path (they may appear only as sidecar deps if using a single package.json — then they must not be imported from `src/plugin/`).
   - Verification: `npm ls` / grep imports from `src/plugin`.
-  - Evidence: `rg "better-sqlite3|sqlite-vec" src/plugin` exit 1; plus `package.json` dependency review.
+  - Evidence: `npm run check:boundaries` (or `rg "better-sqlite3|sqlite-vec" src/plugin` exit 1); plus `package.json` dependency review.
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all configured TS projects for this repo
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all configured TS projects for this repo
   - Evidence: CI or local log of `npm run build`
 
 - [ ] **Z2** — `npm run lint` passes **or** criterion deferred: if ESLint is not yet introduced, state **N/A — complete FND-2 Z2** and leave unchecked until FND-2 merges
   - Evidence: `npm run lint` (after FND-2) or explicit N/A note in PR description linking FND-2
+  - **Deferred:** **N/A — complete FND-2 Z2** (ESLint not introduced in this story).
 
-- [ ] **Z3** — No `any` types in any new or modified TypeScript file for this story
+- [x] **Z3** — No `any` types in any new or modified TypeScript file for this story
   - Evidence: `rg ": any" src/` on touched files (should be empty) or ESLint `@typescript-eslint/no-explicit-any`
 
-- [ ] **Z4** — **N/A — repository convention**: This project does not use a `@shared/types` alias. New types introduced in this story must live under `src/core/` or story-local modules only; no ad hoc `any` workarounds.
+- [x] **Z4** — **N/A — repository convention**: This project does not use a `@shared/types` alias. New types introduced in this story must live under `src/core/` or story-local modules only; no ad hoc `any` workarounds.
   - Evidence: PR review note confirming no `@shared/types` requirement
 
-- [ ] **Z5** — **N/A** for FND-1 — no production logging paths are required beyond optional stub entries; FND-2+ may add lint rules. If a stub `main.ts` logs on load, use `console` only behind a clear dev comment or omit.
+- [x] **Z5** — **N/A** for FND-1 — no production logging paths are required beyond optional stub entries; FND-2+ may add lint rules. If a stub `main.ts` logs on load, use `console` only behind a clear dev comment or omit.
 
 ---
 

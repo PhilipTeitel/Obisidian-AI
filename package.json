@@ -3,6 +3,26 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Documentation foundation branch (requirements + ADRs). See README.md.",
-  "scripts": {}
+  "description": "Obsidian AI plugin (iteration 2) — plugin + Node sidecar. See README.md.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "npm run build:plugin && npm run build:sidecar",
+    "build:plugin": "node esbuild.config.mjs",
+    "build:sidecar": "node esbuild.sidecar.mjs",
+    "typecheck": "tsc -p tsconfig.core.json --noEmit && tsc -p tsconfig.plugin.json --noEmit && tsc -p tsconfig.sidecar.json --noEmit",
+    "verify:plugin-bundle": "node scripts/verify-plugin-bundle.mjs",
+    "check:boundaries": "node scripts/check-source-boundaries.mjs",
+    "smoke:sidecar": "node dist/sidecar/server.js",
+    "dev": "node scripts/dev.mjs",
+    "dev:plugin": "node esbuild.config.mjs --watch",
+    "dev:sidecar": "node esbuild.sidecar.mjs --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.7.2",
+    "typescript": "^5.8.2"
+  }
 }

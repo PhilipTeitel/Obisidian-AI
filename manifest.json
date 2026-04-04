@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-ai",
+  "name": "Obsidian AI",
+  "version": "0.0.1",
+  "minAppVersion": "1.11.4",
+  "description": "Semantic search and RAG chat (iteration 2 scaffold).",
+  "author": "",
+  "isDesktopOnly": true,
+  "main": "main.js"
+}
