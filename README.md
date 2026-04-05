@@ -1021,11 +1021,11 @@ Parsing pipeline for [§4 hierarchical model](#4-hierarchical-document-model), [
 
 | ID    | Status      | Story                                                                 | Size | Notes                                                      |
 | ----- | ----------- | --------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
-| [CHK-1](docs/features/CHK-1.md) | Not Started | Hierarchical chunker (headings, paragraphs, ordering, heading trails) | L    | Node types through `bullet`; `contentHash` per node        |
-| [CHK-2](docs/features/CHK-2.md) | Not Started | Sentence-boundary splitting for embedding limits                      | M    | [§6](#6-sentence-splitting); reassembly via `siblingOrder` |
-| [CHK-3](docs/features/CHK-3.md) | Not Started | Bullet groups and nested bullets                                      | M    | [§7](#7-bullet-grouping)                                   |
-| [CHK-4](docs/features/CHK-4.md) | Not Started | Wikilinks and markdown links → `cross_refs`                           | M    | [§12](#12-cross-references)                                |
-| [CHK-5](docs/features/CHK-5.md) | Not Started | Scoped tags (frontmatter on note, inline on enclosing nodes)          | M    | [§11](#11-scoped-tags)                                     |
+| [CHK-1](docs/features/CHK-1.md) | Complete    | Hierarchical chunker (headings, paragraphs, ordering, heading trails) | L    | `chunkNote` pipeline in `src/core/domain/chunker.ts`        |
+| [CHK-2](docs/features/CHK-2.md) | Complete    | Sentence-boundary splitting for embedding limits                      | M    | `sentenceSplitter.ts`, `tokenEstimator.ts`                  |
+| [CHK-3](docs/features/CHK-3.md) | Complete    | Bullet groups and nested bullets                                      | M    | `bullet_group` in chunker                                   |
+| [CHK-4](docs/features/CHK-4.md) | Complete    | Wikilinks and markdown links → `cross_refs`                           | M    | `wikilinkParser.ts`; `ChunkNoteResult`                      |
+| [CHK-5](docs/features/CHK-5.md) | Complete    | Scoped tags (frontmatter on note, inline on enclosing nodes)          | M    | `frontmatterTags.ts`, `inlineTags.ts`                       |
 
 ### Epic 3: SQLite store, vectors, and indexing persistence
 

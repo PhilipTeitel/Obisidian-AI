@@ -98,6 +98,40 @@ export interface VaultFile {
   path: string;
 }
 
+/** Outbound link extracted during chunking (CHK-4); persisted as `cross_refs` in SQLite. */
+export interface ParsedCrossRef {
+  sourceNodeId: string;
+  targetPath: string;
+  linkText: string | null;
+}
+
+/** Tag scoped to a structural node (CHK-5); persisted as `tags` in SQLite. */
+export interface ParsedTag {
+  nodeId: string;
+  tag: string;
+  source: 'frontmatter' | 'inline';
+}
+
+/** Result of parsing one vault note (CHK-4+). */
+export interface ChunkNoteResult {
+  nodes: DocumentNode[];
+  crossRefs: ParsedCrossRef[];
+  tags: ParsedTag[];
+}
+
+/** Inputs for `chunkNote` (CHK-4+). */
+export interface ChunkNoteInput {
+  noteId: string;
+  noteTitle: string;
+  /** Vault-relative path of this note (resolves relative markdown links). */
+  vaultPath: string;
+  markdown: string;
+  /**
+   * When omitted, chunker uses `DEFAULT_MAX_EMBEDDING_TOKENS` from token estimator (CHK-2).
+   */
+  maxEmbeddingTokens?: number;
+}
+
 /** One dequeue-able unit from `IQueuePort` (ADR-007). */
 export interface QueueItem<T> {
   id: string;
