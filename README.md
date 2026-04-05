@@ -68,39 +68,70 @@ Since one of the main objectives of this plugin was to explore the concepts of A
 
 ## Table of Contents
 
-- [Requirements](#requirements)
-- [High-Level Architecture](#high-level-architecture)
-- [Technical Stack](#technical-stack)
-- [Key Design Decisions](#key-design-decisions)
-  - [1. Hexagonal Architecture (Ports and Adapters)](#1-hexagonal-architecture-ports-and-adapters)
-  - [2. Sidecar Architecture](#2-sidecar-architecture)
-  - [3. Transport Abstraction](#3-transport-abstraction)
-  - [4. Hierarchical Document Model](#4-hierarchical-document-model)
-  - [5. Bottom-Up Summaries](#5-bottom-up-summaries)
-  - [6. Sentence Splitting](#6-sentence-splitting)
-  - [7. Bullet Grouping](#7-bullet-grouping)
-  - [8. SQLite Schema](#8-sqlite-schema)
-  - [9. Three-Phase Retrieval](#9-three-phase-retrieval)
-  - [10. Structured Context Formatting](#10-structured-context-formatting)
-  - [11. Scoped Tags](#11-scoped-tags)
-  - [12. Cross-References](#12-cross-references)
-  - [13. Incremental Summaries](#13-incremental-summaries)
-  - [14. Provider Abstraction](#14-provider-abstraction)
-  - [15. Startup Performance](#15-startup-performance)
-  - [16. Agent File Operations](#16-agent-file-operations)
-  - [17. Local Data Constraint](#17-local-data-constraint)
-  - [18. Queue Abstraction](#18-queue-abstraction)
-  - [19. Idempotent Indexing State Machine](#19-idempotent-indexing-state-machine)
-  - [20. Logging and Observability](#20-logging-and-observability)
-  - [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Available Scripts](#available-scripts)
-- [UI Components](#ui-components)
-- [API Contract](#api-contract)
-- [Plugin Settings](#plugin-settings)
-- [Backlog Items](#backlog-items)
-- [License](#license)
+- [Obsidian AI Plugin — Iteration 2](#obsidian-ai-plugin--iteration-2)
+  - [Preface](#preface)
+  - [Purpose](#purpose)
+  - [Lessons Learned](#lessons-learned)
+    - [AI-Assisted Development](#ai-assisted-development)
+    - [Indexing, Embedding, RAG and Search](#indexing-embedding-rag-and-search)
+    - [Obsidian and Plugins](#obsidian-and-plugins)
+  - [Table of Contents](#table-of-contents)
+  - [Requirements](#requirements)
+  - [High-Level Architecture](#high-level-architecture)
+    - [Data Flow: Vault → Index](#data-flow-vault--index)
+    - [Data Flow: Search Query](#data-flow-search-query)
+    - [Indexing State Machine](#indexing-state-machine)
+  - [Technical Stack](#technical-stack)
+  - [Key Design Decisions](#key-design-decisions)
+    - [1. Hexagonal Architecture (Ports and Adapters)](#1-hexagonal-architecture-ports-and-adapters)
+    - [2. Sidecar Architecture](#2-sidecar-architecture)
+    - [3. Transport Abstraction](#3-transport-abstraction)
+    - [4. Hierarchical Document Model](#4-hierarchical-document-model)
+    - [5. Bottom-Up Summaries](#5-bottom-up-summaries)
+    - [6. Sentence Splitting](#6-sentence-splitting)
+    - [7. Bullet Grouping](#7-bullet-grouping)
+    - [8. SQLite Schema](#8-sqlite-schema)
+    - [9. Three-Phase Retrieval](#9-three-phase-retrieval)
+    - [10. Structured Context Formatting](#10-structured-context-formatting)
+    - [11. Scoped Tags](#11-scoped-tags)
+    - [12. Cross-References](#12-cross-references)
+    - [13. Incremental Summaries](#13-incremental-summaries)
+    - [14. Provider Abstraction](#14-provider-abstraction)
+    - [15. Startup Performance](#15-startup-performance)
+    - [16. Agent File Operations](#16-agent-file-operations)
+    - [17. Local Data Constraint](#17-local-data-constraint)
+    - [18. Queue Abstraction](#18-queue-abstraction)
+    - [19. Idempotent Indexing State Machine](#19-idempotent-indexing-state-machine)
+    - [20. Logging and Observability](#20-logging-and-observability)
+    - [Project Structure](#project-structure)
+  - [Prerequisites](#prerequisites)
+  - [Getting Started](#getting-started)
+    - [1. Install dependencies](#1-install-dependencies)
+    - [2. Build](#2-build)
+    - [3. Install into an Obsidian vault](#3-install-into-an-obsidian-vault)
+    - [4. Enable the plugin](#4-enable-the-plugin)
+    - [5. Development mode](#5-development-mode)
+  - [Available Scripts](#available-scripts)
+  - [UI Components](#ui-components)
+    - [SearchView](#searchview)
+    - [ChatView](#chatview)
+    - [ProgressSlideout](#progressslideout)
+  - [API Contract](#api-contract)
+    - [Port Interfaces (Internal Service Contracts)](#port-interfaces-internal-service-contracts)
+    - [Sidecar Message Protocol](#sidecar-message-protocol)
+  - [Plugin Settings](#plugin-settings)
+  - [Backlog Items](#backlog-items)
+    - [Epic 1: Scaffold, toolchain, and domain contracts](#epic-1-scaffold-toolchain-and-domain-contracts)
+    - [Epic 2: Hierarchical chunking and note metadata](#epic-2-hierarchical-chunking-and-note-metadata)
+    - [Epic 3: SQLite store, vectors, and indexing persistence](#epic-3-sqlite-store-vectors-and-indexing-persistence)
+    - [Epic 4: Index, summary, and embedding workflows](#epic-4-index-summary-and-embedding-workflows)
+    - [Epic 5: Retrieval, search workflow, and chat workflow](#epic-5-retrieval-search-workflow-and-chat-workflow)
+    - [Epic 6: Provider adapters](#epic-6-provider-adapters)
+    - [Epic 7: Sidecar server, routes, and observability](#epic-7-sidecar-server-routes-and-observability)
+    - [Epic 8: Plugin client, settings, secrets, and vault I/O](#epic-8-plugin-client-settings-secrets-and-vault-io)
+    - [Epic 9: Plugin UI, commands, and agent file operations](#epic-9-plugin-ui-commands-and-agent-file-operations)
+    - [Epic 10: Testing, authoring guide, and release hardening](#epic-10-testing-authoring-guide-and-release-hardening)
+  - [License](#license)
 
 ---
 
@@ -982,7 +1013,7 @@ Repository layout, builds, quality gates, and portable core boundaries per hexag
 | ------------------------------- | ----------- | ------------------------------------------------------------------------------ | ---- | -------------------------------------------------------------------------------- |
 | [FND-1](docs/features/FND-1.md) | Complete    | Monorepo layout, `tsconfig` split, esbuild for plugin and sidecar, npm scripts | M    | Matches [Project Structure](#project-structure); no native code in plugin bundle |
 | [FND-2](docs/features/FND-2.md) | Complete    | ESLint, Prettier, Vitest config, CI-friendly `test` / `typecheck` / `lint`     | S    | Align with [Available Scripts](#available-scripts)                               |
-| [FND-3](docs/features/FND-3.md) | Not Started | Core `ports/*` interfaces and `domain/types.ts`                                | M    | No Obsidian/SQLite imports in `src/core/`                                        |
+| [FND-3](docs/features/FND-3.md) | Complete    | Core `ports/*` interfaces and `domain/types.ts`                                | M    | No Obsidian/SQLite imports in `src/core/`                                        |
 
 ### Epic 2: Hierarchical chunking and note metadata
 
@@ -990,23 +1021,23 @@ Parsing pipeline for [§4 hierarchical model](#4-hierarchical-document-model), [
 
 | ID    | Status      | Story                                                                 | Size | Notes                                                      |
 | ----- | ----------- | --------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
-| CHK-1 | Not Started | Hierarchical chunker (headings, paragraphs, ordering, heading trails) | L    | Node types through `bullet`; `contentHash` per node        |
-| CHK-2 | Not Started | Sentence-boundary splitting for embedding limits                      | M    | [§6](#6-sentence-splitting); reassembly via `siblingOrder` |
-| CHK-3 | Not Started | Bullet groups and nested bullets                                      | M    | [§7](#7-bullet-grouping)                                   |
-| CHK-4 | Not Started | Wikilinks and markdown links → `cross_refs`                           | M    | [§12](#12-cross-references)                                |
-| CHK-5 | Not Started | Scoped tags (frontmatter on note, inline on enclosing nodes)          | M    | [§11](#11-scoped-tags)                                     |
+| [CHK-1](docs/features/CHK-1.md) | Not Started | Hierarchical chunker (headings, paragraphs, ordering, heading trails) | L    | Node types through `bullet`; `contentHash` per node        |
+| [CHK-2](docs/features/CHK-2.md) | Not Started | Sentence-boundary splitting for embedding limits                      | M    | [§6](#6-sentence-splitting); reassembly via `siblingOrder` |
+| [CHK-3](docs/features/CHK-3.md) | Not Started | Bullet groups and nested bullets                                      | M    | [§7](#7-bullet-grouping)                                   |
+| [CHK-4](docs/features/CHK-4.md) | Not Started | Wikilinks and markdown links → `cross_refs`                           | M    | [§12](#12-cross-references)                                |
+| [CHK-5](docs/features/CHK-5.md) | Not Started | Scoped tags (frontmatter on note, inline on enclosing nodes)          | M    | [§11](#11-scoped-tags)                                     |
 
 ### Epic 3: SQLite store, vectors, and indexing persistence
 
 `SqliteDocumentStore`, schema, sqlite-vec, per-vault paths ([ADR-004](docs/decisions/ADR-004-per-vault-index-storage.md)), queue and job tables ([ADR-007](docs/decisions/ADR-007-queue-abstraction.md), [ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)).
 
-| ID    | Status      | Story                                                                                                  | Size | Notes                                                                                                       |
-| ----- | ----------- | ------------------------------------------------------------------------------------------------------ | ---- | ----------------------------------------------------------------------------------------------------------- |
-| STO-1 | Not Started | SQLite migrations: `nodes`, `summaries`, `tags`, `cross_refs`, `note_meta`, `queue_items`, `job_steps` | M    | [§8 SQLite Schema](#8-sqlite-schema)                                                                        |
-| STO-2 | Not Started | `vec0` virtual tables + `embedding_meta`; dimension aligned with settings                              | M    | `better-sqlite3` + `sqlite-vec` in sidecar only                                                             |
-| STO-3 | Not Started | `SqliteDocumentStore` implementing `IDocumentStore`                                                    | L    | CRUD, ANN search, ancestors/siblings, note meta                                                             |
-| QUE-1 | Not Started | `InProcessQueue` + `IQueuePort` with crash-safe `queue_items`                                          | M    | Configurable concurrency; ack/nack/dead-letter                                                              |
-| QUE-2 | Not Started | `job_steps` integration: idempotent steps, resume, retry cap                                           | L    | Emit step transitions for progress ([ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)) |
+| ID                              | Status      | Story                                                                                                  | Size | Notes                                                                                                       |
+| ------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------ | ---- | ----------------------------------------------------------------------------------------------------------- |
+| [STO-1](docs/features/STO-1.md) | Not Started | SQLite migrations: `nodes`, `summaries`, `tags`, `cross_refs`, `note_meta`, `queue_items`, `job_steps` | M    | [§8 SQLite Schema](#8-sqlite-schema)                                                                        |
+| [STO-2](docs/features/STO-2.md) | Not Started | `vec0` virtual tables + `embedding_meta`; dimension aligned with settings                              | M    | `better-sqlite3` + `sqlite-vec` in sidecar only                                                             |
+| [STO-3](docs/features/STO-3.md) | Not Started | `SqliteDocumentStore` implementing `IDocumentStore`                                                    | L    | CRUD, ANN search, ancestors/siblings, note meta                                                             |
+| [QUE-1](docs/features/QUE-1.md) | Not Started | `InProcessQueue` + `IQueuePort` with crash-safe `queue_items`                                          | M    | Configurable concurrency; ack/nack/dead-letter                                                              |
+| [QUE-2](docs/features/QUE-2.md) | Not Started | `job_steps` integration: idempotent steps, resume, retry cap                                           | L    | Emit step transitions for progress ([ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)) |
 
 ### Epic 4: Index, summary, and embedding workflows
 
