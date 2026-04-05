@@ -3,7 +3,7 @@
 **Story**: Define all core port interfaces under `src/core/ports/` and shared domain types in `src/core/domain/types.ts` so adapters and workflows have a single hexagonal contract — with no infrastructure imports in `src/core/`.
 **Epic**: 1 — Scaffold, toolchain, and domain contracts
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -120,50 +120,50 @@ Not applicable.
 
 ### Phase A: Domain types
 
-- [ ] **A1** — `NodeType` union (or const enum) includes exactly the seven types in section 4 **Y4**, spelling-matched to README SQLite `CHECK` and ADR-002.
+- [x] **A1** — `NodeType` union (or const enum) includes exactly the seven types in section 4 **Y4**, spelling-matched to README SQLite `CHECK` and ADR-002.
   - Verification: Compare to README schema and ADR-002.
   - Evidence: `src/core/domain/types.ts` + README excerpt in PR description
 
-- [ ] **A2** — `DocumentNode` (or equivalent core tree node) includes fields needed for hierarchical model: identity, parent/child relationship, `type`, ordering, heading trail, content, content hash — subset acceptable if PR documents fields deferred to CHK-\* with explicit TODOs **only** where not needed for port signatures yet.
+- [x] **A2** — `DocumentNode` (or equivalent core tree node) includes fields needed for hierarchical model: identity, parent/child relationship, `type`, ordering, heading trail, content, content hash — subset acceptable if PR documents fields deferred to CHK-\* with explicit TODOs **only** where not needed for port signatures yet.
   - Verification: Types compile; CHK-1 story can import without rewrite.
   - Evidence: `src/core/domain/types.ts` reviewed against ADR-002
 
 ### Phase B: Ports defined
 
-- [ ] **B1** — All seven ports from README §1 exist as `.ts` files under `src/core/ports/` with exported interfaces.
+- [x] **B1** — All seven ports from README §1 exist as `.ts` files under `src/core/ports/` with exported interfaces.
   - Verification: File list matches README names (`IDocumentStore`, `IQueuePort`, `IEmbeddingPort`, `IChatPort`, `IVaultAccessPort`, `IProgressPort`, `ISidecarTransport`).
   - Evidence: `ls src/core/ports`
 
-- [ ] **B2** — `IQueuePort<T>` declares enqueue, dequeue, ack, nack, peek with async signatures consistent with ADR-007.
+- [x] **B2** — `IQueuePort<T>` declares enqueue, dequeue, ack, nack, peek with async signatures consistent with ADR-007.
   - Verification: Compare method list to ADR-007 and README §18.
   - Evidence: `src/core/ports/IQueuePort.ts`
 
 ### Phase C: Compilation + lint
 
-- [ ] **C1** — `npm run typecheck` passes with new interfaces referenced from a minimal `src/core/index.ts` or test import.
+- [x] **C1** — `npm run typecheck` passes with new interfaces referenced from a minimal `src/core/index.ts` or test import.
   - Evidence: `npm run typecheck`
 
-- [ ] **C2** — `npm run lint` passes on `src/core/**`.
+- [x] **C2** — `npm run lint` passes on `src/core/**`.
   - Evidence: `npm run lint`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** ESLint fails if `src/core/**` imports `obsidian`, `better-sqlite3`, or relative paths into `src/sidecar/` / `src/plugin/` (adjust rule to allow only same-layer imports).
+- [x] **Y1** — **(binding)** ESLint fails if `src/core/**` imports `obsidian`, `better-sqlite3`, or relative paths into `src/sidecar/` / `src/plugin/` (adjust rule to allow only same-layer imports).
   - Verification: Temporary forbidden import in a throwaway branch triggers lint error.
   - Evidence: `eslint.config.mjs(npm run lint)` + screenshot/log of intentional violation test
 
-- [ ] **Y2** — **(binding)** `rg "from 'obsidian'|from \"obsidian\"|better-sqlite3" src/core` returns no matches.
+- [x] **Y2** — **(binding)** `rg "from 'obsidian'|from \"obsidian\"|better-sqlite3" src/core` returns no matches.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` or documented `rg` in CI
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all configured TS projects
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all configured TS projects
   - Evidence: `npm run build`
 
-- [ ] **Z2** — `npm run lint` passes (or only pre-existing warnings)
+- [x] **Z2** — `npm run lint` passes (or only pre-existing warnings)
   - Evidence: `npm run lint`
 
-- [ ] **Z3** — No `any` types in any new or modified file under `src/core/`
+- [x] **Z3** — No `any` types in any new or modified file under `src/core/`
   - Evidence: ESLint `@typescript-eslint/no-explicit-any` on `src/core`
 
 - [ ] **Z4** — **N/A** — No `@shared/types` alias; exports use `src/core/ports/index.ts` or direct paths per repo convention.

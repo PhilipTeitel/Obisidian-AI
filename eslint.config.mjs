@@ -58,6 +58,14 @@ export default tseslint.config(
               name: 'better-sqlite3',
               message: 'Core must not depend on better-sqlite3 (FND-1 / FND-2).',
             },
+            {
+              name: 'electron',
+              message: 'Core must not depend on Electron (FND-3 Y1).',
+            },
+            {
+              name: '@sqlite.org/sqlite-wasm',
+              message: 'Core must not depend on wa-sqlite stack (FND-3 Y1).',
+            },
           ],
           patterns: [
             {
@@ -67,6 +75,23 @@ export default tseslint.config(
             {
               group: ['better-sqlite3/*'],
               message: 'Core must not depend on better-sqlite3 (FND-1 / FND-2).',
+            },
+            {
+              group: ['electron/*'],
+              message: 'Core must not depend on Electron (FND-3 Y1).',
+            },
+            {
+              group: [
+                '../plugin/**',
+                '../../plugin/**',
+                '../../../plugin/**',
+                '../../../../plugin/**',
+                '../sidecar/**',
+                '../../sidecar/**',
+                '../../../sidecar/**',
+                '../../../../sidecar/**',
+              ],
+              message: 'Core must not import plugin or sidecar adapter paths (FND-3 Y1).',
             },
           ],
         },
