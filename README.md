@@ -150,6 +150,7 @@ Since one of the main objectives of this plugin was to explore the concepts of A
 - [docs/decisions/ADR-006-sidecar-architecture.md](docs/decisions/ADR-006-sidecar-architecture.md) — Sidecar process and transport abstraction
 - [docs/decisions/ADR-007-queue-abstraction.md](docs/decisions/ADR-007-queue-abstraction.md) — Queue port and SQLite-backed in-process queue
 - [docs/decisions/ADR-008-idempotent-indexing-state-machine.md](docs/decisions/ADR-008-idempotent-indexing-state-machine.md) — Per-note job steps, retries, dead-letter
+- [docs/decisions/ADR-009-chat-cancellation-and-timeout.md](docs/decisions/ADR-009-chat-cancellation-and-timeout.md) — Chat streaming `AbortSignal` + `timeoutMs` across `IChatPort` and transport
 
 ---
 
@@ -775,7 +776,8 @@ obsidian-ai-plugin/
 │   │   ├── ADR-005-provider-abstraction.md             # Accepted
 │   │   ├── ADR-006-sidecar-architecture.md             # Accepted
 │   │   ├── ADR-007-queue-abstraction.md                # Accepted
-│   │   └── ADR-008-idempotent-indexing-state-machine.md # Accepted
+│   │   ├── ADR-008-idempotent-indexing-state-machine.md # Accepted
+│   │   └── ADR-009-chat-cancellation-and-timeout.md      # Accepted
 │   └── requirements/
 │       └── REQUIREMENTS.md
 ├── styles.css                               # Obsidian theme-aware styles
@@ -949,7 +951,7 @@ A non-blocking overlay that shows real-time indexing progress.
 | `IQueuePort<T>`    | `nack`                 | `(itemId: string, reason: string) → Promise<void>`                                          | Report failure (triggers retry or dead-letter) |
 | `IQueuePort<T>`    | `peek`                 | `() → Promise<number>`                                                                      | Get pending item count                         |
 | `IEmbeddingPort`   | `embed`                | `(texts: string[], apiKey?: string) → Promise<Float32Array[]>`                              | Embed text into vectors                        |
-| `IChatPort`        | `complete`             | `(messages: ChatMessage[], context: string, apiKey?: string) → AsyncIterable<string>`       | Streaming chat completion                      |
+| `IChatPort`        | `complete`             | `(messages, context, apiKey?, options?) → AsyncIterable<string>`; `options`: `{ signal?, timeoutMs? }` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md)) | Streaming chat completion; cancel/timeout        |
 | `IVaultAccessPort` | `listFiles`            | `(folders: string[]) → Promise<VaultFile[]>`                                                | List vault files in configured folders         |
 | `IVaultAccessPort` | `readFile`             | `(path: string) → Promise<string>`                                                          | Read a vault file's content                    |
 | `IProgressPort`    | `emit`                 | `(event: ProgressEvent) → void`                                                             | Emit a progress event to the UI                |
@@ -964,7 +966,7 @@ These messages are sent between the plugin and sidecar over the transport layer.
 | `index/incremental` | Plugin → Sidecar | `{ files: [{path, content, hash}], deletedPaths: string[], apiKey? }` | `{ runId, noteCount }` + progress stream                                  |
 | `index/status`      | Plugin → Sidecar | `{}`                                                                  | `{ pending, processing, completed, failed, deadLetter, jobs: JobStep[] }` |
 | `search`            | Plugin → Sidecar | `{ query, k?, apiKey? }`                                              | `{ results: SearchResult[] }`                                             |
-| `chat`              | Plugin → Sidecar | `{ messages: ChatMessage[], apiKey? }`                                | Streaming: `{ delta: string }` chunks, final `{ sources: Source[] }`      |
+| `chat`              | Plugin → Sidecar | `{ messages: ChatMessage[], apiKey? }` + transport `streamChat(..., { signal? })` per [ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[] }`; client cancel via `signal` |
 | `chat/clear`        | Plugin → Sidecar | `{}`                                                                  | `{ ok: true }`                                                            |
 | `health`            | Plugin → Sidecar | `{}`                                                                  | `{ status: 'ok', uptime, dbReady }`                                       |
 | `progress`          | Sidecar → Plugin | `{ event: IndexProgressEvent }`                                       | — (push notification)                                                     |
@@ -1051,15 +1053,15 @@ Orchestration in core workflows; incremental behavior ([§13](#13-incremental-su
 
 ### Epic 5: Retrieval, search workflow, and chat workflow
 
-Three-phase search ([ADR-003](docs/decisions/ADR-003-phased-retrieval-strategy.md)), structured context ([§10](#10-structured-context-formatting)), RAG chat (REQUIREMENTS §6).
+Three-phase search ([ADR-003](docs/decisions/ADR-003-phased-retrieval-strategy.md)), structured context ([§10](#10-structured-context-formatting)), RAG chat (REQUIREMENTS §6), chat cancel/timeout ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md)).
 
-| ID     | Status      | Story                                                                     | Size | Notes                                                                              |
-| ------ | ----------- | ------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------- |
-| RET-1  | Not Started | `SearchWorkflow`: coarse summary ANN → drill-down content → assembly      | L    | Same embedding space for query and vectors; expose `k` / result shape for plugin   |
-| RET-2  | Not Started | Token budgets and structured snippet formatting                           | M    | Config fractions: matched / sibling / parent ([Plugin Settings](#plugin-settings)) |
-| RET-3  | Not Started | Tag-aware filtering in search (where index exposes tags)                  | S    | REQUIREMENTS §5 tags; optional MVP tightening                                      |
-| CHAT-1 | Not Started | `ChatWorkflow`: retrieve → assemble context → stream completion → sources | L    | Vault-only retrieval path; conversation history in payload                         |
-| CHAT-2 | Not Started | Chat cancel/timeout behavior end-to-end                                   | S    | Configurable timeout; propagate cancel through transport                           |
+| ID                                      | Status      | Story                                                                     | Size | Notes                                                                              |
+| --------------------------------------- | ----------- | ------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------- |
+| [RET-1](docs/features/RET-1.md)         | Not Started | `SearchWorkflow`: coarse summary ANN → drill-down content → assembly      | L    | Same embedding space for query and vectors; expose `k` / result shape for plugin   |
+| [RET-2](docs/features/RET-2.md)         | Not Started | Token budgets and structured snippet formatting                           | M    | Config fractions: matched / sibling / parent ([Plugin Settings](#plugin-settings)) |
+| [RET-3](docs/features/RET-3.md)         | Not Started | Tag-aware filtering in search (where index exposes tags)                  | S    | REQUIREMENTS §5 tags; optional MVP tightening                                      |
+| [CHAT-1](docs/features/CHAT-1.md)       | Not Started | `ChatWorkflow`: retrieve → assemble context → stream completion → sources | L    | Vault-only retrieval path; conversation history in payload                         |
+| [CHAT-2](docs/features/CHAT-2.md)       | Not Started | Chat cancel/timeout behavior end-to-end                                   | S    | [ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md); configurable timeout; cancel through transport |
 
 ### Epic 6: Provider adapters
 
