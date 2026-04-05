@@ -1043,11 +1043,11 @@ Parsing pipeline for [§4 hierarchical model](#4-hierarchical-document-model), [
 
 Orchestration in core workflows; incremental behavior ([§13](#13-incremental-summaries), REQUIREMENTS §5).
 
-| ID    | Status      | Story                                                                            | Size | Notes                                                                  |
-| ----- | ----------- | -------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------- |
-| WKF-1 | Not Started | `SummaryWorkflow` bottom-up LLM summaries                                        | L    | Uses `IChatPort`; skip redundant work when hashes unchanged            |
-| WKF-2 | Not Started | `IndexWorkflow` state machine: queue dequeue → parse → store → summarize → embed | L    | Wire `IQueuePort`, `IDocumentStore`, `IEmbeddingPort`, `IProgressPort` |
-| WKF-3 | Not Started | Incremental indexing: changed-note detection, partial embed/summary reuse        | M    | Deleted notes: direct cleanup without full state machine               |
+| ID                              | Status      | Story                                                                            | Size | Notes                                                                  |
+| ------------------------------- | ----------- | -------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------- |
+| [WKF-1](docs/features/WKF-1.md) | Not Started | `SummaryWorkflow` bottom-up LLM summaries                                        | L    | Uses `IChatPort`; skip redundant work when hashes unchanged            |
+| [WKF-2](docs/features/WKF-2.md) | Not Started | `IndexWorkflow` state machine: queue dequeue → parse → store → summarize → embed | L    | Wire `IQueuePort`, `IDocumentStore`, `IEmbeddingPort`, `IProgressPort` |
+| [WKF-3](docs/features/WKF-3.md) | Not Started | Incremental indexing: changed-note detection, partial embed/summary reuse        | M    | Deleted notes: direct cleanup without full state machine               |
 
 ### Epic 5: Retrieval, search workflow, and chat workflow
 
