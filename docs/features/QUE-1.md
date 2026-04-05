@@ -3,7 +3,7 @@
 **Story**: Implement **`InProcessQueue<T>`** in the sidecar as the [ADR-007](../decisions/ADR-007-queue-abstraction.md) adapter for [IQueuePort](../../src/core/ports/IQueuePort.ts): an **in-memory** dequeue buffer for low latency plus **SQLite persistence** in `queue_items` for crash recovery, with **configurable concurrency** (max parallel workers), and **ack** / **nack** semantics including **retry** and **dead-letter** after `maxRetries` (default **3**, matching [Plugin Settings](../../README.md#plugin-settings)).
 **Epic**: 3 — SQLite store, vectors, and indexing persistence
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -25,11 +25,11 @@ Pointers: [ADR-007](../decisions/ADR-007-queue-abstraction.md); [ADR-008](../dec
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-007-queue-abstraction.md](../decisions/ADR-007-queue-abstraction.md) | Hybrid queue, interface methods, retry/dead-letter behavior. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Adapter runs in sidecar; no queue in plugin. |
-| [docs/decisions/ADR-004-per-vault-index-storage.md](../decisions/ADR-004-per-vault-index-storage.md) | Queue rows live in the same per-vault DB as the index. |
+| ADR                                                                                                  | Why it binds this story                                      |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [docs/decisions/ADR-007-queue-abstraction.md](../decisions/ADR-007-queue-abstraction.md)             | Hybrid queue, interface methods, retry/dead-letter behavior. |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)       | Adapter runs in sidecar; no queue in plugin.                 |
+| [docs/decisions/ADR-004-per-vault-index-storage.md](../decisions/ADR-004-per-vault-index-storage.md) | Queue rows live in the same per-vault DB as the index.       |
 
 ---
 
@@ -101,16 +101,16 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/adapters/InProcessQueue.ts` | `IQueuePort` implementation. |
-| 2 | `src/sidecar/adapters/InProcessQueue.test.ts` | Persistence, ack/nack, restart simulation, peek. |
+| #   | Path                                          | Purpose                                          |
+| --- | --------------------------------------------- | ------------------------------------------------ |
+| 1   | `src/sidecar/adapters/InProcessQueue.ts`      | `IQueuePort` implementation.                     |
+| 2   | `src/sidecar/adapters/InProcessQueue.test.ts` | Persistence, ack/nack, restart simulation, peek. |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| — | — | None strictly required beyond STO-1 DB helpers if shared. |
+| #   | Path | Change                                                    |
+| --- | ---- | --------------------------------------------------------- |
+| —   | —    | None strictly required beyond STO-1 DB helpers if shared. |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -123,55 +123,55 @@ Not applicable.
 
 ### Phase A: Core semantics
 
-- [ ] **A1** — `enqueue` then `dequeue(10)` returns items with correct typed payload round-trip (e.g. `{ notePath: string, noteId: string }`).
+- [x] **A1** — `enqueue` then `dequeue(10)` returns items with correct typed payload round-trip (e.g. `{ notePath: string, noteId: string }`).
   - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::A1_enqueue_dequeue_roundtrip(vitest)`
 
-- [ ] **A2** — `ack` removes item from further dequeues; DB row shows `completed`.
+- [x] **A2** — `ack` removes item from further dequeues; DB row shows `completed`.
   - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::A2_ack_completes(vitest)`
 
-- [ ] **A3** — `nack` with sub-threshold retries returns item to `pending` and preserves/updates `error_message`.
+- [x] **A3** — `nack` with sub-threshold retries returns item to `pending` and preserves/updates `error_message`.
   - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::A3_nack_retries(vitest)`
 
-- [ ] **A4** — `nack` beyond `maxRetries` sets `dead_letter`; item never dequeues again.
+- [x] **A4** — `nack` beyond `maxRetries` sets `dead_letter`; item never dequeues again.
   - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::A4_dead_letter(vitest)`
 
 ### Phase B: Recovery and visibility
 
-- [ ] **B1** — After items are left `processing`, constructing a **new** `InProcessQueue` against the same DB requeues them as `pending` and they dequeue again.
+- [x] **B1** — After items are left `processing`, constructing a **new** `InProcessQueue` against the same DB requeues them as `pending` and they dequeue again.
   - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::B1_restart_reclaims_processing(vitest)`
 
-- [ ] **B2** — `peek()` matches the number of pending items before dequeue in a multi-item scenario.
+- [x] **B2** — `peek()` matches the number of pending items before dequeue in a multi-item scenario.
   - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::B2_peek_matches_pending(vitest)`
 
 ### Phase C: Concurrency (lightweight)
 
-- [ ] **C1** — With `queueConcurrency` > 1, the adapter does not exceed the configured number of concurrent `processing` slots when driven by parallel dequeue callers **or** documents a single-threaded dequeue driver pattern and enforces slot limit internally — **must** be explicit in implementation + test.
+- [x] **C1** — With `queueConcurrency` > 1, the adapter does not exceed the configured number of concurrent `processing` slots when driven by parallel dequeue callers **or** documents a single-threaded dequeue driver pattern and enforces slot limit internally — **must** be explicit in implementation + test.
   - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::C1_concurrency_cap(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `InProcessQueue` lives under `src/sidecar/adapters/` and implements `IQueuePort` imported from `src/core/ports/`.
+- [x] **Y1** — **(binding)** `InProcessQueue` lives under `src/sidecar/adapters/` and implements `IQueuePort` imported from `src/core/ports/`.
   - Evidence: `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
-- [ ] **Y2** — **(binding)** Queue persistence uses `queue_items` columns as per README §8 (no ad-hoc extra statuses).
+- [x] **Y2** — **(binding)** Queue persistence uses `queue_items` columns as per README §8 (no ad-hoc extra statuses).
   - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::Y2_status_values_only_readme(vitest)` (assert CHECK passes / invalid status rejected)
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias — N/A; document N/A
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias — N/A; document N/A
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | JSON payload evolution | Version field inside payload for future WKF-2 if needed. |
-| 2 | `processing` reclaim vs double-execution | Reclaim to `pending` on startup; idempotency still relies on QUE-2/WKF-2 — document at-least-once semantics. |
+| #   | Risk / Tradeoff                          | Mitigation                                                                                                   |
+| --- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 1   | JSON payload evolution                   | Version field inside payload for future WKF-2 if needed.                                                     |
+| 2   | `processing` reclaim vs double-execution | Reclaim to `pending` on startup; idempotency still relies on QUE-2/WKF-2 — document at-least-once semantics. |
 
 ---
 
@@ -185,4 +185,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: QUE-1 | Epic: 3 — SQLite store, vectors, and indexing persistence*
+_Created: 2026-04-05 | Story: QUE-1 | Epic: 3 — SQLite store, vectors, and indexing persistence_

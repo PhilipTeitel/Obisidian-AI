@@ -3,7 +3,7 @@
 **Story**: Extend the sidecar database with **`vec_content` and `vec_summary`** sqlite-vec `vec0` virtual tables plus the **`embedding_meta`** relational table, where the **embedding dimension** used in `FLOAT[d]` DDL is taken from sidecar configuration (default **1536**, matching [Plugin Settings](../../README.md#plugin-settings) `embeddingDimension`) so vector storage stays aligned with the active embedding model.
 **Epic**: 3 — SQLite store, vectors, and indexing persistence
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -21,10 +21,10 @@ Pointers: README §8 (`vec_content`, `vec_summary`, `embedding_meta`); [src/core
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | sqlite-vec + better-sqlite3 run only in the sidecar; plugin ships no native vector stack. |
-| [docs/decisions/ADR-004-per-vault-index-storage.md](../decisions/ADR-004-per-vault-index-storage.md) | Vector data lives in the same per-vault DB file as relational tables. |
+| ADR                                                                                                  | Why it binds this story                                                                   |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)       | sqlite-vec + better-sqlite3 run only in the sidecar; plugin ships no native vector stack. |
+| [docs/decisions/ADR-004-per-vault-index-storage.md](../decisions/ADR-004-per-vault-index-storage.md) | Vector data lives in the same per-vault DB file as relational tables.                     |
 
 **None additional** — vector technology choice is fixed by README + REQUIREMENTS + ADR-006; no new ADR required for configurable dimension within sqlite-vec.
 
@@ -54,10 +54,10 @@ Pointers: README §8 (`vec_content`, `vec_summary`, `embedding_meta`); [src/core
 
 No HTTP routes. Sidecar-internal API:
 
-| Attribute | Value |
-|-----------|-------|
-| Surface | `loadVecExtension(db: Database): void` + `runVectorMigrations(db, { dimension: number }): void` |
-| Auth | N/A |
+| Attribute | Value                                                                                           |
+| --------- | ----------------------------------------------------------------------------------------------- |
+| Surface   | `loadVecExtension(db: Database): void` + `runVectorMigrations(db, { dimension: number }): void` |
+| Auth      | N/A                                                                                             |
 
 ```ts
 /** Implementer aligns with better-sqlite3 Database type. */
@@ -95,19 +95,19 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/db/migrations/002_vectors.sql` (or dynamic DDL in TS) | `vec_content`, `vec_summary`, `embedding_meta` with parameterized dimension. |
-| 2 | `src/sidecar/db/load-sqlite-vec.ts` | Locate and `loadExtension` for sqlite-vec native binary in Node. |
-| 3 | `src/sidecar/db/vector-migrate.test.ts` | Dimension correctness, extension load (skip in CI if no binary — document `vitest` `skip` policy). |
+| #   | Path                                                               | Purpose                                                                                            |
+| --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| 1   | `src/sidecar/db/migrations/002_vectors.sql` (or dynamic DDL in TS) | `vec_content`, `vec_summary`, `embedding_meta` with parameterized dimension.                       |
+| 2   | `src/sidecar/db/load-sqlite-vec.ts`                                | Locate and `loadExtension` for sqlite-vec native binary in Node.                                   |
+| 3   | `src/sidecar/db/vector-migrate.test.ts`                            | Dimension correctness, extension load (skip in CI if no binary — document `vitest` `skip` policy). |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/sidecar/db/migrate.ts` | Chain STO-2 after STO-1; bump version; pass `dimension` from caller. |
-| 2 | `package.json` | Add `sqlite-vec` dependency compatible with better-sqlite3 / Node 18+. |
-| 3 | `esbuild.sidecar.mjs` | Keep `sqlite-vec` external where required for native resolution at runtime. |
+| #   | Path                        | Change                                                                      |
+| --- | --------------------------- | --------------------------------------------------------------------------- |
+| 1   | `src/sidecar/db/migrate.ts` | Chain STO-2 after STO-1; bump version; pass `dimension` from caller.        |
+| 2   | `package.json`              | Add `sqlite-vec` dependency compatible with better-sqlite3 / Node 18+.      |
+| 3   | `esbuild.sidecar.mjs`       | Keep `sqlite-vec` external where required for native resolution at runtime. |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -120,47 +120,47 @@ Not applicable.
 
 ### Phase A: Schema and dimension
 
-- [ ] **A1** — After STO-1 + STO-2 migrations with `dimension = 1536`, both `vec_content` and `vec_summary` exist and accept inserts of 1536-dimensional vectors bound to `node_id` keys present in `nodes`.
+- [x] **A1** — After STO-1 + STO-2 migrations with `dimension = 1536`, both `vec_content` and `vec_summary` exist and accept inserts of 1536-dimensional vectors bound to `node_id` keys present in `nodes`.
   - Evidence: `src/sidecar/db/vector-migrate.test.ts::A1_vec_tables_roundtrip(vitest)` _(may be integration-only if extension load required)_
 
-- [ ] **A2** — `embedding_meta` enforces PK `(node_id, vector_type)` and valid `vector_type` CHECK; FK cascade deletes when parent node removed.
+- [x] **A2** — `embedding_meta` enforces PK `(node_id, vector_type)` and valid `vector_type` CHECK; FK cascade deletes when parent node removed.
   - Evidence: `src/sidecar/db/vector-migrate.test.ts::A2_embedding_meta_fk(vitest)`
 
-- [ ] **A3** — Creating a new DB with `dimension = 768` (example alternate) produces vec DDL with `FLOAT[768]` (inspect generated SQL or pragma — exact introspection method documented in test comment).
+- [x] **A3** — Creating a new DB with `dimension = 768` (example alternate) produces vec DDL with `FLOAT[768]` (inspect generated SQL or pragma — exact introspection method documented in test comment).
   - Evidence: `src/sidecar/db/vector-migrate.test.ts::A3_dimension_parameterized(vitest)`
 
 ### Phase B: Misconfiguration guard
 
-- [ ] **B1** — Opening a DB that was created with dimension D and passing dimension D′ ≠ D causes a **thrown** or **Result** error before any write (per section 4 Y5).
+- [x] **B1** — Opening a DB that was created with dimension D and passing dimension D′ ≠ D causes a **thrown** or **Result** error before any write (per section 4 Y5).
   - Evidence: `src/sidecar/db/vector-migrate.test.ts::B1_dimension_mismatch_fails(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** Root `package.json` lists `sqlite-vec` as a dependency; `src/plugin/**` has no `sqlite-vec` string in imports.
+- [x] **Y1** — **(binding)** Root `package.json` lists `sqlite-vec` as a dependency; `src/plugin/**` has no `sqlite-vec` string in imports.
   - Evidence: `package.json lists "sqlite-vec"` + `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
-- [ ] **Y2** — **(binding)** Sidecar source loads sqlite-vec via `src/sidecar/**` only; `rg "sqlite-vec|loadExtension" src/core src/plugin` returns no matches (or only documented false positives).
+- [x] **Y2** — **(binding)** Sidecar source loads sqlite-vec via `src/sidecar/**` only; `rg "sqlite-vec|loadExtension" src/core src/plugin` returns no matches (or only documented false positives).
   - Evidence: `src/sidecar/db/vector-migrate.test.ts::Y2_sidecar_only_load(vitest)` or CI grep step
 
-- [ ] **Y3** — **(binding)** `npm run verify:plugin-bundle` passes.
+- [x] **Y3** — **(binding)** `npm run verify:plugin-bundle` passes.
   - Evidence: `scripts/verify-plugin-bundle.mjs(npm run verify:plugin-bundle)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A if unchanged; document N/A in PR
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A if unchanged; document N/A in PR
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | sqlite-vec native binary not available on some dev/CI hosts | Gate extension tests behind env flag; document local install; TST-2 covers full integration later. |
-| 2 | Users switching embedding models with different dimensions | Fail fast (Y5); user docs (DOC-2) for delete DB / reindex. |
+| #   | Risk / Tradeoff                                             | Mitigation                                                                                         |
+| --- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 1   | sqlite-vec native binary not available on some dev/CI hosts | Gate extension tests behind env flag; document local install; TST-2 covers full integration later. |
+| 2   | Users switching embedding models with different dimensions  | Fail fast (Y5); user docs (DOC-2) for delete DB / reindex.                                         |
 
 ---
 
@@ -175,4 +175,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: STO-2 | Epic: 3 — SQLite store, vectors, and indexing persistence*
+_Created: 2026-04-05 | Story: STO-2 | Epic: 3 — SQLite store, vectors, and indexing persistence_

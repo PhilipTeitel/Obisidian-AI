@@ -3,7 +3,7 @@
 **Story**: Implement **`SqliteDocumentStore`** in the sidecar — a concrete adapter for [IDocumentStore](../../src/core/ports/IDocumentStore.ts) over `better-sqlite3`, relational tables from STO-1, and sqlite-vec from STO-2 — providing CRUD for nodes/summaries/tags/cross-refs/note metadata, **ANN search** on summary and content vectors, and **tree navigation** (`getAncestors`, `getSiblings`) for context assembly.
 **Epic**: 3 — SQLite store, vectors, and indexing persistence
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -23,11 +23,11 @@ Pointers: [README API Contract](../../README.md#port-interfaces-internal-service
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Adapter lives in sidecar; native SQLite only. |
-| [docs/decisions/ADR-004-per-vault-index-storage.md](../decisions/ADR-004-per-vault-index-storage.md) | Store operates on the per-vault DB file path supplied by future settings wiring. |
-| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md) | ANN + filter semantics must support coarse → drill-down retrieval. |
+| ADR                                                                                                          | Why it binds this story                                                                                     |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)               | Adapter lives in sidecar; native SQLite only.                                                               |
+| [docs/decisions/ADR-004-per-vault-index-storage.md](../decisions/ADR-004-per-vault-index-storage.md)         | Store operates on the per-vault DB file path supplied by future settings wiring.                            |
+| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md)     | ANN + filter semantics must support coarse → drill-down retrieval.                                          |
 | [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Node types and hierarchy inform `getAncestors` / `getSiblings` ordering (document order = `sibling_order`). |
 
 ---
@@ -61,7 +61,9 @@ No new HTTP routes. The public TypeScript surface is **`IDocumentStore`** (alrea
 ```ts
 // No new shared types required if IDocumentStore + domain types suffice.
 // If tests need a factory:
-export function createSqliteDocumentStore(db: unknown): import('../core/ports/IDocumentStore.js').IDocumentStore;
+export function createSqliteDocumentStore(
+  db: unknown,
+): import('../core/ports/IDocumentStore.js').IDocumentStore;
 ```
 
 ---
@@ -88,16 +90,16 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/adapters/SqliteDocumentStore.ts` | `IDocumentStore` implementation. |
-| 2 | `src/sidecar/adapters/SqliteDocumentStore.test.ts` | Unit/integration tests with `:memory:` DB + migrations + vec extension (or mocked vec layer only if Y-binding still covered by integration sibling test — prefer real vec when feasible). |
+| #   | Path                                               | Purpose                                                                                                                                                                                   |
+| --- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `src/sidecar/adapters/SqliteDocumentStore.ts`      | `IDocumentStore` implementation.                                                                                                                                                          |
+| 2   | `src/sidecar/adapters/SqliteDocumentStore.test.ts` | Unit/integration tests with `:memory:` DB + migrations + vec extension (or mocked vec layer only if Y-binding still covered by integration sibling test — prefer real vec when feasible). |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/sidecar/db/migrate.ts` | Export a test helper `openMigratedMemoryDb(options?)` if shared by store tests (optional). |
+| #   | Path                        | Change                                                                                     |
+| --- | --------------------------- | ------------------------------------------------------------------------------------------ |
+| 1   | `src/sidecar/db/migrate.ts` | Export a test helper `openMigratedMemoryDb(options?)` if shared by store tests (optional). |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -110,58 +112,58 @@ Not applicable.
 
 ### Phase A: CRUD and note metadata
 
-- [ ] **A1** — `upsertNodes` + `getNodesByNote` round-trip: persisted `DocumentNode` fields match input (including `headingTrail` JSON and timestamps).
+- [x] **A1** — `upsertNodes` + `getNodesByNote` round-trip: persisted `DocumentNode` fields match input (including `headingTrail` JSON and timestamps).
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A1_nodes_roundtrip(vitest)`
 
-- [ ] **A2** — `deleteNote` removes all nodes for `note_id` and dependent summaries, tags, cross_refs, embedding rows (vec + meta) — verified by absence in queries.
+- [x] **A2** — `deleteNote` removes all nodes for `note_id` and dependent summaries, tags, cross_refs, embedding rows (vec + meta) — verified by absence in queries.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A2_delete_note_cascade(vitest)`
 
-- [ ] **A3** — `upsertSummary` and `upsertNoteMeta` / `getNoteMeta` round-trip per README columns.
+- [x] **A3** — `upsertSummary` and `upsertNoteMeta` / `getNoteMeta` round-trip per README columns.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A3_summary_note_meta(vitest)`
 
 ### Phase B: Vector search and filters
 
-- [ ] **B1** — `upsertEmbedding` + `searchSummaryVectors` returns top-`k` matches with **finite** scores ordered best-first (sqlite-vec distance semantics documented in test).
+- [x] **B1** — `upsertEmbedding` + `searchSummaryVectors` returns top-`k` matches with **finite** scores ordered best-first (sqlite-vec distance semantics documented in test).
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B1_summary_ann(vitest)`
 
-- [ ] **B2** — `searchContentVectors` with `NodeFilter.noteIds` returns only hits inside those notes.
+- [x] **B2** — `searchContentVectors` with `NodeFilter.noteIds` returns only hits inside those notes.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B2_content_filter_note_ids(vitest)`
 
-- [ ] **B3** — `searchContentVectors` with `NodeFilter.nodeTypes` restricts to those `type` values.
+- [x] **B3** — `searchContentVectors` with `NodeFilter.nodeTypes` restricts to those `type` values.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B3_content_filter_node_types(vitest)`
 
 ### Phase C: Tree navigation
 
-- [ ] **C1** — `getAncestors` returns correct ordered chain for a small synthetic tree.
+- [x] **C1** — `getAncestors` returns correct ordered chain for a small synthetic tree.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::C1_ancestors(vitest)`
 
-- [ ] **C2** — `getSiblings` returns ordered siblings excluding self.
+- [x] **C2** — `getSiblings` returns ordered siblings excluding self.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::C2_siblings(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `rg "from '../core/" src/sidecar/adapters/SqliteDocumentStore.ts` shows only **permitted** imports into `src/core` (ports/types); **no** imports from `src/plugin`; no `better-sqlite3` in `src/core`.
+- [x] **Y1** — **(binding)** `rg "from '../core/" src/sidecar/adapters/SqliteDocumentStore.ts` shows only **permitted** imports into `src/core` (ports/types); **no** imports from `src/plugin`; no `better-sqlite3` in `src/core`.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` + `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
-- [ ] **Y2** — **(binding)** `SqliteDocumentStore` source file path is under `src/sidecar/`.
+- [x] **Y2** — **(binding)** `SqliteDocumentStore` source file path is under `src/sidecar/`.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::Y2_adapter_path(vitest)` or filesystem assertion in test
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A if story touches no shared client; document N/A
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A if story touches no shared client; document N/A
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Full note upsert strategy is easy to get wrong vs incremental updates | Start with **delete note subtree + insert batch** in one transaction; optimize later. |
-| 2 | sqlite-vec query API differences by version | Pin dependency version; encapsulate SQL in one module. |
+| #   | Risk / Tradeoff                                                       | Mitigation                                                                            |
+| --- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 1   | Full note upsert strategy is easy to get wrong vs incremental updates | Start with **delete note subtree + insert batch** in one transaction; optimize later. |
+| 2   | sqlite-vec query API differences by version                           | Pin dependency version; encapsulate SQL in one module.                                |
 
 ---
 
@@ -177,4 +179,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: STO-3 | Epic: 3 — SQLite store, vectors, and indexing persistence*
+_Created: 2026-04-05 | Story: STO-3 | Epic: 3 — SQLite store, vectors, and indexing persistence_

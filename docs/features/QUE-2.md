@@ -3,7 +3,7 @@
 **Story**: Implement a sidecar **job-step service** backed by the `job_steps` table ([README §8](../../README.md#8-sqlite-schema), [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md)) that records per-note **state transitions**, enforces **idempotent** updates, supports **resume** after crash (reload non-terminal jobs), applies a **retry cap** aligned with queue dead-letter policy, and emits **[IProgressPort](../../src/core/ports/IProgressPort.ts)** events using [IndexProgressEvent](../../src/core/domain/types.ts) shapes (including **`runId`** correlation per FND-3 types).
 **Epic**: 3 — SQLite store, vectors, and indexing persistence
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -34,11 +34,11 @@ Pointers: ADR-008; [index/status](../../README.md#sidecar-message-protocol) `job
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-008-idempotent-indexing-state-machine.md](../decisions/ADR-008-idempotent-indexing-state-machine.md) | State machine, columns, retries, dead-letter, progress emissions. |
-| [docs/decisions/ADR-007-queue-abstraction.md](../decisions/ADR-007-queue-abstraction.md) | Resume interacts with re-enqueue; retry cap must align with queue `maxRetries` policy. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Service runs in sidecar only. |
+| ADR                                                                                                                      | Why it binds this story                                                                |
+| ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| [docs/decisions/ADR-008-idempotent-indexing-state-machine.md](../decisions/ADR-008-idempotent-indexing-state-machine.md) | State machine, columns, retries, dead-letter, progress emissions.                      |
+| [docs/decisions/ADR-007-queue-abstraction.md](../decisions/ADR-007-queue-abstraction.md)                                 | Resume interacts with re-enqueue; retry cap must align with queue `maxRetries` policy. |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)                           | Service runs in sidecar only.                                                          |
 
 ---
 
@@ -65,7 +65,7 @@ Pointers: ADR-008; [index/status](../../README.md#sidecar-message-protocol) `job
 
 ## 5. API Endpoints + Schemas
 
-No HTTP routes in this story (SRV-* will expose `index/status` later). Internal TypeScript API:
+No HTTP routes in this story (SRV-\* will expose `index/status` later). Internal TypeScript API:
 
 ```ts
 import type { IProgressPort } from '../../core/ports/IProgressPort.js';
@@ -80,19 +80,9 @@ export interface JobStepServiceOptions {
 export class JobStepService {
   constructor(options: JobStepServiceOptions);
 
-  ensureJob(input: {
-    jobId: string;
-    runId: string;
-    notePath: string;
-    contentHash: string;
-  }): void;
+  ensureJob(input: { jobId: string; runId: string; notePath: string; contentHash: string }): void;
 
-  transitionStep(input: {
-    jobId: string;
-    runId: string;
-    to: IndexStep;
-    detail?: string;
-  }): void;
+  transitionStep(input: { jobId: string; runId: string; to: IndexStep; detail?: string }): void;
 
   markFailed(input: { jobId: string; runId: string; message: string }): void;
 
@@ -127,16 +117,16 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/adapters/JobStepService.ts` | `job_steps` access + progress emit. |
-| 2 | `src/sidecar/adapters/JobStepService.test.ts` | State transitions, idempotency, retry cap, recoverable listing, fake `IProgressPort`. |
+| #   | Path                                          | Purpose                                                                               |
+| --- | --------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 1   | `src/sidecar/adapters/JobStepService.ts`      | `job_steps` access + progress emit.                                                   |
+| 2   | `src/sidecar/adapters/JobStepService.test.ts` | State transitions, idempotency, retry cap, recoverable listing, fake `IProgressPort`. |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| — | — | None required in core if types already match ADR-008. |
+| #   | Path | Change                                                |
+| --- | ---- | ----------------------------------------------------- |
+| —   | —    | None required in core if types already match ADR-008. |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -148,57 +138,57 @@ Not applicable.
 
 ### Phase A: Persistence and state machine
 
-- [ ] **A1** — `ensureJob` inserts a row with `current_step = 'queued'` (or documented initial) and sets `content_hash`, `note_path`, `job_id`.
+- [x] **A1** — `ensureJob` inserts a row with `current_step = 'queued'` (or documented initial) and sets `content_hash`, `note_path`, `job_id`.
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::A1_ensure_job(vitest)`
 
-- [ ] **A2** — `transitionStep` advances along the ADR-008 ordering (e.g. `queued` → `parsing` → `parsed` → …) and rejects impossible skips unless explicitly allowed with test justification.
+- [x] **A2** — `transitionStep` advances along the ADR-008 ordering (e.g. `queued` → `parsing` → `parsed` → …) and rejects impossible skips unless explicitly allowed with test justification.
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::A2_valid_transitions(vitest)`
 
-- [ ] **A3** — Idempotent behavior: calling `transitionStep` to the **same** `to` step twice does not corrupt row (second call no-op or safe).
+- [x] **A3** — Idempotent behavior: calling `transitionStep` to the **same** `to` step twice does not corrupt row (second call no-op or safe).
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::A3_idempotent_repeat(vitest)`
 
 ### Phase B: Failure, retry, dead-letter
 
-- [ ] **B1** — `markFailed` sets `failed` state, stores `error_message`, emits progress with `status: 'failed'`.
+- [x] **B1** — `markFailed` sets `failed` state, stores `error_message`, emits progress with `status: 'failed'`.
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::B1_mark_failed(vitest)`
 
-- [ ] **B2** — Retry path increments `retry_count` and can return job toward `queued` until cap; beyond cap → `dead_letter` and no further automatic retry.
+- [x] **B2** — Retry path increments `retry_count` and can return job toward `queued` until cap; beyond cap → `dead_letter` and no further automatic retry.
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::B2_retry_and_dead_letter(vitest)`
 
 ### Phase C: Resume listing
 
-- [ ] **C1** — `listRecoverableJobs` excludes `embedded` and `dead_letter` but includes `failed` and in-progress states per ADR-008 restart narrative.
+- [x] **C1** — `listRecoverableJobs` excludes `embedded` and `dead_letter` but includes `failed` and in-progress states per ADR-008 restart narrative.
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::C1_recoverable_jobs(vitest)`
 
 ### Phase D: Progress emissions
 
-- [ ] **D1** — For a linear happy-path transition sequence, the fake `IProgressPort` receives events with correct `jobId`, `runId`, `notePath`, `step`, and `status` values.
+- [x] **D1** — For a linear happy-path transition sequence, the fake `IProgressPort` receives events with correct `jobId`, `runId`, `notePath`, `step`, and `status` values.
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::D1_progress_sequence(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** Service module imports `IProgressPort` and domain types from `src/core/` only (ports/domain), not from `src/plugin/`.
+- [x] **Y1** — **(binding)** Service module imports `IProgressPort` and domain types from `src/core/` only (ports/domain), not from `src/plugin/`.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` + `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
-- [ ] **Y2** — **(binding)** SQL uses `job_steps` column names exactly as README §8 (`job_id`, `note_path`, `current_step`, `content_hash`, `retry_count`, `error_message`, `updated_at`).
+- [x] **Y2** — **(binding)** SQL uses `job_steps` column names exactly as README §8 (`job_id`, `note_path`, `current_step`, `content_hash`, `retry_count`, `error_message`, `updated_at`).
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::Y2_column_roundtrip(vitest)` (pragma `table_info` or typed read)
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias — N/A; document N/A
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias — N/A; document N/A
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | WKF-2 not yet present — risk of wrong API shape | Keep service methods minimal; add integration test in WKF-2 story later. |
-| 2 | Duplicate progress events | Document which transitions emit `started` vs `completed`; tests lock behavior. |
+| #   | Risk / Tradeoff                                 | Mitigation                                                                     |
+| --- | ----------------------------------------------- | ------------------------------------------------------------------------------ |
+| 1   | WKF-2 not yet present — risk of wrong API shape | Keep service methods minimal; add integration test in WKF-2 story later.       |
+| 2   | Duplicate progress events                       | Document which transitions emit `started` vs `completed`; tests lock behavior. |
 
 ---
 
@@ -213,4 +203,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: QUE-2 | Epic: 3 — SQLite store, vectors, and indexing persistence*
+_Created: 2026-04-05 | Story: QUE-2 | Epic: 3 — SQLite store, vectors, and indexing persistence_
