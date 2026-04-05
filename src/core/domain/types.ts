@@ -39,6 +39,13 @@ export interface EmbedMeta {
   contentHash: string;
 }
 
+/** Row shape for `summaries` (read path for WKF-1 / WKF-3). */
+export interface StoredSummary {
+  summary: string;
+  generatedAt: string;
+  model: string | null;
+}
+
 export interface VectorMatch {
   nodeId: string;
   score: number;
@@ -136,6 +143,19 @@ export interface ChunkNoteInput {
 export interface QueueItem<T> {
   id: string;
   payload: T;
+}
+
+/**
+ * Payload in `queue_items.payload` for indexing (QUE-1 JSON-serializable object: no functions,
+ * no `undefined` values in serialized payloads).
+ * Use vault-relative path as `noteId` for MVP (matches `note_meta` / chunker).
+ */
+export interface NoteIndexJob {
+  noteId: string;
+  vaultPath: string;
+  noteTitle: string;
+  markdown: string;
+  contentHash: string;
 }
 
 // --- Sidecar wire shapes (README API Contract; framing deferred to SRV-*) ---

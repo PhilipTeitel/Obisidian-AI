@@ -3,6 +3,9 @@ import type {
   EmbedMeta,
   NodeFilter,
   NoteMeta,
+  ParsedCrossRef,
+  ParsedTag,
+  StoredSummary,
   VectorMatch,
   VectorType,
 } from '../domain/types.js';
@@ -13,9 +16,15 @@ import type {
  */
 export interface IDocumentStore {
   upsertNodes(nodes: DocumentNode[]): Promise<void>;
+  /** Replace all `tags` rows for nodes belonging to `noteId` (call after `upsertNodes`). */
+  replaceNoteTags(noteId: string, tags: ParsedTag[]): Promise<void>;
+  /** Replace all `cross_refs` rows sourced from nodes of `noteId` (call after `upsertNodes`). */
+  replaceNoteCrossRefs(noteId: string, refs: ParsedCrossRef[]): Promise<void>;
   getNodesByNote(noteId: string): Promise<DocumentNode[]>;
   deleteNote(noteId: string): Promise<void>;
   upsertSummary(nodeId: string, summary: string, model: string): Promise<void>;
+  getSummary(nodeId: string): Promise<StoredSummary | null>;
+  getEmbeddingMeta(nodeId: string, vectorType: VectorType): Promise<EmbedMeta | null>;
   upsertEmbedding(
     nodeId: string,
     type: VectorType,

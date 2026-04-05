@@ -3,7 +3,7 @@
 **Story**: Implement **`SummaryWorkflow`** in `src/core/workflows/SummaryWorkflow.ts` that walks a note’s hierarchical tree **post-order** (leaves first), generates **LLM summaries for every non-leaf node** via **`IChatPort`**, persists them through **`IDocumentStore.upsertSummary`**, and **skips redundant chat calls** when stored summaries are **fresh** per [README §13 — Incremental summaries](../../README.md#13-incremental-summaries) and [ADR-008 §2](../../docs/decisions/ADR-008-idempotent-indexing-state-machine.md) (summarizing idempotency).
 **Epic**: 4 — Index, summary, and embedding workflows
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -148,40 +148,40 @@ Not applicable.
 
 ### Phase A: Port extensions
 
-- [ ] **A1** — `IDocumentStore.getSummary` returns `null` when no row exists, otherwise `{ summary, generatedAt, model }` with ISO-like timestamps consistent with SQLite `datetime('now')` / existing `upsertSummary` writes.
+- [x] **A1** — `IDocumentStore.getSummary` returns `null` when no row exists, otherwise `{ summary, generatedAt, model }` with ISO-like timestamps consistent with SQLite `datetime('now')` / existing `upsertSummary` writes.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A1_getSummary_roundtrip(vitest)`
-- [ ] **A2** — `IDocumentStore.getEmbeddingMeta` returns `null` when no `embedding_meta` row exists for the `(nodeId, vectorType)` pair; otherwise returns `EmbedMeta` fields including `contentHash`.
+- [x] **A2** — `IDocumentStore.getEmbeddingMeta` returns `null` when no `embedding_meta` row exists for the `(nodeId, vectorType)` pair; otherwise returns `EmbedMeta` fields including `contentHash`.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A2_get_embedding_meta(vitest)`
 
 ### Phase B: Traversal and prompts
 
-- [ ] **B1** — For a synthetic tree (note → two paragraph leaves), `SummaryWorkflow` calls `IChatPort.complete` **exactly once** for the parent non-leaf and **never** for leaves; the persisted summary is passed to `upsertSummary` with the correct `nodeId` and non-empty string.
+- [x] **B1** — For a synthetic tree (note → two paragraph leaves), `SummaryWorkflow` calls `IChatPort.complete` **exactly once** for the parent non-leaf and **never** for leaves; the persisted summary is passed to `upsertSummary` with the correct `nodeId` and non-empty string.
   - Evidence: `src/core/workflows/SummaryWorkflow.test.ts::B1_single_parent_two_leaves(vitest)`
-- [ ] **B2** — Post-order: for a depth-3 chain (root topic → subtopic → paragraph), the **deepest** non-leaf is summarized **before** its parent (verify call order via fake that records sequence).
+- [x] **B2** — Post-order: for a depth-3 chain (root topic → subtopic → paragraph), the **deepest** non-leaf is summarized **before** its parent (verify call order via fake that records sequence).
   - Evidence: `src/core/workflows/SummaryWorkflow.test.ts::B2_post_order_depth_chain(vitest)`
 
 ### Phase C: Skip / staleness
 
-- [ ] **C1** — When a non-leaf already has `summaries.generated_at` ≥ `nodes.updated_at` and no dirty marking applies, **zero** `IChatPort.complete` invocations occur for that node (skipped).
+- [x] **C1** — When a non-leaf already has `summaries.generated_at` ≥ `nodes.updated_at` and no dirty marking applies, **zero** `IChatPort.complete` invocations occur for that node (skipped).
   - Evidence: `src/core/workflows/SummaryWorkflow.test.ts::C1_skip_fresh_summary(vitest)`
-- [ ] **C2** — When a leaf’s `content` changes (new hash / updated row), the workflow regenerates summaries for **that leaf’s parent and every ancestor** up to the note root (at least one chat call per affected non-leaf).
+- [x] **C2** — When a leaf’s `content` changes (new hash / updated row), the workflow regenerates summaries for **that leaf’s parent and every ancestor** up to the note root (at least one chat call per affected non-leaf).
   - Evidence: `src/core/workflows/SummaryWorkflow.test.ts::C2_propagate_after_leaf_change(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** No forbidden imports under `src/core/workflows/` (no `better-sqlite3`, `obsidian`, `electron`, or path into `src/sidecar/`).
+- [x] **Y1** — **(binding)** No forbidden imports under `src/core/workflows/` (no `better-sqlite3`, `obsidian`, `electron`, or path into `src/sidecar/`).
   - Verification: `rg` from repo root with negative pattern returns no matches in `src/core/workflows/`.
   - Evidence: `npm run verify:core-imports` (uses `scripts/check-core-imports.mjs` over `src/core/**`)
-- [ ] **Y2** — **(binding)** `SummaryWorkflow` source never imports from `openai`, `@anthropic-ai/sdk`, or `ollama` packages.
+- [x] **Y2** — **(binding)** `SummaryWorkflow` source never imports from `openai`, `@anthropic-ai/sdk`, or `ollama` packages.
   - Evidence: `package.json` does not add those deps to `src/core` path; `rg '^import.*openai' src/core/workflows` returns empty.
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A if no shared package change; if `packages/shared` is touched, enforce alias
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A if no shared package change; if `packages/shared` is touched, enforce alias
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

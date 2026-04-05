@@ -3,6 +3,9 @@ import type {
   EmbedMeta,
   NodeFilter,
   NoteMeta,
+  ParsedCrossRef,
+  ParsedTag,
+  StoredSummary,
   VectorMatch,
   VectorType,
 } from '../../core/domain/types.js';
@@ -89,6 +92,38 @@ export class SqliteDocumentStore implements IDocumentStore {
     txn();
   }
 
+  async replaceNoteTags(noteId: string, tags: ParsedTag[]): Promise<void> {
+    const txn = this.db.transaction(() => {
+      this.db
+        .prepare(`DELETE FROM tags WHERE node_id IN (SELECT id FROM nodes WHERE note_id = ?)`)
+        .run(noteId);
+      const ins = this.db.prepare(
+        `INSERT INTO tags (node_id, tag, source) VALUES (?, ?, ?)`,
+      );
+      for (const t of tags) {
+        ins.run(t.nodeId, t.tag, t.source);
+      }
+    });
+    txn();
+  }
+
+  async replaceNoteCrossRefs(noteId: string, refs: ParsedCrossRef[]): Promise<void> {
+    const txn = this.db.transaction(() => {
+      this.db
+        .prepare(
+          `DELETE FROM cross_refs WHERE source_node_id IN (SELECT id FROM nodes WHERE note_id = ?)`,
+        )
+        .run(noteId);
+      const ins = this.db.prepare(
+        `INSERT INTO cross_refs (source_node_id, target_path, link_text) VALUES (?, ?, ?)`,
+      );
+      for (const r of refs) {
+        ins.run(r.sourceNodeId, r.targetPath, r.linkText);
+      }
+    });
+    txn();
+  }
+
   async getNodesByNote(noteId: string): Promise<DocumentNode[]> {
     const rows = this.db
       .prepare(`SELECT * FROM nodes WHERE note_id = ? ORDER BY depth ASC, sibling_order ASC`)
@@ -97,6 +132,7 @@ export class SqliteDocumentStore implements IDocumentStore {
   }
 
   async deleteNote(noteId: string): Promise<void> {
+    this.db.prepare('DELETE FROM note_meta WHERE note_id = ?').run(noteId);
     this.db.prepare('DELETE FROM nodes WHERE note_id = ?').run(noteId);
   }
 
@@ -111,6 +147,36 @@ export class SqliteDocumentStore implements IDocumentStore {
            generated_at = datetime('now')`,
       )
       .run(nodeId, summary, model);
+  }
+
+  async getSummary(nodeId: string): Promise<StoredSummary | null> {
+    const row = this.db
+      .prepare('SELECT summary, generated_at, model FROM summaries WHERE node_id = ?')
+      .get(nodeId) as
+      | { summary: string; generated_at: string; model: string | null }
+      | undefined;
+    if (!row) return null;
+    return {
+      summary: row.summary,
+      generatedAt: row.generated_at,
+      model: row.model ?? null,
+    };
+  }
+
+  async getEmbeddingMeta(nodeId: string, vectorType: VectorType): Promise<EmbedMeta | null> {
+    const row = this.db
+      .prepare(
+        'SELECT model, dimension, content_hash FROM embedding_meta WHERE node_id = ? AND vector_type = ?',
+      )
+      .get(nodeId, vectorType) as
+      | { model: string; dimension: number; content_hash: string }
+      | undefined;
+    if (!row) return null;
+    return {
+      model: row.model,
+      dimension: row.dimension,
+      contentHash: row.content_hash,
+    };
   }
 
   async upsertEmbedding(

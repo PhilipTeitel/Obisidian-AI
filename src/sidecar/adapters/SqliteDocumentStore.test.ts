@@ -84,6 +84,7 @@ describe('SqliteDocumentStore', () => {
     await s.deleteNote('note1');
     const empty = await s.getNodesByNote('note1');
     expect(empty).toHaveLength(0);
+    expect(await s.getNoteMeta('note1')).toBeNull();
     const tagCount = db.prepare('SELECT COUNT(*) as c FROM tags').get() as {
       c: number;
     };
@@ -96,6 +97,71 @@ describe('SqliteDocumentStore', () => {
       c: number;
     };
     expect(metaCount.c).toBe(0);
+  });
+
+  it('A1_tags_xrefs_replace', async () => {
+    const { store: s, db } = makeStore();
+    await s.upsertNodes([
+      baseNode({ id: 'tn1', noteId: 'note-tx' }),
+      baseNode({
+        id: 'tn2',
+        noteId: 'note-tx',
+        parentId: 'tn1',
+        type: 'paragraph',
+        depth: 1,
+        siblingOrder: 0,
+        content: 'c',
+      }),
+    ]);
+    await s.replaceNoteTags('note-tx', [
+      { nodeId: 'tn2', tag: 't1', source: 'inline' },
+      { nodeId: 'tn2', tag: 't2', source: 'inline' },
+    ]);
+    await s.replaceNoteCrossRefs('note-tx', [
+      { sourceNodeId: 'tn2', targetPath: 'other.md', linkText: 'L' },
+    ]);
+    const tagRows = db.prepare('SELECT tag FROM tags ORDER BY tag').all() as { tag: string }[];
+    expect(tagRows.map((r) => r.tag)).toEqual(['t1', 't2']);
+    const xref = db.prepare('SELECT target_path FROM cross_refs').all() as { target_path: string }[];
+    expect(xref.map((r) => r.target_path)).toEqual(['other.md']);
+    await s.replaceNoteTags('note-tx', []);
+    await s.replaceNoteCrossRefs('note-tx', []);
+    const tagCount = db.prepare('SELECT COUNT(*) as c FROM tags').get() as { c: number };
+    expect(tagCount.c).toBe(0);
+    const xrefCount = db.prepare('SELECT COUNT(*) as c FROM cross_refs').get() as { c: number };
+    expect(xrefCount.c).toBe(0);
+  });
+
+  it('A1_getSummary_roundtrip', async () => {
+    const { store: s } = makeStore();
+    await s.upsertNodes([baseNode({ id: 'sn1', noteId: 'note1' })]);
+    await s.upsertSummary('sn1', 'hello summary', 'gpt-test');
+    const got = await s.getSummary('sn1');
+    expect(got).not.toBeNull();
+    expect(got!.summary).toBe('hello summary');
+    expect(got!.model).toBe('gpt-test');
+    expect(got!.generatedAt).toMatch(/\d{4}/);
+    const missing = await s.getSummary('no-such');
+    expect(missing).toBeNull();
+  });
+
+  it('A2_get_embedding_meta', async () => {
+    const { store: s } = makeStore();
+    await s.upsertNodes([baseNode({ id: 'en1', noteId: 'note1' })]);
+    const v = new Float32Array(DIM).fill(0.3);
+    await s.upsertEmbedding('en1', 'content', v, {
+      model: 'emb-m',
+      dimension: DIM,
+      contentHash: 'ch-xyz',
+    });
+    const meta = await s.getEmbeddingMeta('en1', 'content');
+    expect(meta).toMatchObject({
+      model: 'emb-m',
+      dimension: DIM,
+      contentHash: 'ch-xyz',
+    });
+    expect(await s.getEmbeddingMeta('en1', 'summary')).toBeNull();
+    expect(await s.getEmbeddingMeta('missing', 'content')).toBeNull();
   });
 
   it('A3_summary_note_meta', async () => {

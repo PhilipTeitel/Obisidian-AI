@@ -3,7 +3,7 @@
 **Story**: Implement **`IndexWorkflow`** in `src/core/workflows/IndexWorkflow.ts` that dequeues **`NoteIndexJob`** items from **`IQueuePort`**, drives **`JobStepService`** (via a new **`IJobStepPort`** in core) through ADR-008 steps, runs **`chunkNote`**, persists nodes/tags/cross-refs and metadata through **`IDocumentStore`**, invokes **`SummaryWorkflow`** (WKF-1) for the summarizing phase, then **`IEmbeddingPort`** for content and summary vectors with **idempotent skips** per [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md), emitting **`IProgressPort`** events only through the job-step layer (QUE-2).
 **Epic**: 4 — Index, summary, and embedding workflows
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -188,54 +188,54 @@ Not applicable.
 
 ### Phase A: Store extensions for chunk artifacts
 
-- [ ] **A1** — After `upsertNodes` for a note, `replaceNoteTags` / `replaceNoteCrossRefs` (or combined API) persist all `ParsedTag` / `ParsedCrossRef` rows; re-running with empty arrays clears prior rows for that note.
+- [x] **A1** — After `upsertNodes` for a note, `replaceNoteTags` / `replaceNoteCrossRefs` (or combined API) persist all `ParsedTag` / `ParsedCrossRef` rows; re-running with empty arrays clears prior rows for that note.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A1_tags_xrefs_replace(vitest)`
 
 ### Phase B: Job step port alignment
 
-- [ ] **B1** — `JobStepService` is declared as implementing `IJobStepPort`; TypeScript structural assignability passes without method signature mismatches.
+- [x] **B1** — `JobStepService` is declared as implementing `IJobStepPort`; TypeScript structural assignability passes without method signature mismatches.
   - Evidence: `npm run build` + `src/sidecar/adapters/JobStepService.ts` contains `implements IJobStepPort`
 
 ### Phase C: IndexWorkflow happy path
 
-- [ ] **C1** — For one `NoteIndexJob`, fake ports record **`transitionStep` calls** in order: `queued` established → `parsing` → `parsed` → `storing` → `stored` → `summarizing` → `summarized` → `embedding` → `embedded`, then **`queue.ack`** with the item id.
+- [x] **C1** — For one `NoteIndexJob`, fake ports record **`transitionStep` calls** in order: `queued` established → `parsing` → `parsed` → `storing` → `stored` → `summarizing` → `summarized` → `embedding` → `embedded`, then **`queue.ack`** with the item id.
   - Evidence: `src/core/workflows/IndexWorkflow.test.ts::C1_happy_path_step_order(vitest)`
-- [ ] **C2** — `chunkNote` receives `vaultPath`, `noteTitle`, `markdown`, and `noteId` from the job payload; resulting nodes are passed to `store.upsertNodes`.
+- [x] **C2** — `chunkNote` receives `vaultPath`, `noteTitle`, `markdown`, and `noteId` from the job payload; resulting nodes are passed to `store.upsertNodes`.
   - Evidence: `src/core/workflows/IndexWorkflow.test.ts::C2_chunker_inputs(vitest)`
-- [ ] **C3** — `SummaryWorkflow` is invoked once during `summarizing` with matching `noteId` / paths (spy on fake or extract shared runner).
+- [x] **C3** — `SummaryWorkflow` is invoked once during `summarizing` with matching `noteId` / paths (spy on fake or extract shared runner).
   - Evidence: `src/core/workflows/IndexWorkflow.test.ts::C3_summary_invoked(vitest)`
-- [ ] **C4** — Embedding phase calls `IEmbeddingPort.embed` with batching policy documented in code (batch size ≥ 1); every node that requires a **new** content vector gets `upsertEmbedding` with `EmbedMeta.contentHash === node.contentHash`.
+- [x] **C4** — Embedding phase calls `IEmbeddingPort.embed` with batching policy documented in code (batch size ≥ 1); every node that requires a **new** content vector gets `upsertEmbedding` with `EmbedMeta.contentHash === node.contentHash`.
   - Evidence: `src/core/workflows/IndexWorkflow.test.ts::C4_embed_meta_matches_node_hash(vitest)`
 
 ### Phase D: Idempotent embed skip
 
-- [ ] **D1** — When `getEmbeddingMeta(nodeId,'content')` already matches the node’s `contentHash`, **no** `embed` call includes that node’s text for content vectors (skipped).
+- [x] **D1** — When `getEmbeddingMeta(nodeId,'content')` already matches the node’s `contentHash`, **no** `embed` call includes that node’s text for content vectors (skipped).
   - Evidence: `src/core/workflows/IndexWorkflow.test.ts::D1_skip_content_embed(vitest)`
 
 ### Phase E: Failure + queue nack
 
-- [ ] **E1** — If `embed` throws, workflow calls `markFailed` with non-empty message and `queue.nack` with reason; **does not** call `ack`.
+- [x] **E1** — If `embed` throws, workflow calls `markFailed` with non-empty message and `queue.nack` with reason; **does not** call `ack`.
   - Evidence: `src/core/workflows/IndexWorkflow.test.ts::E1_embed_failure_nack(vitest)`
 
 ### Phase F: Resume hook
 
-- [ ] **F1** — `resumeInterruptedJobs` (or equivalent) reads `listRecoverableJobs()` and enqueues at least one returned job via `queue.enqueue` when rows are non-terminal.
+- [x] **F1** — `resumeInterruptedJobs` (or equivalent) reads `listRecoverableJobs()` and enqueues at least one returned job via `queue.enqueue` when rows are non-terminal.
   - Evidence: `src/core/workflows/IndexWorkflow.test.ts::F1_resume_reenqueue(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `src/core/workflows/IndexWorkflow.ts` contains **no** import from `src/sidecar/` paths or `better-sqlite3`.
+- [x] **Y1** — **(binding)** `src/core/workflows/IndexWorkflow.ts` contains **no** import from `src/sidecar/` paths or `better-sqlite3`.
   - Evidence: `npm run verify:core-imports` or `IndexWorkflow.test.ts::Y1_no_sidecar_imports(vitest)` documenting `rg` invocation
-- [ ] **Y2** — **(binding)** `NoteIndexJob` is JSON-serializable (no `undefined`, no functions); document in interface JSDoc; `InProcessQueue<NoteIndexJob>` round-trips through SQLite payload in an integration-style test **or** unit test `JSON.parse(JSON.stringify(job))`.
+- [x] **Y2** — **(binding)** `NoteIndexJob` is JSON-serializable (no `undefined`, no functions); document in interface JSDoc; `InProcessQueue<NoteIndexJob>` round-trips through SQLite payload in an integration-style test **or** unit test `JSON.parse(JSON.stringify(job))`.
   - Evidence: `src/core/workflows/IndexWorkflow.test.ts::Y2_payload_json_roundtrip(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A unless shared package touched
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A unless shared package touched
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

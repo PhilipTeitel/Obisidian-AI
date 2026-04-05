@@ -1,4 +1,5 @@
 export type { IDocumentStore } from './IDocumentStore.js';
+export type { IJobStepPort } from './IJobStepPort.js';
 export type { IQueuePort } from './IQueuePort.js';
 export type { IEmbeddingPort } from './IEmbeddingPort.js';
 export type { IChatPort } from './IChatPort.js';

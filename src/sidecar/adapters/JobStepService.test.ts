@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { ProgressEvent } from '../../core/domain/types.js';
+import type { NoteIndexJob, ProgressEvent } from '../../core/domain/types.js';
 import type { IProgressPort } from '../../core/ports/IProgressPort.js';
+import { planAndApplyIncrementalIndex } from '../../core/workflows/IncrementalIndexPlanner.js';
 import Database from 'better-sqlite3';
+import { openMigratedMemoryDb } from '../db/open.js';
 import { runRelationalMigrations } from '../db/migrate.js';
+import { InProcessQueue } from './InProcessQueue.js';
 import { JobStepService } from './JobStepService.js';
+import { SqliteDocumentStore } from './SqliteDocumentStore.js';
 
 class FakeProgress implements IProgressPort {
   readonly events: ProgressEvent[] = [];
@@ -163,6 +167,49 @@ describe('JobStepService', () => {
     expect(progress.events.every((e) => e.jobId === 'j1')).toBe(true);
     expect(progress.events.every((e) => e.runId === 'r1')).toBe(true);
     expect(progress.events.every((e) => e.notePath === 'n.md')).toBe(true);
+    db.close();
+  });
+
+  it('B2_delete_job_by_path', () => {
+    const { db, job } = svc();
+    job.ensureJob({
+      jobId: 'j1',
+      runId: 'r1',
+      notePath: 'x.md',
+      contentHash: 'h',
+    });
+    job.deleteJobForNotePath('x.md');
+    const row = db.prepare('SELECT * FROM job_steps WHERE note_path = ?').get('x.md');
+    expect(row).toBeUndefined();
+    db.close();
+  });
+
+  it('C1_incremental_delete_integration', async () => {
+    const db = openMigratedMemoryDb({ embeddingDimension: 4 });
+    const store = new SqliteDocumentStore(db);
+    const progress = new FakeProgress();
+    const job = new JobStepService({ db, progress });
+    const queue = new InProcessQueue<NoteIndexJob>({ db, queueName: 'index' });
+    await store.upsertNoteMeta({
+      noteId: 'del.md',
+      vaultPath: 'del.md',
+      contentHash: 'hh',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 0,
+    });
+    job.ensureJob({
+      jobId: 'run:del.md',
+      runId: 'run',
+      notePath: 'del.md',
+      contentHash: 'hh',
+    });
+    const r = await planAndApplyIncrementalIndex(
+      { store, queue, jobSteps: job },
+      { runId: 'r2', files: [], deletedPaths: ['del.md'], noteTitlesByPath: {} },
+    );
+    expect(r.deleted).toBe(1);
+    expect(await store.getNoteMeta('del.md')).toBeNull();
+    expect(db.prepare('SELECT * FROM job_steps WHERE note_path = ?').get('del.md')).toBeUndefined();
     db.close();
   });
 

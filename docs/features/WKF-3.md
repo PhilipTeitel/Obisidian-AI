@@ -3,7 +3,7 @@
 **Story**: Implement **incremental indexing orchestration** that compares **vault file hashes** to **`note_meta`**, builds **`IndexIncrementalRequest`**-shaped work (files to upsert + `deletedPaths`), **enqueues** only changed/new notes via **`IQueuePort<NoteIndexJob>`**, and performs **direct cleanup** for deleted paths ([ADR-008 §6](../decisions/ADR-008-idempotent-indexing-state-machine.md)) without running the full per-note state machine — while reusing **WKF-1 / WKF-2 skip logic** for unchanged content inside changed files.
 **Epic**: 4 — Index, summary, and embedding workflows
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -147,37 +147,37 @@ Not applicable.
 
 ### Phase A: Diff logic
 
-- [ ] **A1** — Given `files` where hash equals `getNoteMeta(noteId)?.contentHash`, the planner **does not** call `enqueue`.
+- [x] **A1** — Given `files` where hash equals `getNoteMeta(noteId)?.contentHash`, the planner **does not** call `enqueue`.
   - Evidence: `src/core/workflows/IncrementalIndexPlanner.test.ts::A1_skip_unchanged(vitest)`
-- [ ] **A2** — Given a file with **new** hash vs meta, planner enqueues **exactly one** `NoteIndexJob` with `contentHash` matching the file’s hash.
+- [x] **A2** — Given a file with **new** hash vs meta, planner enqueues **exactly one** `NoteIndexJob` with `contentHash` matching the file’s hash.
   - Evidence: `src/core/workflows/IncrementalIndexPlanner.test.ts::A2_enqueue_changed(vitest)`
-- [ ] **A3** — Given a path in `files` with **no** `note_meta` row, planner enqueues (treat as new).
+- [x] **A3** — Given a path in `files` with **no** `note_meta` row, planner enqueues (treat as new).
   - Evidence: `src/core/workflows/IncrementalIndexPlanner.test.ts::A3_enqueue_new_note(vitest)`
 
 ### Phase B: Deletes
 
-- [ ] **B1** — For each `deletedPaths` entry, planner calls `store.deleteNote(noteId)` with `noteId === path`.
+- [x] **B1** — For each `deletedPaths` entry, planner calls `store.deleteNote(noteId)` with `noteId === path`.
   - Evidence: `src/core/workflows/IncrementalIndexPlanner.test.ts::B1_delete_note_store(vitest)`
-- [ ] **B2** — Same delete batch calls `jobSteps.deleteJobForNotePath(path)` so `job_steps` has no row with that `note_path`.
+- [x] **B2** — Same delete batch calls `jobSteps.deleteJobForNotePath(path)` so `job_steps` has no row with that `note_path`.
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::B2_delete_job_by_path(vitest)`
 
 ### Phase C: Integration-shaped DB test (optional but recommended)
 
-- [ ] **C1** — With real `better-sqlite3` temp DB (migrations applied), insert `note_meta` + `job_steps`, run `planAndApplyIncrementalIndex` with `deletedPaths`, assert both tables no longer reference the note.
+- [x] **C1** — With real `better-sqlite3` temp DB (migrations applied), insert `note_meta` + `job_steps`, run `planAndApplyIncrementalIndex` with `deletedPaths`, assert both tables no longer reference the note.
   - Evidence: `src/sidecar/adapters/JobStepService.test.ts::C1_incremental_delete_integration(vitest)` **or** new `IncrementalIndexPlanner.integration.test.ts`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `IncrementalIndexPlanner.ts` has no `obsidian` / `better-sqlite3` imports.
+- [x] **Y1** — **(binding)** `IncrementalIndexPlanner.ts` has no `obsidian` / `better-sqlite3` imports.
   - Evidence: `IncrementalIndexPlanner.test.ts::Y1_core_only(vitest)` + `rg` assertion documented
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A unless shared package touched
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A unless shared package touched
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

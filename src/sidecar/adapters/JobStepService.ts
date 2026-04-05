@@ -1,4 +1,5 @@
 import type { IndexProgressStatus, IndexStep, JobStep } from '../../core/domain/types.js';
+import type { IJobStepPort } from '../../core/ports/IJobStepPort.js';
 import type { IProgressPort } from '../../core/ports/IProgressPort.js';
 import Database from 'better-sqlite3';
 
@@ -28,7 +29,7 @@ const FORWARD: Partial<Record<IndexStep, IndexStep[]>> = {
   embedding: ['embedded', 'failed'],
 };
 
-export class JobStepService {
+export class JobStepService implements IJobStepPort {
   private readonly db: SqliteDatabase;
   private readonly progress: IProgressPort;
   private readonly maxRetries: number;
@@ -211,5 +212,9 @@ export class JobStepService {
       .prepare(`SELECT * FROM job_steps WHERE current_step NOT IN ('embedded', 'dead_letter')`)
       .all() as Record<string, unknown>[];
     return rows.map((r) => this.rowToJobStep(r));
+  }
+
+  deleteJobForNotePath(notePath: string): void {
+    this.db.prepare('DELETE FROM job_steps WHERE note_path = ?').run(notePath);
   }
 }
