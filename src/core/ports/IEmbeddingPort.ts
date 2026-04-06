@@ -1,5 +1,5 @@
 /**
- * Pluggable text embeddings (ADR-005). OpenAI/Ollama are adapters only; secrets are passed per call.
+ * Pluggable text embeddings (ADR-005). Vendor-specific code stays in sidecar adapters; secrets are passed per call.
  */
 export interface IEmbeddingPort {
   /**

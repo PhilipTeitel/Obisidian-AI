@@ -3,7 +3,7 @@
 **Story**: Ship **sidecar-local** `IChatPort` implementations for **OpenAI** and **Ollama** that **stream** text deltas via **`AsyncIterable<string>`**, honor **`apiKey?`** and **`options?: { signal?: AbortSignal; timeoutMs?: number }`** per [ADR-009](../decisions/ADR-009-chat-cancellation-and-timeout.md) and the [README API Contract](../../README.md#port-interfaces-internal-service-contracts), and build provider requests from **`(messages, context)`** using the **context-injection rules** below so both **SummaryWorkflow** (system + body as `context`) and **ChatWorkflow** (history + vault context) work without port signature changes.
 **Epic**: 6 — Provider adapters
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -122,18 +122,19 @@ Not applicable.
 | 3 | `src/sidecar/adapters/createChatPort.ts` | Factory `createChatPort('openai' \| 'ollama', config) → IChatPort`. |
 | 4 | `src/sidecar/adapters/OpenAIChatAdapter.test.ts` | SSE parsing, delta order, abort. |
 | 5 | `src/sidecar/adapters/OllamaChatAdapter.test.ts` | NDJSON / stream parsing, abort. |
+| 6 | `src/sidecar/adapters/chatProviderMessages.ts` | Shared context-injection rules for both providers. |
+| 7 | `src/sidecar/adapters/composeAbortSignal.ts` | `signal` + `timeoutMs` composition (ADR-009). |
+| 8 | `src/sidecar/adapters/readWithAbort.ts` | Race `reader.read()` with abort so timeouts cannot hang on stalled pulls. |
 
 ### Files to MODIFY
 
 | # | Path | Change |
 |---|------|--------|
-| 1 | `src/core/ports/IChatPort.ts` | Add **`ChatCompletionOptions`** + fourth param if missing (**Y2**). |
-| 2 | `src/core/ports/index.ts` | Re-export **`ChatCompletionOptions`** if public. |
-| 3 | `src/core/workflows/SummaryWorkflow.test.ts` | Update **`IChatPort`** fakes to match **four-parameter** signature (optional fourth arg). |
-| 4 | `src/core/workflows/IndexWorkflow.test.ts` | Update **`IChatPort`** fake (`complete` arity / typing). |
+| — | — | *None — `IChatPort` / `index.ts` / workflow test fakes already matched the four-parameter contract.* |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
+- `src/core/ports/IChatPort.ts` — **already** matched ADR-009 / README before this implementation; no edit in this PR.
 - `src/core/workflows/SummaryWorkflow.ts` — existing three-argument **`complete`** calls remain valid when the fourth parameter is optional.
 - `src/core/ports/IEmbeddingPort.ts` — unrelated.
 - `docs/decisions/ADR-009-chat-cancellation-and-timeout.md` — reference only.
@@ -144,56 +145,56 @@ Not applicable.
 
 ### Phase A: Port alignment
 
-- [ ] **A1** — **`IChatPort.complete`** accepts optional fourth argument **`options?: ChatCompletionOptions`** exactly as in **section 5**; **`npm run typecheck`** passes repository-wide.
+- [x] **A1** — **`IChatPort.complete`** accepts optional fourth argument **`options?: ChatCompletionOptions`** exactly as in **section 5**; **`npm run typecheck`** passes repository-wide.
   - Evidence: `npm run typecheck`
 
 ### Phase B: OpenAI streaming adapter
 
-- [ ] **B1** — For a mocked streaming HTTP body, the adapter **yields** the **concatenation of delta text** in order until `[DONE]` (or vendor-equivalent end).
+- [x] **B1** — For a mocked streaming HTTP body, the adapter **yields** the **concatenation of delta text** in order until `[DONE]` (or vendor-equivalent end).
   - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::B1_openai_sse_deltas(vitest)`
 
-- [ ] **B2** — **Context injection:** when `messages = [{ role: 'user', content: 'Q' }]` and `context = 'V'`, the JSON body’s `messages` array contains **both** the injected vault system entry **before** the user message and preserves **`Q`** as the final user content.
+- [x] **B2** — **Context injection:** when `messages = [{ role: 'user', content: 'Q' }]` and `context = 'V'`, the JSON body’s `messages` array contains **both** the injected vault system entry **before** the user message and preserves **`Q`** as the final user content.
   - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::B2_context_before_last_user(vitest)`
 
-- [ ] **B3** — When `messages = [{ role: 'system', content: 'S' }]` and `context = 'body'`, the outgoing `messages` are **`system S` then `user body`** (append-user rule).
+- [x] **B3** — When `messages = [{ role: 'system', content: 'S' }]` and `context = 'body'`, the outgoing `messages` are **`system S` then `user body`** (append-user rule).
   - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::B3_summary_shape(vitest)`
 
 ### Phase C: Ollama streaming adapter
 
-- [ ] **C1** — Mocked Ollama stream yields correct **string deltas** for at least two chunks.
+- [x] **C1** — Mocked Ollama stream yields correct **string deltas** for at least two chunks.
   - Evidence: `src/sidecar/adapters/OllamaChatAdapter.test.ts::C1_ollama_stream_deltas(vitest)`
 
-- [ ] **C2** — **Same** context-injection tests as **B2/B3** (or shared test helper) pass for Ollama adapter payload shape.
+- [x] **C2** — **Same** context-injection tests as **B2/B3** (or shared test helper) pass for Ollama adapter payload shape.
   - Evidence: `src/sidecar/adapters/OllamaChatAdapter.test.ts::C2_ollama_context_rules(vitest)`
 
 ### Phase D: Abort + timeout
 
-- [ ] **D1** — When **`options.signal`** is aborted **mid-stream**, the adapter **stops yielding** within a **short** bounded window (test uses fake clock or immediate abort) and completes the async iterator without throwing **unless** existing product policy throws (document choice; test must assert **no unbounded hang**).
+- [x] **D1** — When **`options.signal`** is aborted **mid-stream**, the adapter **stops yielding** within a **short** bounded window (test uses fake clock or immediate abort) and completes the async iterator without throwing **unless** existing product policy throws (document choice; test must assert **no unbounded hang**).
   - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::D1_abort_stops_stream(vitest)` (Ollama may share helper)
 
-- [ ] **D2** — When **`options.timeoutMs`** is a **small** positive value and the mocked stream **never ends**, the adapter **terminates** (error or stop — document; must not loop forever) and **aborts** `fetch`.
+- [x] **D2** — When **`options.timeoutMs`** is a **small** positive value and the mocked stream **never ends**, the adapter **terminates** (error or stop — document; must not loop forever) and **aborts** `fetch`.
   - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::D2_timeout_aborts_fetch(vitest)`
 
 ### Phase E: Factory
 
-- [ ] **E1** — `createChatPort('openai', cfg)` / `createChatPort('ollama', cfg)` return **`IChatPort`** at compile time.
+- [x] **E1** — `createChatPort('openai', cfg)` / `createChatPort('ollama', cfg)` return **`IChatPort`** at compile time.
   - Evidence: `npm run typecheck` + `src/sidecar/adapters/createChatPort.ts` in PR
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** No file under `src/core/` imports `OpenAIChatAdapter`, `OllamaChatAdapter`, or `createChatPort`.
+- [x] **Y1** — **(binding)** No file under `src/core/` imports `OpenAIChatAdapter`, `OllamaChatAdapter`, or `createChatPort`.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` and `rg "OpenAIChat|OllamaChat|createChatPort" src/core` → no matches
 
-- [ ] **Y2** — **(binding)** Root `package.json` **`dependencies`** does not list **`openai`**, **`@ai-sdk/openai`**, or **`ollama`** npm packages.
+- [x] **Y2** — **(binding)** Root `package.json` **`dependencies`** does not list **`openai`**, **`@ai-sdk/openai`**, or **`ollama`** npm packages.
   - Evidence: `rg -E '"openai"|"@ai-sdk/openai"|"ollama"' package.json` exits **1**
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** (no shared package)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** (no shared package)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

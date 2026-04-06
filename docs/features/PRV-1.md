@@ -3,7 +3,7 @@
 **Story**: Ship **sidecar-local** `IEmbeddingPort` implementations for **OpenAI** and **Ollama** that honor **`embed(texts, apiKey?)`**, perform **true batch** embedding where the vendor API allows it, and read **base URL + model id** from **runtime configuration** (wired later from [README Plugin Settings](../../README.md#plugin-settings) via SRV-/PLG-stories) — without importing vendor SDKs into **`src/core/`**.
 **Epic**: 6 — Provider adapters
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -123,46 +123,46 @@ Not applicable. **PLG-4** surfaces embedding provider settings in the Obsidian U
 
 ### Phase A: OpenAI adapter behavior
 
-- [ ] **A1** — For `texts.length === n`, a single mocked `fetch` invocation receives a JSON body whose `input` is an **array of length n** (OpenAI batch) and `model` equals configured model id.
+- [x] **A1** — For `texts.length === n`, a single mocked `fetch` invocation receives a JSON body whose `input` is an **array of length n** (OpenAI batch) and `model` equals configured model id.
   - Evidence: `src/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts::A1_openai_batch_payload(vitest)`
 
-- [ ] **A2** — When `apiKey` is defined, the request headers include **`Authorization: Bearer <value>`** exactly once.
+- [x] **A2** — When `apiKey` is defined, the request headers include **`Authorization: Bearer <value>`** exactly once.
   - Evidence: `src/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts::A2_openai_bearer_header(vitest)`
 
-- [ ] **A3** — Response parsing maps `data[i].embedding` to **`Float32Array`** entries **in order**; non-OK HTTP throws an error that includes **status** (and body snippet when JSON parse fails, optional).
+- [x] **A3** — Response parsing maps `data[i].embedding` to **`Float32Array`** entries **in order**; non-OK HTTP throws an error that includes **status** (and body snippet when JSON parse fails, optional).
   - Evidence: `src/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts::A3_openai_order_and_errors(vitest)`
 
 ### Phase B: Ollama adapter behavior
 
-- [ ] **B1** — Mocked `fetch` targets `{baseUrl}/api/embeddings` (normalized slash rules documented in code) with `model` and an `input` field appropriate to the implemented Ollama request shape.
+- [x] **B1** — Mocked `fetch` targets `{baseUrl}/api/embeddings` (normalized slash rules documented in code) with `model` and an `input` field appropriate to the implemented Ollama request shape.
   - Evidence: `src/sidecar/adapters/OllamaEmbeddingAdapter.test.ts::B1_ollama_url_and_body(vitest)`
 
-- [ ] **B2** — Returned vectors are **`Float32Array`** with length equal to the embedding returned by the mocked response; order matches `texts` for multi-call strategies.
+- [x] **B2** — Returned vectors are **`Float32Array`** with length equal to the embedding returned by the mocked response; order matches `texts` for multi-call strategies.
   - Evidence: `src/sidecar/adapters/OllamaEmbeddingAdapter.test.ts::B2_ollama_order(vitest)`
 
 ### Phase C: Factory
 
-- [ ] **C1** — `createEmbeddingPort('openai', cfg)` and `createEmbeddingPort('ollama', cfg)` return objects that satisfy **`IEmbeddingPort`** at compile time (`implements` or explicit return type annotation).
+- [x] **C1** — `createEmbeddingPort('openai', cfg)` and `createEmbeddingPort('ollama', cfg)` return objects that satisfy **`IEmbeddingPort`** at compile time (`implements` or explicit return type annotation).
   - Evidence: `npm run typecheck` (no errors) + `src/sidecar/adapters/createEmbeddingPort.ts` reviewed in PR
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** No file under `src/core/` imports `OpenAIEmbeddingAdapter`, `OllamaEmbeddingAdapter`, or `createEmbeddingPort`.
+- [x] **Y1** — **(binding)** No file under `src/core/` imports `OpenAIEmbeddingAdapter`, `OllamaEmbeddingAdapter`, or `createEmbeddingPort`.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` plus `rg "OpenAI|OllamaEmbedding|createEmbeddingPort" src/core` → no matches
 
-- [ ] **Y2** — **(binding)** Root `package.json` **`dependencies`** does not list **`openai`**, **`@ai-sdk/openai`**, or **`ollama`** npm packages (this story uses **`fetch` only**).
+- [x] **Y2** — **(binding)** Root `package.json` **`dependencies`** does not list **`openai`**, **`@ai-sdk/openai`**, or **`ollama`** npm packages (this story uses **`fetch` only**).
   - Evidence: `rg -E '"openai"|"@ai-sdk/openai"|"ollama"' package.json` exits **1** (no matches) after change
 
-- [ ] **Y3** — **(binding)** `scripts/check-source-boundaries.mjs(npm run check:boundaries)` passes (core remains free of `better-sqlite3` / `obsidian` patterns).
+- [x] **Y3** — **(binding)** `scripts/check-source-boundaries.mjs(npm run check:boundaries)` passes (core remains free of `better-sqlite3` / `obsidian` patterns).
   - Evidence: `npm run check:boundaries`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** (no `packages/shared`; types remain local or in `src/core/domain/types.ts` only if added)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** (no `packages/shared`; types remain local or in `src/core/domain/types.ts` only if added)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

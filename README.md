@@ -1071,8 +1071,8 @@ OpenAI and Ollama behind ports ([ADR-005](docs/decisions/ADR-005-provider-abstra
 
 | ID                                      | Status      | Story                                               | Size | Notes                                    |
 | --------------------------------------- | ----------- | --------------------------------------------------- | ---- | ---------------------------------------- |
-| [PRV-1](docs/features/PRV-1.md)         | Not Started | `OpenAIEmbeddingAdapter` / `OllamaEmbeddingAdapter` | M    | Batch embed; API key optional in payload |
-| [PRV-2](docs/features/PRV-2.md)         | Not Started | `OpenAIChatAdapter` / `OllamaChatAdapter` streaming | M    | Base URL and model from settings         |
+| [PRV-1](docs/features/PRV-1.md)         | Complete    | `OpenAIEmbeddingAdapter` / `OllamaEmbeddingAdapter` | M    | Batch embed; API key optional in payload |
+| [PRV-2](docs/features/PRV-2.md)         | Complete    | `OpenAIChatAdapter` / `OllamaChatAdapter` streaming | M    | Base URL and model from settings         |
 
 ### Epic 7: Sidecar server, routes, and observability
 
