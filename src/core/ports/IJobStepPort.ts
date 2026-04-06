@@ -22,6 +22,9 @@ export interface IJobStepPort {
 
   listRecoverableJobs(): JobStep[];
 
+  /** All rows in `job_steps` (for sidecar `index/status`). */
+  listJobSteps(): JobStep[];
+
   /** Remove `job_steps` row when the note file was deleted from the vault (ADR-008 §6). */
   deleteJobForNotePath(notePath: string): void;
 }

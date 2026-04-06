@@ -41,6 +41,10 @@ class FakeJobSteps implements IJobStepPort {
   }
 
   deleteJobForNotePath(_notePath: string): void {}
+
+  listJobSteps(): JobStep[] {
+    return [];
+  }
 }
 
 class FakeQueue implements IQueuePort<NoteIndexJob> {
@@ -212,6 +216,7 @@ describe('IndexWorkflow', () => {
     const item: QueueItem<NoteIndexJob> = {
       id: 'qi-1',
       payload: {
+        runId: 'r1',
         noteId: 'n1',
         vaultPath: 'a/b.md',
         noteTitle: 'T',
@@ -219,7 +224,7 @@ describe('IndexWorkflow', () => {
         contentHash: 'ch1',
       },
     };
-    await processOneJob(baseDeps(store, jobSteps, queue, fakeEmbed(4)), { runId: 'r1' }, item);
+    await processOneJob(baseDeps(store, jobSteps, queue, fakeEmbed(4)), {}, item);
     expect(jobSteps.ensureInputs[0]).toMatchObject({
       jobId: 'r1:a/b.md',
       runId: 'r1',
@@ -264,13 +269,14 @@ describe('IndexWorkflow', () => {
     const jobSteps = new FakeJobSteps();
     const queue = new FakeQueue();
     const payload: NoteIndexJob = {
+      runId: 'r2',
       noteId: 'n1',
       vaultPath: 'v/x.md',
       noteTitle: 'MyTitle',
       markdown: '# MD\n',
       contentHash: 'c',
     };
-    await processOneJob(baseDeps(store, jobSteps, queue, fakeEmbed(4)), { runId: 'r2' }, {
+    await processOneJob(baseDeps(store, jobSteps, queue, fakeEmbed(4)), {}, {
       id: 'q',
       payload,
     });
@@ -291,9 +297,10 @@ describe('IndexWorkflow', () => {
     const store = new FakeStore();
     const jobSteps = new FakeJobSteps();
     const queue = new FakeQueue();
-    await processOneJob(baseDeps(store, jobSteps, queue, fakeEmbed(4)), { runId: 'r3' }, {
+    await processOneJob(baseDeps(store, jobSteps, queue, fakeEmbed(4)), {}, {
       id: 'q',
       payload: {
+        runId: 'r3',
         noteId: 'n1',
         vaultPath: 'p.md',
         noteTitle: 'T',
@@ -315,9 +322,10 @@ describe('IndexWorkflow', () => {
     const store = new FakeStore();
     const jobSteps = new FakeJobSteps();
     const queue = new FakeQueue();
-    await processOneJob(baseDeps(store, jobSteps, queue, fakeEmbed(4)), { runId: 'r4' }, {
+    await processOneJob(baseDeps(store, jobSteps, queue, fakeEmbed(4)), {}, {
       id: 'q',
       payload: {
+        runId: 'r4',
         noteId: 'n1',
         vaultPath: 'p.md',
         noteTitle: 'T',
@@ -341,9 +349,10 @@ describe('IndexWorkflow', () => {
     const queue = new FakeQueue();
     const embed = fakeEmbed(4);
     const embedSpy = vi.spyOn(embed, 'embed');
-    await processOneJob(baseDeps(store, jobSteps, queue, embed), { runId: 'r5' }, {
+    await processOneJob(baseDeps(store, jobSteps, queue, embed), {}, {
       id: 'q',
       payload: {
+        runId: 'r5',
         noteId: 'n1',
         vaultPath: 'p.md',
         noteTitle: 'T',
@@ -368,9 +377,10 @@ describe('IndexWorkflow', () => {
         return [];
       },
     };
-    await processOneJob(baseDeps(store, jobSteps, queue, embed), { runId: 'r6' }, {
+    await processOneJob(baseDeps(store, jobSteps, queue, embed), {}, {
       id: 'q',
       payload: {
+        runId: 'r6',
         noteId: 'n1',
         vaultPath: 'p.md',
         noteTitle: 'T',
@@ -399,11 +409,10 @@ describe('IndexWorkflow', () => {
       },
     ];
     const queue = new FakeQueue();
-    await resumeInterruptedJobs(baseDeps(store, jobSteps, queue, fakeEmbed(4)), {
-      runId: 'new-run',
-    });
+    await resumeInterruptedJobs(baseDeps(store, jobSteps, queue, fakeEmbed(4)));
     expect(queue.enqueued).toHaveLength(1);
     expect(queue.enqueued[0][0]).toMatchObject({
+      runId: 'old',
       noteId: 'path.md',
       vaultPath: 'path.md',
       contentHash: 'hh',
@@ -417,6 +426,7 @@ describe('IndexWorkflow', () => {
 
   it('Y2_payload_json_roundtrip', () => {
     const job: NoteIndexJob = {
+      runId: 'r',
       noteId: 'n',
       vaultPath: 'v.md',
       noteTitle: 't',
@@ -430,6 +440,6 @@ describe('IndexWorkflow', () => {
 
 describe('indexJobId', () => {
   it('uses runId and path', () => {
-    expect(indexJobId({ runId: 'r' }, 'a/b.md')).toBe('r:a/b.md');
+    expect(indexJobId({ runId: 'r', vaultPath: 'a/b.md' })).toBe('r:a/b.md');
   });
 });

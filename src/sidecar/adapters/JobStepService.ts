@@ -214,6 +214,11 @@ export class JobStepService implements IJobStepPort {
     return rows.map((r) => this.rowToJobStep(r));
   }
 
+  listJobSteps(): JobStep[] {
+    const rows = this.db.prepare(`SELECT * FROM job_steps`).all() as Record<string, unknown>[];
+    return rows.map((r) => this.rowToJobStep(r));
+  }
+
   deleteJobForNotePath(notePath: string): void {
     this.db.prepare('DELETE FROM job_steps WHERE note_path = ?').run(notePath);
   }

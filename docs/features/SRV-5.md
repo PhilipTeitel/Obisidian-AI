@@ -3,7 +3,7 @@
 **Story**: Implement **`IProgressPort`** in the sidecar as a **`ProgressAdapter`** that forwards **`emit()`** to all registered sinks: **stdio push lines** and **WebSocket clients** (SRV-2), so `JobStepService` progress reaches the plugin **in real time** ([README ProgressSlideout](../../README.md#progressslideout)).
 **Epic**: 7 — Sidecar server, routes, and observability
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -24,9 +24,9 @@
 
 ## 3. Definition of Ready (DoR)
 
-- [ ] Linked ADRs **Accepted**
-- [ ] Section 4 filled
-- [ ] Phase Y non-mock evidence
+- [x] Linked ADRs **Accepted**
+- [x] Section 4 filled
+- [x] Phase Y non-mock evidence
 
 ---
 
@@ -71,24 +71,24 @@
 
 ### Phase A
 
-- [ ] **A1** — Calling `emit` on `ProgressAdapter` invokes registered stdout callback with serialized event containing `jobId`, `runId`, `notePath`, `step`.
+- [x] **A1** — Calling `emit` on `ProgressAdapter` invokes registered stdout callback with serialized event containing `jobId`, `runId`, `notePath`, `step`.
   - Evidence: `src/sidecar/adapters/ProgressAdapter.test.ts::A1_stdout_sink(vitest)`
 
-- [ ] **A2** — Second sink (WS mock) receives same event when registered.
+- [x] **A2** — Second sink (WS mock) receives same event when registered.
   - Evidence: `src/sidecar/adapters/ProgressAdapter.test.ts::A2_dual_sink(vitest)`
 
 ### Phase Y
 
-- [ ] **Y1** — **(binding)** `JobStepService` in runtime uses **`ProgressAdapter`** instance (grep `new JobStepService` in sidecar).
+- [x] **Y1** — **(binding)** `JobStepService` in runtime uses **`ProgressAdapter`** instance (grep `new JobStepService` in sidecar).
   - Evidence: `rg "new JobStepService" src/sidecar`
 
 ### Phase Z
 
-- [ ] **Z1** — `npm run build` passes
-- [ ] **Z2** — `npm run lint` passes
-- [ ] **Z3** — No `any`
-- [ ] **Z4** — **N/A**
-- [ ] **Z5** — Sink errors logged via SRV-4 logger
+- [x] **Z1** — `npm run build` passes
+- [x] **Z2** — `npm run lint` passes
+- [x] **Z3** — No `any`
+- [x] **Z4** — **N/A**
+- [x] **Z5** — Sink errors logged via SRV-4 logger
 
 ---
 

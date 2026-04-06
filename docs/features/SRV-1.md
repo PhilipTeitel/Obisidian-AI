@@ -3,7 +3,7 @@
 **Story**: Replace the sidecar stub with a **stdio NDJSON** server that maps each inbound message **`type`** to a **route handler**, opens the SQLite database **lazily on first use** ([ADR-004](../decisions/ADR-004-per-vault-index-storage.md)), runs a **background queue worker** after `index/full` and `index/incremental`, and emits **progress push lines** on stdout for `IndexProgressEvent` (shape compatible with [README API Contract](../../README.md#sidecar-message-protocol)).
 **Epic**: 7 — Sidecar server, routes, and observability
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -33,10 +33,10 @@
 
 ## 3. Definition of Ready (DoR)
 
-- [ ] Linked ADRs exist and are **Accepted** (or the story is explicitly labeled a **spike** and only **Proposed** ADRs apply)
-- [ ] README, requirements, and ADRs do not contradict each other on persistence, dependencies, or integration boundaries
-- [ ] Section 4 (Binding constraints) is filled with 3–8 bullets copied or restated from those ADRs
-- [ ] Phase Y (binding compliance) includes at least one criterion with **non-mock** evidence (static check, dependency manifest, integration test, or script) where wrong-stack substitution is a risk
+- [x] Linked ADRs exist and are **Accepted** (or the story is explicitly labeled a **spike** and only **Proposed** ADRs apply)
+- [x] README, requirements, and ADRs do not contradict each other on persistence, dependencies, or integration boundaries
+- [x] Section 4 (Binding constraints) is filled with 3–8 bullets copied or restated from those ADRs
+- [x] Phase Y (binding compliance) includes at least one criterion with **non-mock** evidence (static check, dependency manifest, integration test, or script) where wrong-stack substitution is a risk
 
 ---
 
@@ -125,37 +125,37 @@ Not applicable (sidecar only).
 
 ### Phase A: Protocol + routing
 
-- [ ] **A1** — A valid `{id,type:'health'}` line produces a response line with `body.status === 'ok'` and numeric `uptime` without opening SQLite (no file at dummy path required).
+- [x] **A1** — A valid `{id,type:'health'}` line produces a response line with `body.status === 'ok'` and numeric `uptime` without opening SQLite (no file at dummy path required).
   - Evidence: `src/sidecar/stdio/stdioServer.test.ts::A1_health_without_db(vitest)`
 
-- [ ] **A2** — Unknown `type` yields an error line with the same `id` and a non-empty `error.message`.
+- [x] **A2** — Unknown `type` yields an error line with the same `id` and a non-empty `error.message`.
   - Evidence: `src/sidecar/stdio/stdioServer.test.ts::A2_unknown_type_error(vitest)`
 
 ### Phase B: Lazy database
 
-- [ ] **B1** — First `index/status` (or `search`) with valid `OBSIDIAN_AI_DB_PATH` triggers `openDatabase` exactly once; second call reuses the same connection (assert with spy or counter in test module).
+- [x] **B1** — First `index/status` (or `search`) with valid `OBSIDIAN_AI_DB_PATH` triggers `openDatabase` exactly once; second call reuses the same connection (assert with spy or counter in test module).
   - Evidence: `src/sidecar/runtime/SidecarRuntime.test.ts::B1_lazy_open_once(vitest)`
 
 ### Phase C: Index enqueue + worker
 
-- [ ] **C1** — `index/full` with in-memory or temp DB path enqueues jobs whose payloads include `runId` matching the ack `runId`, and `noteCount` equals enqueued count; worker runs `processOneJob` to completion for a tiny fixture (fake embed/chat or existing test fakes in sidecar tests).
-  - Evidence: `src/sidecar/stdio/stdioServer.test.ts::C1_index_full_enqueue_and_drain(vitest)` or `src/sidecar/runtime/SidecarRuntime.test.ts`
+- [x] **C1** — `index/full` with in-memory or temp DB path enqueues jobs whose payloads include `runId` matching the ack `runId`, and `noteCount` equals enqueued count; worker runs `processOneJob` to completion for a tiny fixture (fake embed/chat or existing test fakes in sidecar tests).
+  - Evidence: `src/sidecar/runtime/SidecarRuntime.test.ts::C1_index_full_ack(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `npm run verify:core-imports` passes; no new `src/core` imports of `better-sqlite3` or sidecar routes.
+- [x] **Y1** — **(binding)** `npm run verify:core-imports` passes; no new `src/core` imports of `better-sqlite3` or sidecar routes.
   - Evidence: `npm run verify:core-imports`
 
-- [ ] **Y2** — **(binding)** `NoteIndexJob` in `src/core/domain/types.ts` requires `runId`; `rg "NoteIndexJob"` in core shows updated struct literals in tests/planner.
+- [x] **Y2** — **(binding)** `NoteIndexJob` in `src/core/domain/types.ts` requires `runId`; `rg "NoteIndexJob"` in core shows updated struct literals in tests/planner.
   - Evidence: `npm run typecheck` + `src/core/workflows/IncrementalIndexPlanner.test.ts` updated
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias — **N/A** (no shared package; plugin unchanged)
-- [ ] **Z5** — Errors and significant operations log or surface structured messages (stderr acceptable until SRV-4)
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias — **N/A** (no shared package; plugin unchanged)
+- [x] **Z5** — Errors and significant operations log or surface structured messages (stderr acceptable until SRV-4)
 
 ---
 

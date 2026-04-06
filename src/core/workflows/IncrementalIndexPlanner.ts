@@ -53,6 +53,7 @@ export async function planAndApplyIncrementalIndex(
       continue;
     }
     const job: NoteIndexJob = {
+      runId: input.runId,
       noteId: path,
       vaultPath: path,
       noteTitle: noteTitleForPath(path, titles),

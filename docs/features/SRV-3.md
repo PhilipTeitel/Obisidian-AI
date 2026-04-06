@@ -3,7 +3,7 @@
 **Story**: Ensure **`health`** responses match [README API Contract](../../README.md#sidecar-message-protocol): `{ status: 'ok', uptime, dbReady }` where **`dbReady`** is **true** iff the SQLite database has been successfully opened and migrated (lazy init complete), and **`uptime`** is process uptime in **seconds** (or ms—**pick one**, document in type; align `HealthResponse` in [types.ts](../../src/core/domain/types.ts) if README and type disagree).
 **Epic**: 7 — Sidecar server, routes, and observability
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -24,10 +24,10 @@ Plugin startup budget ([README §15](../../README.md#15-startup-performance)) re
 
 ## 3. Definition of Ready (DoR)
 
-- [ ] Linked ADRs **Accepted**
-- [ ] No README/requirements contradiction on `health` fields
-- [ ] Section 4 filled
-- [ ] Phase Y non-mock evidence
+- [x] Linked ADRs **Accepted**
+- [x] No README/requirements contradiction on `health` fields
+- [x] Section 4 filled
+- [x] Phase Y non-mock evidence
 
 ---
 
@@ -74,7 +74,7 @@ export interface HealthResponse {
 
 | # | Path | Purpose |
 |---|------|---------|
-| 1 | `src/sidecar/runtime/health.test.ts` | dbReady transitions |
+| 1 | `src/sidecar/runtime/SidecarRuntime.test.ts` | `A1`/`A2` dbReady + uptime (merged into runtime tests) |
 
 ---
 
@@ -82,24 +82,24 @@ export interface HealthResponse {
 
 ### Phase A
 
-- [ ] **A1** — Before any DB operation, `health` returns `dbReady: false` and numeric `uptime >= 0`.
-  - Evidence: `src/sidecar/runtime/health.test.ts::A1_db_not_ready_initially(vitest)`
+- [x] **A1** — Before any DB operation, `health` returns `dbReady: false` and numeric `uptime >= 0`.
+  - Evidence: `src/sidecar/runtime/SidecarRuntime.test.ts::A1_db_not_ready_initially(vitest)`
 
-- [ ] **A2** — After successful lazy open (or `openDatabase` in test), `health` returns `dbReady: true`.
-  - Evidence: `src/sidecar/runtime/health.test.ts::A2_db_ready_after_open(vitest)`
+- [x] **A2** — After successful lazy open (or `openDatabase` in test), `health` returns `dbReady: true`.
+  - Evidence: `src/sidecar/runtime/SidecarRuntime.test.ts::A2_db_ready_after_open(vitest)`
 
 ### Phase Y
 
-- [ ] **Y1** — **(binding)** `HealthResponse` in `types.ts` documents `uptime` unit; `npm run typecheck` passes.
+- [x] **Y1** — **(binding)** `HealthResponse` in `types.ts` documents `uptime` unit; `npm run typecheck` passes.
   - Evidence: `npm run typecheck`
 
 ### Phase Z
 
-- [ ] **Z1** — `npm run build` passes
-- [ ] **Z2** — `npm run lint` passes
-- [ ] **Z3** — No `any`
-- [ ] **Z4** — **N/A**
-- [ ] **Z5** — N/A minimal
+- [x] **Z1** — `npm run build` passes
+- [x] **Z2** — `npm run lint` passes
+- [x] **Z3** — No `any`
+- [x] **Z4** — **N/A**
+- [x] **Z5** — N/A minimal
 
 ---
 

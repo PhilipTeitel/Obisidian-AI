@@ -3,7 +3,7 @@
 **Story**: Replace ad-hoc **`console.*`** in **`src/sidecar/**`** (except stdout protocol writes) with **Pino** per [ADR-010](../decisions/ADR-010-structured-logging-sidecar.md) and [README §20](../../README.md#20-logging-and-observability): **child loggers** with **`runId`**, **`jobId`**, **`scope`**; **stderr** output; level from **`OBSIDIAN_AI_LOG_LEVEL`**; never log **apiKey**, note **content**, or raw vectors.
 **Epic**: 7 — Sidecar server, routes, and observability
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -23,10 +23,10 @@ Centralize **`createSidecarLogger()`** (or similar) in `src/sidecar/logging/logg
 
 ## 3. Definition of Ready (DoR)
 
-- [ ] ADR-010 **Accepted**
-- [ ] README §20 alignment
-- [ ] Section 4 filled
-- [ ] Phase Y non-mock evidence
+- [x] ADR-010 **Accepted**
+- [x] README §20 alignment
+- [x] Section 4 filled
+- [x] Phase Y non-mock evidence
 
 ---
 
@@ -73,24 +73,24 @@ Centralize **`createSidecarLogger()`** (or similar) in `src/sidecar/logging/logg
 
 ### Phase A
 
-- [ ] **A1** — `createSidecarLogger()` produces a logger that respects `OBSIDIAN_AI_LOG_LEVEL=error` (info logs not emitted — use sink test or pino test helper).
+- [x] **A1** — `createSidecarLogger()` produces a logger that respects `OBSIDIAN_AI_LOG_LEVEL=error` (info logs not emitted — use sink test or pino test helper).
   - Evidence: `src/sidecar/logging/logger.test.ts::A1_log_level_env(vitest)`
 
 ### Phase Y
 
-- [ ] **Y1** — **(binding)** `package.json` **`dependencies`** includes **`pino`**.
+- [x] **Y1** — **(binding)** `package.json` **`dependencies`** includes **`pino`**.
   - Evidence: `rg '"pino"' package.json`
 
-- [ ] **Y2** — **(binding)** `rg "console\\.log" src/sidecar` shows **no** production-path logs to stdout (stdio write helpers exempted if named `writeLine`).
+- [x] **Y2** — **(binding)** `rg "console\\.log" src/sidecar` shows **no** production-path logs to stdout (stdio write helpers exempted if named `writeLine`).
   - Evidence: `rg "console\\.log" src/sidecar` (document allowed files in story if any)
 
 ### Phase Z
 
-- [ ] **Z1** — `npm run build` passes
-- [ ] **Z2** — `npm run lint` passes
-- [ ] **Z3** — No `any`
-- [ ] **Z4** — **N/A**
-- [ ] **Z5** — Satisfied by Pino adoption
+- [x] **Z1** — `npm run build` passes
+- [x] **Z2** — `npm run lint` passes
+- [x] **Z3** — No `any`
+- [x] **Z4** — **N/A**
+- [x] **Z5** — Satisfied by Pino adoption
 
 ---
 

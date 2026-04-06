@@ -119,6 +119,10 @@ class PlannerFakeJobSteps implements IJobStepPort {
   deleteJobForNotePath(notePath: string): void {
     this.deletedPaths.push(notePath);
   }
+
+  listJobSteps() {
+    return [];
+  }
 }
 
 describe('IncrementalIndexPlanner', () => {
@@ -170,6 +174,7 @@ describe('IncrementalIndexPlanner', () => {
     expect(queue.batches).toHaveLength(1);
     expect(queue.batches[0]).toHaveLength(1);
     expect(queue.batches[0][0]).toMatchObject({
+      runId: 'r',
       noteId: 'b.md',
       vaultPath: 'b.md',
       contentHash: 'newhash',

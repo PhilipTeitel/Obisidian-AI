@@ -45,7 +45,7 @@ export class InProcessQueue<T> implements IQueuePort<T> {
       .run(this.queueName);
   }
 
-  private countProcessing(): number {
+  countProcessing(): number {
     const row = this.db
       .prepare(
         `SELECT COUNT(*) as c FROM queue_items

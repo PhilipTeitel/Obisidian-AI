@@ -3,7 +3,7 @@
 **Story**: Add an **opt-in HTTP surface** on **`127.0.0.1`** with a **random port** and **per-session Bearer token** ([ADR-006](../decisions/ADR-006-sidecar-architecture.md)), exposing the same operations as stdio: **REST** routes mirroring message types and a **WebSocket** for **`progress`** and **chat** streaming chunks. Auth: `Authorization: Bearer <token>` on every HTTP request; WebSocket subprotocol or first message may carry token (document chosen approach in code).
 **Epic**: 7 — Sidecar server, routes, and observability
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -26,10 +26,10 @@ When `OBSIDIAN_AI_HTTP_PORT` is set to a non-empty value **or** a dedicated flag
 
 ## 3. Definition of Ready (DoR)
 
-- [ ] Linked ADRs exist and are **Accepted**
-- [ ] README, requirements, and ADRs do not contradict each other
-- [ ] Section 4 filled
-- [ ] Phase Y includes non-mock evidence
+- [x] Linked ADRs exist and are **Accepted**
+- [x] README, requirements, and ADRs do not contradict each other
+- [x] Section 4 filled
+- [x] Phase Y includes non-mock evidence
 
 ---
 
@@ -91,29 +91,29 @@ Not applicable.
 
 ### Phase A: Security + binding
 
-- [ ] **A1** — Server binds to **127.0.0.1** only (assert in test via listen address or connection refusal to non-local).
+- [x] **A1** — Server binds to **127.0.0.1** only (assert in test via listen address or connection refusal to non-local).
   - Evidence: `src/sidecar/http/httpServer.test.ts::A1_localhost_only(vitest)`
 
-- [ ] **A2** — Request without Bearer returns **401** for a protected route.
+- [x] **A2** — Request without Bearer returns **401** for a protected route.
   - Evidence: `src/sidecar/http/httpServer.test.ts::A2_bearer_required(vitest)`
 
 ### Phase B: Parity
 
-- [ ] **B1** — `GET /health` with valid token returns JSON matching `HealthResponse` shape.
+- [x] **B1** — `GET /health` with valid token returns JSON matching `HealthResponse` shape.
   - Evidence: `src/sidecar/http/httpServer.test.ts::B1_health_json(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `package.json` lists **`ws`** in `dependencies`.
+- [x] **Y1** — **(binding)** `package.json` lists **`ws`** in `dependencies`.
   - Evidence: `rg '"ws"' package.json`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes
-- [ ] **Z2** — `npm run lint` passes
-- [ ] **Z3** — No `any` in new files
-- [ ] **Z4** — **N/A** (`@shared/types`)
-- [ ] **Z5** — Appropriate logging (SRV-4) or stderr until then
+- [x] **Z1** — `npm run build` passes
+- [x] **Z2** — `npm run lint` passes
+- [x] **Z3** — No `any` in new files
+- [x] **Z4** — **N/A** (`@shared/types`)
+- [x] **Z5** — Appropriate logging (SRV-4) or stderr until then
 
 ---
 

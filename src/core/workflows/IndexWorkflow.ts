@@ -26,8 +26,15 @@ export interface IndexWorkflowDeps {
   chatModelLabel: string;
 }
 
-export function indexJobId(ctx: { runId: string }, vaultPath: string): string {
-  return `${ctx.runId}:${vaultPath}`;
+export function indexJobId(job: Pick<NoteIndexJob, 'runId' | 'vaultPath'>): string {
+  return `${job.runId}:${job.vaultPath}`;
+}
+
+/** `job_id` format is `<runId>:<vaultPath>` (first `:` separates run). */
+export function runIdFromJobId(jobId: string): string {
+  const i = jobId.indexOf(':');
+  if (i <= 0) return 'recovery';
+  return jobId.slice(0, i);
 }
 
 function isNonLeaf(nodes: DocumentNode[], nodeId: string): boolean {
@@ -36,31 +43,32 @@ function isNonLeaf(nodes: DocumentNode[], nodeId: string): boolean {
 
 export async function processOneJob(
   deps: IndexWorkflowDeps,
-  ctx: { runId: string; apiKey?: string },
+  ctx: { apiKey?: string },
   item: QueueItem<NoteIndexJob>,
 ): Promise<void> {
   const job = item.payload;
-  const jid = indexJobId(ctx, job.vaultPath);
+  const jid = indexJobId(job);
+  const runId = job.runId;
   let ensured = false;
   try {
     deps.jobSteps.ensureJob({
       jobId: jid,
-      runId: ctx.runId,
+      runId,
       notePath: job.vaultPath,
       contentHash: job.contentHash,
     });
     ensured = true;
 
-    deps.jobSteps.transitionStep({ jobId: jid, runId: ctx.runId, to: 'parsing' });
+    deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'parsing' });
     const parsed = chunkNote({
       noteId: job.noteId,
       noteTitle: job.noteTitle,
       vaultPath: job.vaultPath,
       markdown: job.markdown,
     });
-    deps.jobSteps.transitionStep({ jobId: jid, runId: ctx.runId, to: 'parsed' });
+    deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'parsed' });
 
-    deps.jobSteps.transitionStep({ jobId: jid, runId: ctx.runId, to: 'storing' });
+    deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'storing' });
     await deps.store.upsertNodes(parsed.nodes);
     await deps.store.replaceNoteTags(job.noteId, parsed.tags);
     await deps.store.replaceNoteCrossRefs(job.noteId, parsed.crossRefs);
@@ -72,9 +80,9 @@ export async function processOneJob(
       indexedAt: now,
       nodeCount: parsed.nodes.length,
     });
-    deps.jobSteps.transitionStep({ jobId: jid, runId: ctx.runId, to: 'stored' });
+    deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'stored' });
 
-    deps.jobSteps.transitionStep({ jobId: jid, runId: ctx.runId, to: 'summarizing' });
+    deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'summarizing' });
     await summarizeNote(
       { chat: deps.chat, store: deps.store },
       {
@@ -87,9 +95,9 @@ export async function processOneJob(
         precomputed: parsed,
       },
     );
-    deps.jobSteps.transitionStep({ jobId: jid, runId: ctx.runId, to: 'summarized' });
+    deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'summarized' });
 
-    deps.jobSteps.transitionStep({ jobId: jid, runId: ctx.runId, to: 'embedding' });
+    deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'embedding' });
 
     const contentTexts: string[] = [];
     const contentIds: string[] = [];
@@ -140,13 +148,13 @@ export async function processOneJob(
       }
     }
 
-    deps.jobSteps.transitionStep({ jobId: jid, runId: ctx.runId, to: 'embedded' });
+    deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'embedded' });
     await deps.queue.ack(item.id);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn('IndexWorkflow: job failed', { jobId: jid, error: msg });
     if (ensured) {
-      deps.jobSteps.markFailed({ jobId: jid, runId: ctx.runId, message: msg });
+      deps.jobSteps.markFailed({ jobId: jid, runId, message: msg });
     }
     await deps.queue.nack(item.id, msg);
   }
@@ -156,13 +164,11 @@ export async function processOneJob(
  * Re-queue jobs that were interrupted (ADR-008). Payloads omit `markdown`; caller must refill
  * before processing or re-fetch from vault (WKF-3).
  */
-export async function resumeInterruptedJobs(
-  deps: IndexWorkflowDeps,
-  _ctx: { runId: string },
-): Promise<void> {
+export async function resumeInterruptedJobs(deps: IndexWorkflowDeps): Promise<void> {
   const jobs = deps.jobSteps.listRecoverableJobs();
   if (jobs.length === 0) return;
   const payloads: NoteIndexJob[] = jobs.map((j) => ({
+    runId: runIdFromJobId(j.jobId),
     noteId: j.notePath,
     vaultPath: j.notePath,
     noteTitle: j.notePath.split('/').pop() ?? j.notePath,

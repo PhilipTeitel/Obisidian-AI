@@ -1081,11 +1081,11 @@ Message router, protocol parity across transports ([ADR-006](docs/decisions/ADR-
 
 | ID                                      | Status      | Story                                                                | Size | Notes                                                           |
 | --------------------------------------- | ----------- | -------------------------------------------------------------------- | ---- | --------------------------------------------------------------- |
-| [SRV-1](docs/features/SRV-1.md)         | Not Started | `server.ts` + route modules; stdio NDJSON framing                    | L    | Map message `type` to handlers; lazy DB open on first use       |
-| [SRV-2](docs/features/SRV-2.md)         | Not Started | HTTP adapter surface: REST + WebSocket progress; `127.0.0.1` + token | M    | Same payloads as stdio; [API Contract](#api-contract)           |
-| [SRV-3](docs/features/SRV-3.md)         | Not Started | `health` route and startup handshake fields (`dbReady`, uptime)      | S    | Plugin startup under 2s budget ([§15](#15-startup-performance)) |
-| [SRV-4](docs/features/SRV-4.md)         | Not Started | Structured logging, `runId` / `jobId`, redaction policy              | M    | Pino sidecar ([ADR-010](docs/decisions/ADR-010-structured-logging-sidecar.md)); plugin logger compatible with Obsidian console |
-| [SRV-5](docs/features/SRV-5.md)         | Not Started | `ProgressAdapter` / push path for `IndexProgressEvent`               | M    | Real-time slideout feed                                         |
+| [SRV-1](docs/features/SRV-1.md)         | Complete    | `server.ts` + route modules; stdio NDJSON framing                    | L    | Map message `type` to handlers; lazy DB open on first use       |
+| [SRV-2](docs/features/SRV-2.md)         | Complete    | HTTP adapter surface: REST + WebSocket progress; `127.0.0.1` + token | M    | Same payloads as stdio; [API Contract](#api-contract)           |
+| [SRV-3](docs/features/SRV-3.md)         | Complete    | `health` route and startup handshake fields (`dbReady`, uptime)      | S    | Plugin startup under 2s budget ([§15](#15-startup-performance)) |
+| [SRV-4](docs/features/SRV-4.md)         | Complete    | Structured logging, `runId` / `jobId`, redaction policy              | M    | Pino sidecar ([ADR-010](docs/decisions/ADR-010-structured-logging-sidecar.md)); plugin logger compatible with Obsidian console |
+| [SRV-5](docs/features/SRV-5.md)         | Complete    | `ProgressAdapter` / push path for `IndexProgressEvent`               | M    | Real-time slideout feed                                         |
 
 ### Epic 8: Plugin client, settings, secrets, and vault I/O
 

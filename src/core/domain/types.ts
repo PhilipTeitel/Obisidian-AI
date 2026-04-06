@@ -155,6 +155,8 @@ export interface QueueItem<T> {
  * Use vault-relative path as `noteId` for MVP (matches `note_meta` / chunker).
  */
 export interface NoteIndexJob {
+  /** Correlates `job_steps` rows and progress with the client indexing run (`IndexRunAck.runId`). */
+  runId: string;
   noteId: string;
   vaultPath: string;
   noteTitle: string;
@@ -249,6 +251,7 @@ export type ChatStreamChunk =
 
 export interface HealthResponse {
   status: 'ok';
+  /** Process uptime in whole seconds since sidecar start. */
   uptime: number;
   dbReady: boolean;
 }
