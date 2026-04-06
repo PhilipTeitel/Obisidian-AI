@@ -3,7 +3,7 @@
 **Story**: Command **pre-fills** `SearchView` query from **editor selection** (or empty), activates **same leaf** as UI-1.
 **Epic**: 9 — Plugin UI, commands, and agent file operations
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 

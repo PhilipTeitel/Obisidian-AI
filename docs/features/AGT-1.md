@@ -3,7 +3,7 @@
 **Story**: Service **`writeAgentNote(vaultPath, markdown)`** creates/updates a note **only** if vault-relative folder is under **`agentOutputFolders`** and **`markdown.length ≤ maxGeneratedNoteSize`** ([README §16](../../README.md#16-agent-file-operations)); distinct from **`indexedFolders`**.
 **Epic**: 9 — Plugin UI, commands, and agent file operations
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 

@@ -3,7 +3,7 @@
 **Story**: Register commands: **reindex vault** (full index payload from vault), **incremental index** (stub or same as full for MVP), **open search**, **open chat**, **open progress**.
 **Epic**: 9 — Plugin UI, commands, and agent file operations
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 

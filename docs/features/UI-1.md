@@ -3,7 +3,7 @@
 **Story**: Register an **`ItemView`** with search input, **Search** action calling `ISidecarTransport.send({ type: 'search', payload })` with **`k`** from settings and **`apiKey`** from SecretStorage, render **result cards** (path, snippet, score), **click → open file**, **selectable** snippet text.
 **Epic**: 9 — Plugin UI, commands, and agent file operations
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 

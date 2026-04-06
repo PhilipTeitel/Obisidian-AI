@@ -3,7 +3,7 @@
 **Story**: **`ItemView`** (or dedicated right leaf) showing **latest `IndexProgressEvent`** lines from transport push demux (stdio) or WS (http) — MVP: **poll `index/status`** on interval when indexing or display last events if stdio push forwarded to plugin in future; **this story** implements a **simple list UI** + **optional** subscription hook on `StdioTransportAdapter` for `channel:push` progress (extend adapter with `onProgress` callback).
 **Epic**: 9 — Plugin UI, commands, and agent file operations
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 

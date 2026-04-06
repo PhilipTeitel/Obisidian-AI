@@ -3,7 +3,7 @@
 **Story**: **`ItemView`** with message list, **bottom textarea**, **Send** calls `streamChat` with **`timeoutMs`** from settings, **Cancel** uses `AbortSignal`, renders **sources** as links; **New conversation** clears history.
 **Epic**: 9 — Plugin UI, commands, and agent file operations
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
