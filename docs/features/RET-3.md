@@ -3,7 +3,7 @@
 **Story**: Extend **`NodeFilter`** and **`SqliteDocumentStore.searchContentVectors`** so semantic search can **restrict hits** to nodes that carry **any of** a caller-supplied tag set (OR semantics, case-insensitive match on stored tag text), using the existing **`tags`** table ([README §8](../../README.md#8-sqlite-schema)); thread optional **`tags`** from **`SearchRequest`** through **`SearchWorkflow`** Phase 2 (and optionally Phase 1 post-filter — see below).
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -122,29 +122,29 @@ Not applicable (UI-1 may add tag chips later).
 
 ### Phase A: Request wiring
 
-- [ ] **A1** — When `SearchRequest.tags` is `['foo']`, `searchContentVectors` receives `filter.tagsAny` containing `'foo'` (same casing as request).
+- [x] **A1** — When `SearchRequest.tags` is `['foo']`, `searchContentVectors` receives `filter.tagsAny` containing `'foo'` (same casing as request).
   - Evidence: `src/core/workflows/SearchWorkflow.test.ts::A1_tags_forwarded(vitest)`
 
 ### Phase B: SQLite behavior
 
-- [ ] **B1** — Given two content nodes only one of which has tag `#Foo`, ANN with `tagsAny: ['foo']` returns **only** the tagged node (distance ordering preserved among matches).
+- [x] **B1** — Given two content nodes only one of which has tag `#Foo`, ANN with `tagsAny: ['foo']` returns **only** the tagged node (distance ordering preserved among matches).
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B1_tag_filter_sqlite(vitest)`
 
-- [ ] **B2** — `tagsAny: ['a', 'b']` returns nodes tagged **either** `a` or `b`.
+- [x] **B2** — `tagsAny: ['a', 'b']` returns nodes tagged **either** `a` or `b`.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B2_tag_or_semantics(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** Tag filter SQL references the physical table name **`tags`** and joins through **`nodes`** (grep-based proof in review or comment in test file pointing to migration STO-1).
+- [x] **Y1** — **(binding)** Tag filter SQL references the physical table name **`tags`** and joins through **`nodes`** (grep-based proof in review or comment in test file pointing to migration STO-1).
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::Y1_uses_tags_table(vitest)` (assert via prepared statement string snapshot or documented `toContain('tags')` on SQL builder output)
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias — **N/A**
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias — **N/A**
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

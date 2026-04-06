@@ -3,7 +3,7 @@
 **Story**: Implement **`ChatWorkflow`** in `src/core/workflows/ChatWorkflow.ts` that (1) derives a **retrieval query** from the latest user turn in the conversation, (2) reuses the **same phased retrieval and assembly** behavior as search ([RET-1](RET-1.md), [RET-2](RET-2.md)) to build a **vault-only** context string, (3) streams assistant text via **`IChatPort.complete`**, and (4) emits **`Source[]`** aligned with the notes/nodes that contributed to context (for `ChatStreamChunk` `done`).
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -133,37 +133,37 @@ Not applicable (UI-3 consumes transport stream later).
 
 ### Phase A: Retrieval integration
 
-- [ ] **A1** — For `messages` ending with `{ role: 'user', content: 'Q' }`, the workflow invokes the shared retrieval path with query **`'Q'`** (trimmed).
+- [x] **A1** — For `messages` ending with `{ role: 'user', content: 'Q' }`, the workflow invokes the shared retrieval path with query **`'Q'`** (trimmed).
   - Evidence: `src/core/workflows/ChatWorkflow.test.ts::A1_uses_last_user_message(vitest)`
 
-- [ ] **A2** — When no `user` message exists, workflow **fails fast** with documented behavior (error or zero deltas).
+- [x] **A2** — When no `user` message exists, workflow **fails fast** with documented behavior (error or zero deltas).
   - Evidence: `src/core/workflows/ChatWorkflow.test.ts::A2_no_user_message_fails(vitest)`
 
 ### Phase B: Chat port contract
 
-- [ ] **B1** — `IChatPort.complete` receives **`messages`** identical to input and a **non-empty** `context` string when retrieval returns hits in the fake store.
+- [x] **B1** — `IChatPort.complete` receives **`messages`** identical to input and a **non-empty** `context` string when retrieval returns hits in the fake store.
   - Evidence: `src/core/workflows/ChatWorkflow.test.ts::B1_context_passed_to_chat(vitest)`
 
-- [ ] **B2** — Every yielded chunk from the fake chat port is forwarded to the consumer in order until completion.
+- [x] **B2** — Every yielded chunk from the fake chat port is forwarded to the consumer in order until completion.
   - Evidence: `src/core/workflows/ChatWorkflow.test.ts::B2_streams_deltas(vitest)`
 
 ### Phase C: Sources
 
-- [ ] **C1** — Terminal result includes **`sources`** with `notePath` matching `SearchResult.notePath` for retrieved hits used in context.
+- [x] **C1** — Terminal result includes **`sources`** with `notePath` matching `SearchResult.notePath` for retrieved hits used in context.
   - Evidence: `src/core/workflows/ChatWorkflow.test.ts::C1_sources_aligned(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `ChatWorkflow.ts` imports no `obsidian`, `better-sqlite3`, or `src/sidecar/` paths.
+- [x] **Y1** — **(binding)** `ChatWorkflow.ts` imports no `obsidian`, `better-sqlite3`, or `src/sidecar/` paths.
   - Evidence: `npm run check:boundaries` or `rg` pattern as in RET-1 **Y1**
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias — **N/A**
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias — **N/A**
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

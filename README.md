@@ -638,6 +638,8 @@ MVP ships two providers behind the port interfaces:
 
 Adding a provider is additive: implement `IEmbeddingPort` and/or `IChatPort`, register in the provider factory. No changes to domain workflows.
 
+**Backlog — implementation stories:** [PRV-1 — embedding adapters](docs/features/PRV-1.md), [PRV-2 — streaming chat adapters](docs/features/PRV-2.md).
+
 Provider configuration (base URL, model name, timeouts) is user-visible in the settings tab. Secrets (API keys) use Obsidian SecretStorage.
 
 ### 15. Startup Performance
@@ -965,8 +967,8 @@ These messages are sent between the plugin and sidecar over the transport layer.
 | `index/full`        | Plugin → Sidecar | `{ files: [{path, content, hash}], apiKey? }`                         | `{ runId, noteCount }` + progress stream                                  |
 | `index/incremental` | Plugin → Sidecar | `{ files: [{path, content, hash}], deletedPaths: string[], apiKey? }` | `{ runId, noteCount }` + progress stream                                  |
 | `index/status`      | Plugin → Sidecar | `{}`                                                                  | `{ pending, processing, completed, failed, deadLetter, jobs: JobStep[] }` |
-| `search`            | Plugin → Sidecar | `{ query, k?, apiKey? }`                                              | `{ results: SearchResult[] }`                                             |
-| `chat`              | Plugin → Sidecar | `{ messages: ChatMessage[], apiKey? }` + transport `streamChat(..., { signal? })` per [ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[] }`; client cancel via `signal` |
+| `search`            | Plugin → Sidecar | `{ query, k?, apiKey?, tags? }` (optional tag filter, OR / case-insensitive) | `{ results: SearchResult[] }`                                             |
+| `chat`              | Plugin → Sidecar | `{ messages, apiKey?, context?, timeoutMs? }` + transport `streamChat(payload, { signal? })` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md)) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[] }`; cancel/timeout via `signal` / `timeoutMs` |
 | `chat/clear`        | Plugin → Sidecar | `{}`                                                                  | `{ ok: true }`                                                            |
 | `health`            | Plugin → Sidecar | `{}`                                                                  | `{ status: 'ok', uptime, dbReady }`                                       |
 | `progress`          | Sidecar → Plugin | `{ event: IndexProgressEvent }`                                       | — (push notification)                                                     |
@@ -1057,20 +1059,20 @@ Three-phase search ([ADR-003](docs/decisions/ADR-003-phased-retrieval-strategy.m
 
 | ID                                      | Status      | Story                                                                     | Size | Notes                                                                              |
 | --------------------------------------- | ----------- | ------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------- |
-| [RET-1](docs/features/RET-1.md)         | Not Started | `SearchWorkflow`: coarse summary ANN → drill-down content → assembly      | L    | Same embedding space for query and vectors; expose `k` / result shape for plugin   |
-| [RET-2](docs/features/RET-2.md)         | Not Started | Token budgets and structured snippet formatting                           | M    | Config fractions: matched / sibling / parent ([Plugin Settings](#plugin-settings)) |
-| [RET-3](docs/features/RET-3.md)         | Not Started | Tag-aware filtering in search (where index exposes tags)                  | S    | REQUIREMENTS §5 tags; optional MVP tightening                                      |
-| [CHAT-1](docs/features/CHAT-1.md)       | Not Started | `ChatWorkflow`: retrieve → assemble context → stream completion → sources | L    | Vault-only retrieval path; conversation history in payload                         |
-| [CHAT-2](docs/features/CHAT-2.md)       | Not Started | Chat cancel/timeout behavior end-to-end                                   | S    | [ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md); configurable timeout; cancel through transport |
+| [RET-1](docs/features/RET-1.md)         | Complete    | `SearchWorkflow`: coarse summary ANN → drill-down content → assembly      | L    | Same embedding space for query and vectors; expose `k` / result shape for plugin   |
+| [RET-2](docs/features/RET-2.md)         | Complete    | Token budgets and structured snippet formatting                           | M    | Config fractions: matched / sibling / parent ([Plugin Settings](#plugin-settings)) |
+| [RET-3](docs/features/RET-3.md)         | Complete    | Tag-aware filtering in search (where index exposes tags)                  | S    | REQUIREMENTS §5 tags; optional MVP tightening                                      |
+| [CHAT-1](docs/features/CHAT-1.md)       | Complete    | `ChatWorkflow`: retrieve → assemble context → stream completion → sources | L    | Vault-only retrieval path; conversation history in payload                         |
+| [CHAT-2](docs/features/CHAT-2.md)       | Complete    | Chat cancel/timeout behavior end-to-end                                   | S    | [ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md); configurable timeout; cancel through transport |
 
 ### Epic 6: Provider adapters
 
 OpenAI and Ollama behind ports ([ADR-005](docs/decisions/ADR-005-provider-abstraction.md), REQUIREMENTS §7).
 
-| ID    | Status      | Story                                               | Size | Notes                                    |
-| ----- | ----------- | --------------------------------------------------- | ---- | ---------------------------------------- |
-| PRV-1 | Not Started | `OpenAIEmbeddingAdapter` / `OllamaEmbeddingAdapter` | M    | Batch embed; API key optional in payload |
-| PRV-2 | Not Started | `OpenAIChatAdapter` / `OllamaChatAdapter` streaming | M    | Base URL and model from settings         |
+| ID                                      | Status      | Story                                               | Size | Notes                                    |
+| --------------------------------------- | ----------- | --------------------------------------------------- | ---- | ---------------------------------------- |
+| [PRV-1](docs/features/PRV-1.md)         | Not Started | `OpenAIEmbeddingAdapter` / `OllamaEmbeddingAdapter` | M    | Batch embed; API key optional in payload |
+| [PRV-2](docs/features/PRV-2.md)         | Not Started | `OpenAIChatAdapter` / `OllamaChatAdapter` streaming | M    | Base URL and model from settings         |
 
 ### Epic 7: Sidecar server, routes, and observability
 

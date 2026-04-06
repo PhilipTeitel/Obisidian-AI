@@ -29,6 +29,10 @@ class PlannerFakeStore implements IDocumentStore {
     return [];
   }
 
+  async getNodeById(): Promise<null> {
+    return null;
+  }
+
   async deleteNote(noteId: string): Promise<void> {
     this.deleted.push(noteId);
     this.noteMeta.delete(noteId);
@@ -72,6 +76,10 @@ class PlannerFakeStore implements IDocumentStore {
 
   async upsertNoteMeta(): Promise<void> {
     throw new Error('unused');
+  }
+
+  async noteMatchesTagFilter(): Promise<boolean> {
+    return true;
   }
 }
 

@@ -131,6 +131,14 @@ export class SqliteDocumentStore implements IDocumentStore {
     return rows.map(rowToDocumentNode);
   }
 
+  async getNodeById(nodeId: string): Promise<DocumentNode | null> {
+    const row = this.db.prepare('SELECT * FROM nodes WHERE id = ?').get(nodeId) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) return null;
+    return rowToDocumentNode(row);
+  }
+
   async deleteNote(noteId: string): Promise<void> {
     this.db.prepare('DELETE FROM note_meta WHERE note_id = ?').run(noteId);
     this.db.prepare('DELETE FROM nodes WHERE note_id = ?').run(noteId);
@@ -231,11 +239,33 @@ export class SqliteDocumentStore implements IDocumentStore {
     filter?: NodeFilter,
   ): Promise<VectorMatch[]> {
     this.assertVectorLength(query, 'searchContentVectors');
-    let sql = `SELECT v.node_id, v.distance FROM vec_content v
-      INNER JOIN nodes n ON n.id = v.node_id
-      WHERE v.embedding MATCH ?
-        AND k = ?`;
-    const params: unknown[] = [query, k];
+    const roots = filter?.subtreeRootNodeIds?.filter(Boolean) ?? [];
+    const hasSubtree = roots.length > 0;
+
+    let sql: string;
+    const params: unknown[] = [];
+
+    if (hasSubtree) {
+      const rootPh = roots.map(() => '?').join(', ');
+      sql = `WITH RECURSIVE subtree(id) AS (
+          SELECT id FROM nodes WHERE id IN (${rootPh})
+          UNION ALL
+          SELECT n.id FROM nodes n INNER JOIN subtree s ON n.parent_id = s.id
+        )
+        SELECT v.node_id, v.distance FROM vec_content v
+        INNER JOIN nodes n ON n.id = v.node_id
+        WHERE n.id IN (SELECT id FROM subtree)
+          AND v.embedding MATCH ?
+          AND k = ?`;
+      params.push(...roots, query, k);
+    } else {
+      sql = `SELECT v.node_id, v.distance FROM vec_content v
+        INNER JOIN nodes n ON n.id = v.node_id
+        WHERE v.embedding MATCH ?
+          AND k = ?`;
+      params.push(query, k);
+    }
+
     if (filter?.noteIds?.length) {
       sql += ` AND n.note_id IN (${filter.noteIds.map(() => '?').join(',')})`;
       params.push(...filter.noteIds);
@@ -243,6 +273,15 @@ export class SqliteDocumentStore implements IDocumentStore {
     if (filter?.nodeTypes?.length) {
       sql += ` AND n.type IN (${filter.nodeTypes.map(() => '?').join(',')})`;
       params.push(...filter.nodeTypes);
+    }
+    if (filter?.tagsAny?.length) {
+      const lowered = filter.tagsAny.map((t) => t.toLowerCase());
+      const ph = lowered.map(() => '?').join(', ');
+      sql += ` AND EXISTS (
+        SELECT 1 FROM tags t
+        WHERE t.node_id = n.id AND lower(t.tag) IN (${ph})
+      )`;
+      params.push(...lowered);
     }
     sql += ` ORDER BY v.distance ASC`;
     const rows = this.db.prepare(sql).all(...params) as {
@@ -329,5 +368,21 @@ export class SqliteDocumentStore implements IDocumentStore {
         indexed_at: meta.indexedAt,
         node_count: meta.nodeCount,
       });
+  }
+
+  async noteMatchesTagFilter(noteId: string, tagsAny: string[]): Promise<boolean> {
+    if (tagsAny.length === 0) return true;
+    const lowered = tagsAny.map((t) => t.toLowerCase());
+    const ph = lowered.map(() => '?').join(', ');
+    const row = this.db
+      .prepare(
+        `SELECT EXISTS (
+           SELECT 1 FROM tags t
+           INNER JOIN nodes n ON n.id = t.node_id
+           WHERE n.note_id = ? AND lower(t.tag) IN (${ph})
+         ) AS ok`,
+      )
+      .get(noteId, ...lowered) as { ok: number };
+    return row.ok === 1;
   }
 }

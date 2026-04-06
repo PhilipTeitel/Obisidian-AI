@@ -55,6 +55,10 @@ export interface VectorMatch {
 export interface NodeFilter {
   noteIds?: string[];
   nodeTypes?: NodeType[];
+  /** Limit hits to these nodes and all descendants (Phase 2 drill-down, RET-1). */
+  subtreeRootNodeIds?: string[];
+  /** OR semantics: node matches if it has any of these tags (case-insensitive), RET-3. */
+  tagsAny?: string[];
 }
 
 export interface NoteMeta {
@@ -205,6 +209,8 @@ export interface SearchRequest {
   query: string;
   k?: number;
   apiKey?: string;
+  /** Optional tag filter (OR, case-insensitive); forwarded to Phase 1 prune + Phase 2 ANN. */
+  tags?: string[];
 }
 
 export interface SearchResult {
@@ -217,6 +223,19 @@ export interface SearchResult {
 
 export interface SearchResponse {
   results: SearchResult[];
+}
+
+/** Fractions of `totalTokenBudget` for the three assembly tiers (README Plugin Settings). */
+export interface ContextBudgetConfig {
+  matchedContent: number;
+  siblingContext: number;
+  parentSummary: number;
+}
+
+export interface SearchAssemblyOptions {
+  budget: ContextBudgetConfig;
+  /** Token budget for the three tier bodies (headings/labels are added outside this budget). */
+  totalTokenBudget: number;
 }
 
 export interface Source {
@@ -244,7 +263,16 @@ export type SidecarRequest =
   | { type: 'index/incremental'; payload: IndexIncrementalRequest }
   | { type: 'index/status'; payload?: Record<string, never> }
   | { type: 'search'; payload: SearchRequest }
-  | { type: 'chat'; payload: { messages: ChatMessage[]; context?: string; apiKey?: string } }
+  | {
+      type: 'chat';
+      payload: {
+        messages: ChatMessage[];
+        context?: string;
+        apiKey?: string;
+        /** Wall-clock budget for the stream (maps to `IChatPort` / workflow; ADR-009). */
+        timeoutMs?: number;
+      };
+    }
   | { type: 'chat/clear'; payload?: Record<string, never> }
   | { type: 'health'; payload?: Record<string, never> };
 

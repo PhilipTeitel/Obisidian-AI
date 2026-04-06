@@ -21,6 +21,8 @@ export interface IDocumentStore {
   /** Replace all `cross_refs` rows sourced from nodes of `noteId` (call after `upsertNodes`). */
   replaceNoteCrossRefs(noteId: string, refs: ParsedCrossRef[]): Promise<void>;
   getNodesByNote(noteId: string): Promise<DocumentNode[]>;
+  /** Single node by id (retrieval / assembly). */
+  getNodeById(nodeId: string): Promise<DocumentNode | null>;
   deleteNote(noteId: string): Promise<void>;
   upsertSummary(nodeId: string, summary: string, model: string): Promise<void>;
   getSummary(nodeId: string): Promise<StoredSummary | null>;
@@ -41,4 +43,8 @@ export interface IDocumentStore {
   getSiblings(nodeId: string): Promise<DocumentNode[]>;
   getNoteMeta(noteId: string): Promise<NoteMeta | null>;
   upsertNoteMeta(meta: NoteMeta): Promise<void>;
+  /**
+   * True if any `tags` row for this note matches one of `tagsAny` (case-insensitive). RET-3 Phase 1 prune.
+   */
+  noteMatchesTagFilter(noteId: string, tagsAny: string[]): Promise<boolean>;
 }

@@ -1,7 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { DocumentNode } from '../../core/domain/types.js';
 import { openMigratedMemoryDb } from '../db/open.js';
 import { SqliteDocumentStore } from './SqliteDocumentStore.js';
+
+const storeSourcePath = fileURLToPath(new URL('./SqliteDocumentStore.ts', import.meta.url));
 
 const DIM = 4;
 
@@ -314,6 +318,139 @@ describe('SqliteDocumentStore', () => {
     ]);
     const sib = await s.getSiblings('a');
     expect(sib.map((x) => x.id)).toEqual(['b']);
+  });
+
+  it('B1_tag_filter_sqlite', async () => {
+    const { store: s, db } = makeStore();
+    const v = new Float32Array(DIM).fill(0.4);
+    const q = new Float32Array(DIM).fill(0.4);
+    await s.upsertNodes([
+      baseNode({ id: 'nr', noteId: 'n' }),
+      baseNode({
+        id: 'plain',
+        noteId: 'n',
+        parentId: 'nr',
+        type: 'paragraph',
+        depth: 1,
+        siblingOrder: 0,
+      }),
+      baseNode({
+        id: 'tagged',
+        noteId: 'n',
+        parentId: 'nr',
+        type: 'paragraph',
+        depth: 1,
+        siblingOrder: 1,
+      }),
+    ]);
+    db.prepare(`INSERT INTO tags (node_id, tag, source) VALUES ('tagged', 'Foo', 'inline')`).run();
+    await s.upsertEmbedding('plain', 'content', v, {
+      model: 'm',
+      dimension: DIM,
+      contentHash: 'h1',
+    });
+    await s.upsertEmbedding('tagged', 'content', v, {
+      model: 'm',
+      dimension: DIM,
+      contentHash: 'h2',
+    });
+    const all = await s.searchContentVectors(q, 10);
+    expect(new Set(all.map((h) => h.nodeId))).toEqual(new Set(['plain', 'tagged']));
+    const filt = await s.searchContentVectors(q, 10, { tagsAny: ['foo'] });
+    expect(filt.map((h) => h.nodeId)).toEqual(['tagged']);
+  });
+
+  it('B2_tag_or_semantics', async () => {
+    const { store: s, db } = makeStore();
+    const v = new Float32Array(DIM).fill(0.5);
+    const q = new Float32Array(DIM).fill(0.5);
+    await s.upsertNodes([
+      baseNode({ id: 'r2', noteId: 'n2' }),
+      baseNode({
+        id: 'na',
+        noteId: 'n2',
+        parentId: 'r2',
+        type: 'paragraph',
+        depth: 1,
+        siblingOrder: 0,
+      }),
+      baseNode({
+        id: 'nb',
+        noteId: 'n2',
+        parentId: 'r2',
+        type: 'paragraph',
+        depth: 1,
+        siblingOrder: 1,
+      }),
+    ]);
+    db.prepare(`INSERT INTO tags (node_id, tag, source) VALUES ('na', 'a', 'inline')`).run();
+    db.prepare(`INSERT INTO tags (node_id, tag, source) VALUES ('nb', 'b', 'inline')`).run();
+    await s.upsertEmbedding('na', 'content', v, {
+      model: 'm',
+      dimension: DIM,
+      contentHash: 'ha',
+    });
+    await s.upsertEmbedding('nb', 'content', v, {
+      model: 'm',
+      dimension: DIM,
+      contentHash: 'hb',
+    });
+    const hits = await s.searchContentVectors(q, 10, { tagsAny: ['a', 'b'] });
+    expect(hits.map((h) => h.nodeId).sort()).toEqual(['na', 'nb']);
+  });
+
+  it('Y1_uses_tags_table', () => {
+    const src = readFileSync(storeSourcePath, 'utf8');
+    expect(src).toContain('FROM tags');
+    expect(src).toContain('JOIN nodes');
+  });
+
+  it('Y2_subtree_filter_sqlite', async () => {
+    const { store: s } = makeStore();
+    const v = new Float32Array(DIM).fill(0.3);
+    const q = new Float32Array(DIM).fill(0.3);
+    await s.upsertNodes([
+      baseNode({ id: 'r', noteId: 'n' }),
+      baseNode({
+        id: 't',
+        noteId: 'n',
+        parentId: 'r',
+        type: 'topic',
+        depth: 1,
+        siblingOrder: 0,
+      }),
+      baseNode({
+        id: 'p1',
+        noteId: 'n',
+        parentId: 't',
+        type: 'paragraph',
+        depth: 2,
+        siblingOrder: 0,
+      }),
+      baseNode({
+        id: 'p2',
+        noteId: 'n',
+        parentId: 'r',
+        type: 'paragraph',
+        depth: 1,
+        siblingOrder: 1,
+      }),
+    ]);
+    await s.upsertEmbedding('p1', 'content', v, {
+      model: 'm',
+      dimension: DIM,
+      contentHash: 'h1',
+    });
+    await s.upsertEmbedding('p2', 'content', v, {
+      model: 'm',
+      dimension: DIM,
+      contentHash: 'h2',
+    });
+    const all = await s.searchContentVectors(q, 10);
+    expect(all.map((h) => h.nodeId).sort()).toEqual(['p1', 'p2']);
+
+    const sub = await s.searchContentVectors(q, 10, { subtreeRootNodeIds: ['t'] });
+    expect(sub.map((h) => h.nodeId)).toEqual(['p1']);
   });
 
   it('Y2_adapter_path', () => {

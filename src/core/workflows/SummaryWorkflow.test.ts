@@ -38,8 +38,20 @@ class MemoryStore implements IDocumentStore {
     }
   }
 
+  async replaceNoteTags(): Promise<void> {}
+
+  async replaceNoteCrossRefs(): Promise<void> {}
+
   async getNodesByNote(noteId: string): Promise<DocumentNode[]> {
     return [...(this.noteNodes.get(noteId) ?? [])];
+  }
+
+  async getNodeById(nodeId: string): Promise<DocumentNode | null> {
+    for (const nodes of this.noteNodes.values()) {
+      const found = nodes.find((n) => n.id === nodeId);
+      if (found) return found;
+    }
+    return null;
   }
 
   async deleteNote(noteId: string): Promise<void> {
@@ -85,11 +97,15 @@ class MemoryStore implements IDocumentStore {
   }
 
   async upsertNoteMeta(): Promise<void> {}
+
+  async noteMatchesTagFilter(): Promise<boolean> {
+    return true;
+  }
 }
 
 function fakeChat(response: string): IChatPort {
   return {
-    async *complete() {
+    async *complete(_messages, _context, _apiKey, _options) {
       yield response;
     },
   };
@@ -247,7 +263,7 @@ describe('SummaryWorkflow', () => {
     const store = new MemoryStore();
     let k = 0;
     const chat: IChatPort = {
-      async *complete() {
+      async *complete(_m, _c, _k, _o) {
         k += 1;
         yield `s${k}`;
       },

@@ -3,7 +3,7 @@
 **Story**: Replace hard-coded tier fractions in retrieval assembly with **injected budget ratios** aligned to plugin settings (`matchedContentBudget`, `siblingContextBudget`, `parentSummaryBudget`), and enforce caps using **`estimateTokens`** from [`tokenEstimator.ts`](../../src/core/domain/tokenEstimator.ts) so snippets and chat context stay within a **target token budget** for the assembled block.
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -118,32 +118,32 @@ Not applicable. **PLG-4** surfaces numeric settings later; this story only consu
 
 ### Phase A: Config validation
 
-- [ ] **A1** — When fractions sum to **0.99**, `runSearch` / assembly entry **rejects** the config (throws or `Result` error) — no partial assembly.
+- [x] **A1** — When fractions sum to **0.99**, `runSearch` / assembly entry **rejects** the config (throws or `Result` error) — no partial assembly.
   - Evidence: `src/core/domain/contextAssembly.test.ts::A1_rejects_bad_sum(vitest)`
 
-- [ ] **A2** — When fractions are **`0.6 / 0.25 / 0.15`**, assembly runs without error on a minimal fake tree.
+- [x] **A2** — When fractions are **`0.6 / 0.25 / 0.15`**, assembly runs without error on a minimal fake tree.
   - Evidence: `src/core/domain/contextAssembly.test.ts::A2_default_budget_ok(vitest)`
 
 ### Phase B: Truncation behavior
 
-- [ ] **B1** — With a tiny `totalTokenBudget`, **`Matched content`** section is truncated first per tier allocation (matched tier cannot borrow sibling/parent share).
+- [x] **B1** — With a tiny `totalTokenBudget`, **`Matched content`** section is truncated first per tier allocation (matched tier cannot borrow sibling/parent share).
   - Evidence: `src/core/domain/contextAssembly.test.ts::B1_matched_truncation_respects_share(vitest)`
 
-- [ ] **B2** — `SearchResult.snippet` length (estimated tokens) **≤** `totalTokenBudget` for each result in the workflow test harness.
+- [x] **B2** — `SearchResult.snippet` estimated tokens **≤** `totalTokenBudget` + fixed heading overhead (`SNIPPET_HEADING_OVERHEAD_TOKENS` in `contextAssembly.ts`), matching §5 “tier bodies” vs headings.
   - Evidence: `src/core/workflows/SearchWorkflow.test.ts::B2_snippet_within_budget(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `contextAssembly.ts` imports **only** `src/core/**` modules (no `sidecar`, `obsidian`, `better-sqlite3`).
+- [x] **Y1** — **(binding)** `contextAssembly.ts` imports **only** `src/core/**` modules (no `sidecar`, `obsidian`, `better-sqlite3`).
   - Evidence: `npm run check:boundaries` or `rg` on `contextAssembly.ts` as in RET-1 **Y1**
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias — **N/A** (no shared package)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias — **N/A** (no shared package)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

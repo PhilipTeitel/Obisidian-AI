@@ -3,7 +3,7 @@
 **Story**: Implement **configurable timeout** and **client-initiated cancellation** for streaming chat per [ADR-009](../decisions/ADR-009-chat-cancellation-and-timeout.md): extend **`IChatPort.complete`**, **`ISidecarTransport.streamChat`**, and concrete chat adapters (or stubs if PRV-2 not landed) so **`chatTimeout`** from settings maps to **`timeoutMs`** and **`AbortSignal`** stops streams without hanging.
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -130,31 +130,31 @@ Not applicable in core repo slice; **UI-3** passes `AbortSignal` when implemente
 
 ### Phase A: Port signatures
 
-- [ ] **A1** — **(binding)** `npm run typecheck` passes after updating **`IChatPort.complete`** and every implementation / test fake in the repo to the four-parameter signature.
+- [x] **A1** — **(binding)** `npm run typecheck` passes after updating **`IChatPort.complete`** and every implementation / test fake in the repo to the four-parameter signature.
   - Evidence: `package.json` script `typecheck` (no TS errors)
 
 ### Phase B: Timeout
 
-- [ ] **B1** — Fake chat port that never yields respects **`timeoutMs: 50`** and **stops** within a bounded window (use fake timers or real clock with generous upper bound in CI).
+- [x] **B1** — Fake chat port that never yields respects **`timeoutMs`** and **stops** within a bounded window (workflow uses `withChatCompletionControls`; test uses **150ms**).
   - Evidence: `src/core/workflows/ChatWorkflow.test.ts::B1_timeout_stops_stream(vitest)` or adapter test file if logic lives only in adapter
 
 ### Phase C: Cancel
 
-- [ ] **C1** — When **`AbortSignal.abort()`** is called after the first delta, **no further deltas** are observed from `complete(...)`.
+- [x] **C1** — When **`AbortSignal.abort()`** is called after the first delta, **no further deltas** are observed from `complete(...)`.
   - Evidence: `src/core/workflows/ChatWorkflow.test.ts::C1_abort_stops_deltas(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** After port signature changes, **`npm run verify:core-imports`** still passes (core must not import `obsidian`, `better-sqlite3`, or `../sidecar/`).
+- [x] **Y1** — **(binding)** After port signature changes, **`npm run verify:core-imports`** still passes (core must not import `obsidian`, `better-sqlite3`, or `../sidecar/`).
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias — **N/A**
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias — **N/A**
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

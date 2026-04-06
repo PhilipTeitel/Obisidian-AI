@@ -3,7 +3,7 @@
 **Story**: Implement **`SearchWorkflow`** in core as a port-driven three-phase pipeline: embed query, ANN on summary vectors, scoped content-vector drill-down under coarse candidates, then assemble **`SearchResult[]`** (paths, scores, heading trails, snippets) for the plugin contract — with configurable **`k`** and explicit result shape for later UI (UI-1).
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -139,38 +139,38 @@ Not applicable. This story is core + sidecar store filtering only. **UI-1** cons
 
 ### Phase A: Phase ordering and embedding
 
-- [ ] **A1** — For a non-empty index fake, `runSearch` calls **`embedder.embed`** exactly once with an array whose sole element is the trimmed `SearchRequest.query`.
+- [x] **A1** — For a non-empty index fake, `runSearch` calls **`embedder.embed`** exactly once with an array whose sole element is the trimmed `SearchRequest.query`.
   - Evidence: `src/core/workflows/SearchWorkflow.test.ts::A1_single_embed_call(vitest)`
 
-- [ ] **A2** — After embedding, the workflow calls **`searchSummaryVectors`** before any **`searchContentVectors`**.
+- [x] **A2** — After embedding, the workflow calls **`searchSummaryVectors`** before any **`searchContentVectors`**.
   - Evidence: `src/core/workflows/SearchWorkflow.test.ts::A2_summary_before_content(vitest)`
 
-- [ ] **A3** — When Phase 1 returns zero summary matches, **`searchContentVectors` is not invoked** and `results` is `[]`.
+- [x] **A3** — When Phase 1 returns zero summary matches, **`searchContentVectors` is not invoked** and `results` is `[]`.
   - Evidence: `src/core/workflows/SearchWorkflow.test.ts::A3_no_coarse_no_drilldown(vitest)`
 
 ### Phase B: Results shape
 
-- [ ] **B1** — Each `SearchResult` includes **`nodeId`**, **`notePath`** (vault-relative string), **`score`** (numeric, from content match or documented merge rule), **`snippet`** (non-empty string for hits), **`headingTrail`** (string array, may be empty for note-level).
+- [x] **B1** — Each `SearchResult` includes **`nodeId`**, **`notePath`** (vault-relative string), **`score`** (numeric, from content match or documented merge rule), **`snippet`** (non-empty string for hits), **`headingTrail`** (string array, may be empty for note-level).
   - Evidence: `src/core/workflows/SearchWorkflow.test.ts::B1_result_shape(vitest)`
 
-- [ ] **B2** — **`SearchRequest.k`** caps the number of results returned (≤ `k` when more candidates exist in fake data).
+- [x] **B2** — **`SearchRequest.k`** caps the number of results returned (≤ `k` when more candidates exist in fake data).
   - Evidence: `src/core/workflows/SearchWorkflow.test.ts::B2_respects_k_cap(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `SearchWorkflow.ts` contains **no** import path matching `sidecar`, `better-sqlite3`, or `obsidian`.
+- [x] **Y1** — **(binding)** `SearchWorkflow.ts` contains **no** import path matching `sidecar`, `better-sqlite3`, or `obsidian`.
   - Evidence: `scripts/check-source-boundaries.mjs(npm run check:boundaries)` or `rg --glob 'SearchWorkflow.ts' 'better-sqlite3|obsidian|/sidecar/'` exiting non-zero if matched
 
-- [ ] **Y2** — **(binding)** `searchContentVectors` with `subtreeRootNodeIds` set returns **only** rows whose `nodes.id` is the root or a descendant (transitive) of one of the roots in a populated SQLite fixture.
+- [x] **Y2** — **(binding)** `searchContentVectors` with `subtreeRootNodeIds` set returns **only** rows whose `nodes.id` is the root or a descendant (transitive) of one of the roots in a populated SQLite fixture.
   - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::Y2_subtree_filter_sqlite(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A**: no `packages/shared`; types remain in `src/core/domain/types.ts`
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A**: no `packages/shared`; types remain in `src/core/domain/types.ts`
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines
 
 ---
 

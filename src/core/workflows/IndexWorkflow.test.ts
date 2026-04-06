@@ -108,6 +108,10 @@ class FakeStore implements IDocumentStore {
     return this.storedNodes;
   }
 
+  async getNodeById(nodeId: string): Promise<DocumentNode | null> {
+    return this.storedNodes.find((n) => n.id === nodeId) ?? null;
+  }
+
   async deleteNote(): Promise<void> {}
 
   async upsertSummary(nodeId: string, summary: string, model: string): Promise<void> {
@@ -162,6 +166,10 @@ class FakeStore implements IDocumentStore {
   async upsertNoteMeta(meta: import('../domain/types.js').NoteMeta): Promise<void> {
     this.noteMeta.push(meta);
   }
+
+  async noteMatchesTagFilter(): Promise<boolean> {
+    return true;
+  }
 }
 
 function fakeEmbed(dim: number): IEmbeddingPort {
@@ -173,7 +181,7 @@ function fakeEmbed(dim: number): IEmbeddingPort {
 }
 
 const chat: IChatPort = {
-  async *complete() {
+  async *complete(_m, _c, _k, _o) {
     yield 'summary-text';
   },
 };

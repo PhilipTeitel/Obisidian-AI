@@ -11,5 +11,6 @@ export interface ISidecarTransport {
 
   streamChat(
     request: Extract<SidecarRequest, { type: 'chat' }>['payload'],
+    options?: { signal?: AbortSignal },
   ): AsyncIterable<ChatStreamChunk>;
 }
