@@ -1104,14 +1104,14 @@ Thin client: lifecycle, transport, settings, per-request secrets (REQUIREMENTS �
 
 Panes and command palette (REQUIREMENTS §3, §6, §10); agent writes ([§16](#16-agent-file-operations)).
 
-| ID    | Status      | Story                                                                  | Size | Notes                          |
-| ----- | ----------- | ---------------------------------------------------------------------- | ---- | ------------------------------ |
-| UI-1  | Not Started | `SearchView`: query, results cards, navigation, selectable text        | L    | Reuse single pane instance     |
-| UI-2  | Not Started | Semantic search selection command                                      | S    | Pre-fill from editor selection |
-| UI-3  | Not Started | `ChatView`: history, streaming, sources, copy, new conversation        | L    | Theme variables; bottom input  |
-| UI-4  | Not Started | `ProgressSlideout`: per-note steps + aggregate + errors/dead-letter    | M    | Subscribe to progress stream   |
-| UI-5  | Not Started | Commands: reindex vault, incremental index, open search/chat panes     | S    | Discoverable palette entries   |
-| AGT-1 | Not Started | Agent create/update notes via Obsidian API; allowed folders + max size | M    | Distinct from `indexedFolders` |
+| ID                                      | Status      | Story                                                                  | Size | Notes                          |
+| --------------------------------------- | ----------- | ---------------------------------------------------------------------- | ---- | ------------------------------ |
+| [UI-1](docs/features/UI-1.md)           | Not Started | `SearchView`: query, results cards, navigation, selectable text        | L    | Reuse single pane instance     |
+| [UI-2](docs/features/UI-2.md)           | Not Started | Semantic search selection command                                      | S    | Pre-fill from editor selection |
+| [UI-3](docs/features/UI-3.md)           | Not Started | `ChatView`: history, streaming, sources, copy, new conversation        | L    | Theme variables; bottom input  |
+| [UI-4](docs/features/UI-4.md)           | Not Started | `ProgressSlideout`: per-note steps + aggregate + errors/dead-letter    | M    | Subscribe to progress stream   |
+| [UI-5](docs/features/UI-5.md)           | Not Started | Commands: reindex vault, incremental index, open search/chat panes     | S    | Discoverable palette entries   |
+| [AGT-1](docs/features/AGT-1.md)         | Not Started | Agent create/update notes via Obsidian API; allowed folders + max size | M    | Distinct from `indexedFolders` |
 
 ### Epic 10: Testing, authoring guide, and release hardening
 
