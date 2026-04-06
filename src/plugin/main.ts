@@ -1,9 +1,14 @@
 import { Plugin } from 'obsidian';
 import { getCoreLabel } from '../core/index.js';
+import { registerCommands } from './commands/registerCommands.js';
 import { SidecarLifecycle } from './client/SidecarLifecycle.js';
 import { DEFAULT_SETTINGS } from './settings/defaults.js';
 import { ObsidianAISettingTab } from './settings/SettingsTab.js';
 import type { ObsidianAISettings } from './settings/types.js';
+import { ChatView } from './ui/ChatView.js';
+import { ProgressSlideout } from './ui/ProgressSlideout.js';
+import { SearchView } from './ui/SearchView.js';
+import { VIEW_TYPE_CHAT, VIEW_TYPE_PROGRESS, VIEW_TYPE_SEARCH } from './ui/viewIds.js';
 
 export default class ObsidianAIPlugin extends Plugin {
   settings: ObsidianAISettings = { ...DEFAULT_SETTINGS };
@@ -13,6 +18,10 @@ export default class ObsidianAIPlugin extends Plugin {
     void getCoreLabel();
     await this.loadSettings();
     this.addSettingTab(new ObsidianAISettingTab(this.app, this));
+    this.registerView(VIEW_TYPE_SEARCH, (leaf) => new SearchView(leaf, this));
+    this.registerView(VIEW_TYPE_CHAT, (leaf) => new ChatView(leaf, this));
+    this.registerView(VIEW_TYPE_PROGRESS, (leaf) => new ProgressSlideout(leaf, this));
+    registerCommands(this);
     this.lifecycle = new SidecarLifecycle({
       app: this.app,
       manifest: this.manifest,
