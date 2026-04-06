@@ -33,13 +33,13 @@ Pointers: [IQueuePort](../../src/core/ports/IQueuePort.ts), [IEmbeddingPort](../
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [ADR-007](../decisions/ADR-007-queue-abstraction.md) | All work enters via `IQueuePort`; ack/nack after terminal or failure. |
-| [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md) | Step order, skips, crash recovery, progress correlation. |
-| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Core workflow vs sidecar adapters; vault content arrives in payload. |
-| [ADR-005](../decisions/ADR-005-provider-abstraction.md) | Embeddings via `IEmbeddingPort` only. |
-| [ADR-002](../decisions/ADR-002-hierarchical-document-model.md) | Chunk structure and note identity. |
+| ADR                                                                  | Why it binds this story                                               |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [ADR-007](../decisions/ADR-007-queue-abstraction.md)                 | All work enters via `IQueuePort`; ack/nack after terminal or failure. |
+| [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md) | Step order, skips, crash recovery, progress correlation.              |
+| [ADR-006](../decisions/ADR-006-sidecar-architecture.md)              | Core workflow vs sidecar adapters; vault content arrives in payload.  |
+| [ADR-005](../decisions/ADR-005-provider-abstraction.md)              | Embeddings via `IEmbeddingPort` only.                                 |
+| [ADR-002](../decisions/ADR-002-hierarchical-document-model.md)       | Chunk structure and note identity.                                    |
 
 ---
 
@@ -88,19 +88,9 @@ export interface NoteIndexJob {
 import type { IndexStep, JobStep } from '../domain/types.js';
 
 export interface IJobStepPort {
-  ensureJob(input: {
-    jobId: string;
-    runId: string;
-    notePath: string;
-    contentHash: string;
-  }): void;
+  ensureJob(input: { jobId: string; runId: string; notePath: string; contentHash: string }): void;
 
-  transitionStep(input: {
-    jobId: string;
-    runId: string;
-    to: IndexStep;
-    detail?: string;
-  }): void;
+  transitionStep(input: { jobId: string; runId: string; to: IndexStep; detail?: string }): void;
 
   markFailed(input: { jobId: string; runId: string; message: string }): void;
 
@@ -160,22 +150,22 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/core/ports/IJobStepPort.ts` | Core-facing job step contract. |
-| 2 | `src/core/workflows/IndexWorkflow.ts` | State machine + orchestration. |
-| 3 | `src/core/workflows/IndexWorkflow.test.ts` | Fakes for all ports; step + queue assertions. |
+| #   | Path                                         | Purpose                                       |
+| --- | -------------------------------------------- | --------------------------------------------- |
+| 1   | `src/core/ports/IJobStepPort.ts`             | Core-facing job step contract.                |
+| 2   | `src/core/workflows/IndexWorkflow.ts`        | State machine + orchestration.                |
+| 3   | `tests/core/workflows/IndexWorkflow.test.ts` | Fakes for all ports; step + queue assertions. |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/domain/types.ts` | Add `NoteIndexJob`. |
-| 2 | `src/core/ports/IDocumentStore.ts` | Add tag/xref replace methods for a note. |
-| 3 | `src/core/ports/index.ts` | Export `IJobStepPort`. |
-| 4 | `src/sidecar/adapters/SqliteDocumentStore.ts` | Implement tag/xref replace (transactional with nodes). |
-| 5 | `src/sidecar/adapters/SqliteDocumentStore.test.ts` | Tests for tag/xref replace. |
-| 6 | `src/sidecar/adapters/JobStepService.ts` | `implements IJobStepPort`. |
+| #   | Path                                                 | Change                                                 |
+| --- | ---------------------------------------------------- | ------------------------------------------------------ |
+| 1   | `src/core/domain/types.ts`                           | Add `NoteIndexJob`.                                    |
+| 2   | `src/core/ports/IDocumentStore.ts`                   | Add tag/xref replace methods for a note.               |
+| 3   | `src/core/ports/index.ts`                            | Export `IJobStepPort`.                                 |
+| 4   | `src/sidecar/adapters/SqliteDocumentStore.ts`        | Implement tag/xref replace (transactional with nodes). |
+| 5   | `tests/sidecar/adapters/SqliteDocumentStore.test.ts` | Tests for tag/xref replace.                            |
+| 6   | `src/sidecar/adapters/JobStepService.ts`             | `implements IJobStepPort`.                             |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -189,7 +179,7 @@ Not applicable.
 ### Phase A: Store extensions for chunk artifacts
 
 - [x] **A1** — After `upsertNodes` for a note, `replaceNoteTags` / `replaceNoteCrossRefs` (or combined API) persist all `ParsedTag` / `ParsedCrossRef` rows; re-running with empty arrays clears prior rows for that note.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A1_tags_xrefs_replace(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::A1_tags_xrefs_replace(vitest)`
 
 ### Phase B: Job step port alignment
 
@@ -199,35 +189,35 @@ Not applicable.
 ### Phase C: IndexWorkflow happy path
 
 - [x] **C1** — For one `NoteIndexJob`, fake ports record **`transitionStep` calls** in order: `queued` established → `parsing` → `parsed` → `storing` → `stored` → `summarizing` → `summarized` → `embedding` → `embedded`, then **`queue.ack`** with the item id.
-  - Evidence: `src/core/workflows/IndexWorkflow.test.ts::C1_happy_path_step_order(vitest)`
+  - Evidence: `tests/core/workflows/IndexWorkflow.test.ts::C1_happy_path_step_order(vitest)`
 - [x] **C2** — `chunkNote` receives `vaultPath`, `noteTitle`, `markdown`, and `noteId` from the job payload; resulting nodes are passed to `store.upsertNodes`.
-  - Evidence: `src/core/workflows/IndexWorkflow.test.ts::C2_chunker_inputs(vitest)`
+  - Evidence: `tests/core/workflows/IndexWorkflow.test.ts::C2_chunker_inputs(vitest)`
 - [x] **C3** — `SummaryWorkflow` is invoked once during `summarizing` with matching `noteId` / paths (spy on fake or extract shared runner).
-  - Evidence: `src/core/workflows/IndexWorkflow.test.ts::C3_summary_invoked(vitest)`
+  - Evidence: `tests/core/workflows/IndexWorkflow.test.ts::C3_summary_invoked(vitest)`
 - [x] **C4** — Embedding phase calls `IEmbeddingPort.embed` with batching policy documented in code (batch size ≥ 1); every node that requires a **new** content vector gets `upsertEmbedding` with `EmbedMeta.contentHash === node.contentHash`.
-  - Evidence: `src/core/workflows/IndexWorkflow.test.ts::C4_embed_meta_matches_node_hash(vitest)`
+  - Evidence: `tests/core/workflows/IndexWorkflow.test.ts::C4_embed_meta_matches_node_hash(vitest)`
 
 ### Phase D: Idempotent embed skip
 
 - [x] **D1** — When `getEmbeddingMeta(nodeId,'content')` already matches the node’s `contentHash`, **no** `embed` call includes that node’s text for content vectors (skipped).
-  - Evidence: `src/core/workflows/IndexWorkflow.test.ts::D1_skip_content_embed(vitest)`
+  - Evidence: `tests/core/workflows/IndexWorkflow.test.ts::D1_skip_content_embed(vitest)`
 
 ### Phase E: Failure + queue nack
 
 - [x] **E1** — If `embed` throws, workflow calls `markFailed` with non-empty message and `queue.nack` with reason; **does not** call `ack`.
-  - Evidence: `src/core/workflows/IndexWorkflow.test.ts::E1_embed_failure_nack(vitest)`
+  - Evidence: `tests/core/workflows/IndexWorkflow.test.ts::E1_embed_failure_nack(vitest)`
 
 ### Phase F: Resume hook
 
 - [x] **F1** — `resumeInterruptedJobs` (or equivalent) reads `listRecoverableJobs()` and enqueues at least one returned job via `queue.enqueue` when rows are non-terminal.
-  - Evidence: `src/core/workflows/IndexWorkflow.test.ts::F1_resume_reenqueue(vitest)`
+  - Evidence: `tests/core/workflows/IndexWorkflow.test.ts::F1_resume_reenqueue(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
 - [x] **Y1** — **(binding)** `src/core/workflows/IndexWorkflow.ts` contains **no** import from `src/sidecar/` paths or `better-sqlite3`.
   - Evidence: `npm run verify:core-imports` or `IndexWorkflow.test.ts::Y1_no_sidecar_imports(vitest)` documenting `rg` invocation
 - [x] **Y2** — **(binding)** `NoteIndexJob` is JSON-serializable (no `undefined`, no functions); document in interface JSDoc; `InProcessQueue<NoteIndexJob>` round-trips through SQLite payload in an integration-style test **or** unit test `JSON.parse(JSON.stringify(job))`.
-  - Evidence: `src/core/workflows/IndexWorkflow.test.ts::Y2_payload_json_roundtrip(vitest)`
+  - Evidence: `tests/core/workflows/IndexWorkflow.test.ts::Y2_payload_json_roundtrip(vitest)`
 
 ### Phase Z: Quality Gates
 
@@ -241,11 +231,11 @@ Not applicable.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Large notes → huge batch embed payloads | Batch by N texts; document N; respect provider limits in PRV-1 adapters. |
-| 2 | Tag/xref replace forgets CASCADE edge cases | Run in same transaction as `upsertNodes`; test FK violations. |
-| 3 | `listRecoverableJobs` re-enqueues stale paths | WKF-3 tightens with vault hash diff; WKF-2 documents “caller may filter”. |
+| #   | Risk / Tradeoff                               | Mitigation                                                                |
+| --- | --------------------------------------------- | ------------------------------------------------------------------------- |
+| 1   | Large notes → huge batch embed payloads       | Batch by N texts; document N; respect provider limits in PRV-1 adapters.  |
+| 2   | Tag/xref replace forgets CASCADE edge cases   | Run in same transaction as `upsertNodes`; test FK violations.             |
+| 3   | `listRecoverableJobs` re-enqueues stale paths | WKF-3 tightens with vault hash diff; WKF-2 documents “caller may filter”. |
 
 ---
 
@@ -261,4 +251,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: WKF-2 | Epic: 4 — Index, summary, and embedding workflows*
+_Created: 2026-04-05 | Story: WKF-2 | Epic: 4 — Index, summary, and embedding workflows_

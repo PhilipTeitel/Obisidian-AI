@@ -15,8 +15,8 @@ ADR-006: sidecar never reads vault disk. Hash for index payloads: **SHA-256 hex*
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                     | Why it binds this story      |
+| ------------------------------------------------------- | ---------------------------- |
 | [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Vault access in plugin only. |
 
 ---
@@ -51,11 +51,11 @@ ADR-006: sidecar never reads vault disk. Hash for index payloads: **SHA-256 hex*
 
 ## 7. File Touchpoints
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/plugin/vault/ObsidianVaultAccess.ts` | IVaultAccessPort |
-| 2 | `src/plugin/vault/hashVaultText.ts` | sha256 hex |
-| 3 | `src/plugin/vault/ObsidianVaultAccess.test.ts` | path filter logic |
+| #   | Path                                             | Purpose           |
+| --- | ------------------------------------------------ | ----------------- |
+| 1   | `src/plugin/vault/ObsidianVaultAccess.ts`        | IVaultAccessPort  |
+| 2   | `src/plugin/vault/hashVaultText.ts`              | sha256 hex        |
+| 3   | `tests/plugin/vault/ObsidianVaultAccess.test.ts` | path filter logic |
 
 ---
 
@@ -64,10 +64,10 @@ ADR-006: sidecar never reads vault disk. Hash for index payloads: **SHA-256 hex*
 ### Phase A
 
 - [x] **A1** — Given mock files, `listFiles([])` returns all markdown paths.
-  - Evidence: `src/plugin/vault/ObsidianVaultAccess.test.ts::A1_list_all(vitest)`
+  - Evidence: `tests/plugin/vault/ObsidianVaultAccess.test.ts::A1_list_all(vitest)`
 
 - [x] **A2** — `excludedFolders` excludes subtree.
-  - Evidence: `src/plugin/vault/ObsidianVaultAccess.test.ts::A2_excluded(vitest)`
+  - Evidence: `tests/plugin/vault/ObsidianVaultAccess.test.ts::A2_excluded(vitest)`
 
 ### Phase Y
 
@@ -86,9 +86,9 @@ ADR-006: sidecar never reads vault disk. Hash for index payloads: **SHA-256 hex*
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | Performance on huge vaults | Later incremental watcher (out of scope). |
+| #   | Risk                       | Mitigation                                |
+| --- | -------------------------- | ----------------------------------------- |
+| 1   | Performance on huge vaults | Later incremental watcher (out of scope). |
 
 ---
 
@@ -100,4 +100,4 @@ ADR-006: sidecar never reads vault disk. Hash for index payloads: **SHA-256 hex*
 
 ---
 
-*Created: 2026-04-05 | Story: PLG-6 | Epic: 8*
+_Created: 2026-04-05 | Story: PLG-6 | Epic: 8_

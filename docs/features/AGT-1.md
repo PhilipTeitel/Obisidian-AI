@@ -39,17 +39,17 @@ Used by future chat tool-calling; MVP exposes **tested** pure validation + `Vaul
 
 ## 7. File Touchpoints
 
-| Path | Purpose |
-|------|---------|
+| Path                                    | Purpose         |
+| --------------------------------------- | --------------- |
 | `src/plugin/agent/validateAgentPath.ts` | pure validation |
-| `src/plugin/agent/AgentNoteWriter.ts` | vault I/O |
+| `src/plugin/agent/AgentNoteWriter.ts`   | vault I/O       |
 
 ---
 
 ## 8. Acceptance Criteria Checklist
 
 - [x] **A1** — `validateAgentPath` returns error for `../escape` and for folder not allowed.
-  - Evidence: `src/plugin/agent/validateAgentPath.test.ts`
+  - Evidence: `tests/plugin/agent/validateAgentPath.test.ts`
 
 ### Phase Z
 
@@ -74,4 +74,4 @@ Used by future chat tool-calling; MVP exposes **tested** pure validation + `Vaul
 
 ---
 
-*Created: 2026-04-05 | Story: AGT-1 | Epic: 9*
+_Created: 2026-04-05 | Story: AGT-1 | Epic: 9_

@@ -29,11 +29,11 @@ Pointers: [IChatPort](../../src/core/ports/IChatPort.ts), [ChatMessage](../../sr
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-005-provider-abstraction.md](../decisions/ADR-005-provider-abstraction.md) | Chat only through **`IChatPort`**; streaming; vendor-neutral delta shape. |
+| ADR                                                                                                              | Why it binds this story                                                          |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [docs/decisions/ADR-005-provider-abstraction.md](../decisions/ADR-005-provider-abstraction.md)                   | Chat only through **`IChatPort`**; streaming; vendor-neutral delta shape.        |
 | [docs/decisions/ADR-009-chat-cancellation-and-timeout.md](../decisions/ADR-009-chat-cancellation-and-timeout.md) | **`options.signal`** and **`options.timeoutMs`** on `complete`; no hung streams. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Adapters run in the **sidecar**; core imports no HTTP stack. |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)                   | Adapters run in the **sidecar**; core imports no HTTP stack.                     |
 
 ---
 
@@ -100,14 +100,14 @@ Not applicable.
 ### 6b. Props & Contracts
 
 | Component / Hook | Props / Signature | State | Notes |
-|------------------|-------------------|-------|-------|
-| — | — | — | — |
+| ---------------- | ----------------- | ----- | ----- |
+| —                | —                 | —     | —     |
 
 ### 6c. States (Loading / Error / Empty / Success)
 
-| State   | UI Behavior |
-|---------|-------------|
-| — | — |
+| State | UI Behavior |
+| ----- | ----------- |
+| —     | —           |
 
 ---
 
@@ -115,22 +115,22 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/adapters/OpenAIChatAdapter.ts` | Streaming `IChatPort` for OpenAI-compatible chat completions. |
-| 2 | `src/sidecar/adapters/OllamaChatAdapter.ts` | Streaming `IChatPort` for Ollama `/api/chat`. |
-| 3 | `src/sidecar/adapters/createChatPort.ts` | Factory `createChatPort('openai' \| 'ollama', config) → IChatPort`. |
-| 4 | `src/sidecar/adapters/OpenAIChatAdapter.test.ts` | SSE parsing, delta order, abort. |
-| 5 | `src/sidecar/adapters/OllamaChatAdapter.test.ts` | NDJSON / stream parsing, abort. |
-| 6 | `src/sidecar/adapters/chatProviderMessages.ts` | Shared context-injection rules for both providers. |
-| 7 | `src/sidecar/adapters/composeAbortSignal.ts` | `signal` + `timeoutMs` composition (ADR-009). |
-| 8 | `src/sidecar/adapters/readWithAbort.ts` | Race `reader.read()` with abort so timeouts cannot hang on stalled pulls. |
+| #   | Path                                               | Purpose                                                                   |
+| --- | -------------------------------------------------- | ------------------------------------------------------------------------- |
+| 1   | `src/sidecar/adapters/OpenAIChatAdapter.ts`        | Streaming `IChatPort` for OpenAI-compatible chat completions.             |
+| 2   | `src/sidecar/adapters/OllamaChatAdapter.ts`        | Streaming `IChatPort` for Ollama `/api/chat`.                             |
+| 3   | `src/sidecar/adapters/createChatPort.ts`           | Factory `createChatPort('openai' \| 'ollama', config) → IChatPort`.       |
+| 4   | `tests/sidecar/adapters/OpenAIChatAdapter.test.ts` | SSE parsing, delta order, abort.                                          |
+| 5   | `tests/sidecar/adapters/OllamaChatAdapter.test.ts` | NDJSON / stream parsing, abort.                                           |
+| 6   | `src/sidecar/adapters/chatProviderMessages.ts`     | Shared context-injection rules for both providers.                        |
+| 7   | `src/sidecar/adapters/composeAbortSignal.ts`       | `signal` + `timeoutMs` composition (ADR-009).                             |
+| 8   | `src/sidecar/adapters/readWithAbort.ts`            | Race `reader.read()` with abort so timeouts cannot hang on stalled pulls. |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| — | — | *None — `IChatPort` / `index.ts` / workflow test fakes already matched the four-parameter contract.* |
+| #   | Path | Change                                                                                               |
+| --- | ---- | ---------------------------------------------------------------------------------------------------- |
+| —   | —    | _None — `IChatPort` / `index.ts` / workflow test fakes already matched the four-parameter contract._ |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -151,29 +151,29 @@ Not applicable.
 ### Phase B: OpenAI streaming adapter
 
 - [x] **B1** — For a mocked streaming HTTP body, the adapter **yields** the **concatenation of delta text** in order until `[DONE]` (or vendor-equivalent end).
-  - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::B1_openai_sse_deltas(vitest)`
+  - Evidence: `tests/sidecar/adapters/OpenAIChatAdapter.test.ts::B1_openai_sse_deltas(vitest)`
 
 - [x] **B2** — **Context injection:** when `messages = [{ role: 'user', content: 'Q' }]` and `context = 'V'`, the JSON body’s `messages` array contains **both** the injected vault system entry **before** the user message and preserves **`Q`** as the final user content.
-  - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::B2_context_before_last_user(vitest)`
+  - Evidence: `tests/sidecar/adapters/OpenAIChatAdapter.test.ts::B2_context_before_last_user(vitest)`
 
 - [x] **B3** — When `messages = [{ role: 'system', content: 'S' }]` and `context = 'body'`, the outgoing `messages` are **`system S` then `user body`** (append-user rule).
-  - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::B3_summary_shape(vitest)`
+  - Evidence: `tests/sidecar/adapters/OpenAIChatAdapter.test.ts::B3_summary_shape(vitest)`
 
 ### Phase C: Ollama streaming adapter
 
 - [x] **C1** — Mocked Ollama stream yields correct **string deltas** for at least two chunks.
-  - Evidence: `src/sidecar/adapters/OllamaChatAdapter.test.ts::C1_ollama_stream_deltas(vitest)`
+  - Evidence: `tests/sidecar/adapters/OllamaChatAdapter.test.ts::C1_ollama_stream_deltas(vitest)`
 
 - [x] **C2** — **Same** context-injection tests as **B2/B3** (or shared test helper) pass for Ollama adapter payload shape.
-  - Evidence: `src/sidecar/adapters/OllamaChatAdapter.test.ts::C2_ollama_context_rules(vitest)`
+  - Evidence: `tests/sidecar/adapters/OllamaChatAdapter.test.ts::C2_ollama_context_rules(vitest)`
 
 ### Phase D: Abort + timeout
 
 - [x] **D1** — When **`options.signal`** is aborted **mid-stream**, the adapter **stops yielding** within a **short** bounded window (test uses fake clock or immediate abort) and completes the async iterator without throwing **unless** existing product policy throws (document choice; test must assert **no unbounded hang**).
-  - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::D1_abort_stops_stream(vitest)` (Ollama may share helper)
+  - Evidence: `tests/sidecar/adapters/OpenAIChatAdapter.test.ts::D1_abort_stops_stream(vitest)` (Ollama may share helper)
 
 - [x] **D2** — When **`options.timeoutMs`** is a **small** positive value and the mocked stream **never ends**, the adapter **terminates** (error or stop — document; must not loop forever) and **aborts** `fetch`.
-  - Evidence: `src/sidecar/adapters/OpenAIChatAdapter.test.ts::D2_timeout_aborts_fetch(vitest)`
+  - Evidence: `tests/sidecar/adapters/OpenAIChatAdapter.test.ts::D2_timeout_aborts_fetch(vitest)`
 
 ### Phase E: Factory
 
@@ -200,11 +200,11 @@ Not applicable.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | SSE / Ollama stream format drift | Keep parsing in small pure helpers with fixture strings in tests. |
-| 2 | Duplicate port update vs CHAT-2 | If CHAT-2 merged first, drop port-file edits here and only add adapters; **A1** still must pass. |
-| 3 | `AbortSignal` + `fetch` on older Node | Document engine requirement; use `AbortController` linking per ADR-009. |
+| #   | Risk / Tradeoff                       | Mitigation                                                                                       |
+| --- | ------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1   | SSE / Ollama stream format drift      | Keep parsing in small pure helpers with fixture strings in tests.                                |
+| 2   | Duplicate port update vs CHAT-2       | If CHAT-2 merged first, drop port-file edits here and only add adapters; **A1** still must pass. |
+| 3   | `AbortSignal` + `fetch` on older Node | Document engine requirement; use `AbortController` linking per ADR-009.                          |
 
 ---
 
@@ -220,4 +220,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: PRV-2 | Epic: 6 — Provider adapters*
+_Created: 2026-04-05 | Story: PRV-2 | Epic: 6 — Provider adapters_

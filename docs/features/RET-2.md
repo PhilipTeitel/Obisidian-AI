@@ -17,10 +17,10 @@
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md) | Phase 3 assembly must respect per-tier budgets (matched / sibling / parent summaries). |
-| [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Heading trails and sibling lists define what text enters each tier. |
+| ADR                                                                                                          | Why it binds this story                                                                |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md)     | Phase 3 assembly must respect per-tier budgets (matched / sibling / parent summaries). |
+| [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Heading trails and sibling lists define what text enters each tier.                    |
 
 ---
 
@@ -81,14 +81,14 @@ Not applicable. **PLG-4** surfaces numeric settings later; this story only consu
 ### 6b. Props & Contracts
 
 | Component / Hook | Props / Signature | State | Notes |
-|------------------|-------------------|-------|-------|
-| — | — | — | — |
+| ---------------- | ----------------- | ----- | ----- |
+| —                | —                 | —     | —     |
 
 ### 6c. States (Loading / Error / Empty / Success)
 
-| State   | UI Behavior |
-|---------|-------------|
-| — | — |
+| State | UI Behavior |
+| ----- | ----------- |
+| —     | —           |
 
 ---
 
@@ -96,17 +96,17 @@ Not applicable. **PLG-4** surfaces numeric settings later; this story only consu
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/core/domain/contextAssembly.ts` | Pure helpers: apply budgets, truncate by `estimateTokens`, format tiers. |
-| 2 | `src/core/domain/contextAssembly.test.ts` | Budget math, truncation order, label presence. |
+| #   | Path                                        | Purpose                                                                  |
+| --- | ------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | `src/core/domain/contextAssembly.ts`        | Pure helpers: apply budgets, truncate by `estimateTokens`, format tiers. |
+| 2   | `tests/core/domain/contextAssembly.test.ts` | Budget math, truncation order, label presence.                           |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/workflows/SearchWorkflow.ts` | Inject `SearchAssemblyOptions`; remove magic fraction literals. |
-| 2 | `src/core/workflows/SearchWorkflow.test.ts` | Assert truncation when tiers exceed budgets. |
+| #   | Path                                          | Change                                                          |
+| --- | --------------------------------------------- | --------------------------------------------------------------- |
+| 1   | `src/core/workflows/SearchWorkflow.ts`        | Inject `SearchAssemblyOptions`; remove magic fraction literals. |
+| 2   | `tests/core/workflows/SearchWorkflow.test.ts` | Assert truncation when tiers exceed budgets.                    |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -119,18 +119,18 @@ Not applicable. **PLG-4** surfaces numeric settings later; this story only consu
 ### Phase A: Config validation
 
 - [x] **A1** — When fractions sum to **0.99**, `runSearch` / assembly entry **rejects** the config (throws or `Result` error) — no partial assembly.
-  - Evidence: `src/core/domain/contextAssembly.test.ts::A1_rejects_bad_sum(vitest)`
+  - Evidence: `tests/core/domain/contextAssembly.test.ts::A1_rejects_bad_sum(vitest)`
 
 - [x] **A2** — When fractions are **`0.6 / 0.25 / 0.15`**, assembly runs without error on a minimal fake tree.
-  - Evidence: `src/core/domain/contextAssembly.test.ts::A2_default_budget_ok(vitest)`
+  - Evidence: `tests/core/domain/contextAssembly.test.ts::A2_default_budget_ok(vitest)`
 
 ### Phase B: Truncation behavior
 
 - [x] **B1** — With a tiny `totalTokenBudget`, **`Matched content`** section is truncated first per tier allocation (matched tier cannot borrow sibling/parent share).
-  - Evidence: `src/core/domain/contextAssembly.test.ts::B1_matched_truncation_respects_share(vitest)`
+  - Evidence: `tests/core/domain/contextAssembly.test.ts::B1_matched_truncation_respects_share(vitest)`
 
 - [x] **B2** — `SearchResult.snippet` estimated tokens **≤** `totalTokenBudget` + fixed heading overhead (`SNIPPET_HEADING_OVERHEAD_TOKENS` in `contextAssembly.ts`), matching §5 “tier bodies” vs headings.
-  - Evidence: `src/core/workflows/SearchWorkflow.test.ts::B2_snippet_within_budget(vitest)`
+  - Evidence: `tests/core/workflows/SearchWorkflow.test.ts::B2_snippet_within_budget(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -149,10 +149,10 @@ Not applicable. **PLG-4** surfaces numeric settings later; this story only consu
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | `estimateTokens` is crude vs real tokenizer | Document in code; acceptable MVP per CHK-2; optional follow-up story. |
-| 2 | Truncation mid-bullet hurts readability | Prefer paragraph/sentence boundaries where cheap (reuse sentence splitter only if already imported — optional). |
+| #   | Risk / Tradeoff                             | Mitigation                                                                                                      |
+| --- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1   | `estimateTokens` is crude vs real tokenizer | Document in code; acceptable MVP per CHK-2; optional follow-up story.                                           |
+| 2   | Truncation mid-bullet hurts readability     | Prefer paragraph/sentence boundaries where cheap (reuse sentence splitter only if already imported — optional). |
 
 ---
 
@@ -166,4 +166,4 @@ Not applicable. **PLG-4** surfaces numeric settings later; this story only consu
 
 ---
 
-*Created: 2026-04-05 | Story: RET-2 | Epic: 5 — Retrieval, search workflow, and chat workflow*
+_Created: 2026-04-05 | Story: RET-2 | Epic: 5 — Retrieval, search workflow, and chat workflow_

@@ -15,8 +15,8 @@ MVP: **polling `index/status`** every 2s while panel visible + manual refresh. F
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                                  | Why it binds this story    |
+| -------------------------------------------------------------------- | -------------------------- |
 | [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md) | `IndexProgressEvent` shape |
 
 ---
@@ -42,8 +42,8 @@ MVP: **polling `index/status`** every 2s while panel visible + manual refresh. F
 
 ## 7. File Touchpoints
 
-| Path | Purpose |
-|------|---------|
+| Path                                | Purpose     |
+| ----------------------------------- | ----------- |
 | `src/plugin/ui/ProgressSlideout.ts` | View + poll |
 
 ---
@@ -65,9 +65,9 @@ MVP: **polling `index/status`** every 2s while panel visible + manual refresh. F
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | Poll load | 2s interval; clear on hide |
+| #   | Risk      | Mitigation                 |
+| --- | --------- | -------------------------- |
+| 1   | Poll load | 2s interval; clear on hide |
 
 ---
 
@@ -77,4 +77,4 @@ MVP: **polling `index/status`** every 2s while panel visible + manual refresh. F
 
 ---
 
-*Created: 2026-04-05 | Story: UI-4 | Epic: 9*
+_Created: 2026-04-05 | Story: UI-4 | Epic: 9_

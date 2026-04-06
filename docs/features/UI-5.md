@@ -15,9 +15,9 @@ Uses `ObsidianVaultAccess`, `hashVaultText`, `getOpenAIApiKey`, `transport.send`
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Plugin reads vault |
+| ADR                                                     | Why it binds this story |
+| ------------------------------------------------------- | ----------------------- |
+| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Plugin reads vault      |
 
 ---
 
@@ -40,8 +40,8 @@ Uses `ObsidianVaultAccess`, `hashVaultText`, `getOpenAIApiKey`, `transport.send`
 
 ## 7. File Touchpoints
 
-| Path | Purpose |
-|------|---------|
+| Path                                      | Purpose      |
+| ----------------------------------------- | ------------ |
 | `src/plugin/commands/registerCommands.ts` | all commands |
 
 ---
@@ -74,4 +74,4 @@ Uses `ObsidianVaultAccess`, `hashVaultText`, `getOpenAIApiKey`, `transport.send`
 
 ---
 
-*Created: 2026-04-05 | Story: UI-5 | Epic: 9*
+_Created: 2026-04-05 | Story: UI-5 | Epic: 9_

@@ -15,8 +15,8 @@ Users get better search and chat grounding when notes match the model described 
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                            | Why it binds this story                                        |
+| -------------------------------------------------------------- | -------------------------------------------------------------- |
 | [ADR-002](../decisions/ADR-002-hierarchical-document-model.md) | Explains node types and tree shape users indirectly influence. |
 
 ---
@@ -41,10 +41,10 @@ Users get better search and chat grounding when notes match the model described 
 
 ## 7. File Touchpoints
 
-| Path | Purpose |
-|------|---------|
-| `docs/guides/authoring-for-ai-indexing.md` | New guide |
-| `README.md` | Link from backlog or docs section |
+| Path                                       | Purpose                           |
+| ------------------------------------------ | --------------------------------- |
+| `docs/guides/authoring-for-ai-indexing.md` | New guide                         |
+| `README.md`                                | Link from backlog or docs section |
 
 ---
 
@@ -78,4 +78,4 @@ Users get better search and chat grounding when notes match the model described 
 
 ---
 
-*Created: 2026-04-05 | Story: DOC-1 | Epic: 10*
+_Created: 2026-04-05 | Story: DOC-1 | Epic: 10_

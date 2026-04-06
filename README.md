@@ -769,6 +769,10 @@ obsidian-ai-plugin/
 │           ├── OpenAIChatAdapter.ts
 │           ├── OllamaChatAdapter.ts
 │           └── ProgressAdapter.ts            # Progress event emitter
+├── tests/                                   # Vitest (`*.test.ts`); mirrors `src/{core,plugin,sidecar}`
+│   ├── core/
+│   ├── plugin/
+│   └── sidecar/
 ├── scripts/
 │   └── query-store.mjs                      # Dev utility: inspect SQLite store
 ├── docs/
@@ -792,6 +796,7 @@ obsidian-ai-plugin/
 ├── tsconfig.sidecar.json                    # Separate tsconfig for sidecar
 ├── esbuild.config.mjs                       # Plugin build config
 ├── esbuild.sidecar.mjs                      # Sidecar build config
+├── tsconfig.test.json                       # Typecheck for `tests/**`
 └── vitest.config.ts
 ```
 
@@ -867,25 +872,25 @@ The dev script watches `src/` and rebuilds on change. For hot-reload in Obsidian
 
 ## Available Scripts
 
-| Command                        | Description                                                              |
-| ------------------------------ | ------------------------------------------------------------------------ |
-| `npm run build`                | Build plugin and sidecar for production                                  |
-| `npm run build:plugin`         | Build plugin `main.js` via esbuild                                       |
-| `npm run build:sidecar`        | Build sidecar bundle via esbuild (`dist/sidecar/server.js`)              |
-| `npm run typecheck`            | Type-check `src/core`, `src/plugin`, and `src/sidecar` (no emit)         |
-| `npm run test`                 | Full suite: `src/core` + `src/plugin` + `src/sidecar` (same as unit + integration) |
-| `npm run test:unit`            | Unit tests: `src/core` and `src/plugin` only (no native sidecar stack)   |
-| `npm run test:integration`     | Integration tests: `src/sidecar` (SQLite, sqlite-vec, HTTP, runtime)    |
-| `npm run lint`                 | ESLint 9 flat config over repo sources and tooling configs               |
-| `npm run lint:fix`             | ESLint with `--fix`                                                      |
-| `npm run format`               | Prettier write                                                           |
-| `npm run format:check`         | Prettier check (CI-friendly)                                             |
-| `npm run verify:plugin-bundle` | Fail if `main.js` contains forbidden native/SQLite stack markers (FND-1) |
-| `npm run check:boundaries`     | Fail if `src/core` or `src/plugin` violate import boundaries (FND-1)     |
-| `npm run smoke:sidecar`        | Run built sidecar entry once (expects prior `build:sidecar`)             |
-| `npm run dev`                  | Watch mode for both plugin and sidecar                                   |
-| `npm run dev:plugin`           | Watch mode for plugin only                                               |
-| `npm run dev:sidecar`          | Watch mode for sidecar only                                              |
+| Command                        | Description                                                                              |
+| ------------------------------ | ---------------------------------------------------------------------------------------- |
+| `npm run build`                | Build plugin and sidecar for production                                                  |
+| `npm run build:plugin`         | Build plugin `main.js` via esbuild                                                       |
+| `npm run build:sidecar`        | Build sidecar bundle via esbuild (`dist/sidecar/server.js`)                              |
+| `npm run typecheck`            | Type-check `src/core`, `src/plugin`, `src/sidecar`, and `tests/**` (no emit)             |
+| `npm run test`                 | Full suite: `tests/core` + `tests/plugin` + `tests/sidecar` (same as unit + integration) |
+| `npm run test:unit`            | Unit tests: `tests/core` and `tests/plugin` only (no native sidecar stack)               |
+| `npm run test:integration`     | Integration tests: `tests/sidecar` (SQLite, sqlite-vec, HTTP, runtime)                   |
+| `npm run lint`                 | ESLint 9 flat config over repo sources and tooling configs                               |
+| `npm run lint:fix`             | ESLint with `--fix`                                                                      |
+| `npm run format`               | Prettier write                                                                           |
+| `npm run format:check`         | Prettier check (CI-friendly)                                                             |
+| `npm run verify:plugin-bundle` | Fail if `main.js` contains forbidden native/SQLite stack markers (FND-1)                 |
+| `npm run check:boundaries`     | Fail if `src/core` or `src/plugin` violate import boundaries (FND-1)                     |
+| `npm run smoke:sidecar`        | Run built sidecar entry once (expects prior `build:sidecar`)                             |
+| `npm run dev`                  | Watch mode for both plugin and sidecar                                                   |
+| `npm run dev:plugin`           | Watch mode for plugin only                                                               |
+| `npm run dev:sidecar`          | Watch mode for sidecar only                                                              |
 
 Planned later: `query-store` (dev utility to inspect SQLite store contents).
 
@@ -937,44 +942,44 @@ A non-blocking overlay that shows real-time indexing progress.
 
 ### Port Interfaces (Internal Service Contracts)
 
-| Port               | Method                 | Signature                                                                                   | Description                                    |
-| ------------------ | ---------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `IDocumentStore`   | `upsertNodes`          | `(nodes: DocumentNode[]) → Promise<void>`                                                   | Insert or update hierarchical nodes            |
-| `IDocumentStore`   | `getNodesByNote`       | `(noteId: string) → Promise<DocumentNode[]>`                                                | Retrieve all nodes for a note                  |
-| `IDocumentStore`   | `deleteNote`           | `(noteId: string) → Promise<void>`                                                          | Remove a note and all its nodes                |
-| `IDocumentStore`   | `upsertSummary`        | `(nodeId: string, summary: string, model: string) → Promise<void>`                          | Store a generated summary                      |
-| `IDocumentStore`   | `upsertEmbedding`      | `(nodeId: string, type: VectorType, vector: Float32Array, meta: EmbedMeta) → Promise<void>` | Store an embedding vector                      |
-| `IDocumentStore`   | `searchSummaryVectors` | `(query: Float32Array, k: number) → Promise<VectorMatch[]>`                                 | ANN search on summary embeddings               |
-| `IDocumentStore`   | `searchContentVectors` | `(query: Float32Array, k: number, filter?: NodeFilter) → Promise<VectorMatch[]>`            | ANN search on content embeddings               |
-| `IDocumentStore`   | `getAncestors`         | `(nodeId: string) → Promise<DocumentNode[]>`                                                | Walk up to root for context assembly           |
-| `IDocumentStore`   | `getSiblings`          | `(nodeId: string) → Promise<DocumentNode[]>`                                                | Get sibling nodes for context                  |
-| `IDocumentStore`   | `getNoteMeta`          | `(noteId: string) → Promise<NoteMeta \| null>`                                              | Get note-level metadata                        |
-| `IDocumentStore`   | `upsertNoteMeta`       | `(meta: NoteMeta) → Promise<void>`                                                          | Store note-level metadata                      |
-| `IQueuePort<T>`    | `enqueue`              | `(items: T[]) → Promise<void>`                                                              | Add items to the queue                         |
-| `IQueuePort<T>`    | `dequeue`              | `(batchSize: number) → Promise<QueueItem<T>[]>`                                             | Pull items for processing                      |
-| `IQueuePort<T>`    | `ack`                  | `(itemId: string) → Promise<void>`                                                          | Acknowledge successful processing              |
-| `IQueuePort<T>`    | `nack`                 | `(itemId: string, reason: string) → Promise<void>`                                          | Report failure (triggers retry or dead-letter) |
-| `IQueuePort<T>`    | `peek`                 | `() → Promise<number>`                                                                      | Get pending item count                         |
-| `IEmbeddingPort`   | `embed`                | `(texts: string[], apiKey?: string) → Promise<Float32Array[]>`                              | Embed text into vectors                        |
-| `IChatPort`        | `complete`             | `(messages, context, apiKey?, options?) → AsyncIterable<string>`; `options`: `{ signal?, timeoutMs? }` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md)) | Streaming chat completion; cancel/timeout        |
-| `IVaultAccessPort` | `listFiles`            | `(folders: string[]) → Promise<VaultFile[]>`                                                | List vault files in configured folders         |
-| `IVaultAccessPort` | `readFile`             | `(path: string) → Promise<string>`                                                          | Read a vault file's content                    |
-| `IProgressPort`    | `emit`                 | `(event: ProgressEvent) → void`                                                             | Emit a progress event to the UI                |
+| Port               | Method                 | Signature                                                                                                                                                                   | Description                                    |
+| ------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `IDocumentStore`   | `upsertNodes`          | `(nodes: DocumentNode[]) → Promise<void>`                                                                                                                                   | Insert or update hierarchical nodes            |
+| `IDocumentStore`   | `getNodesByNote`       | `(noteId: string) → Promise<DocumentNode[]>`                                                                                                                                | Retrieve all nodes for a note                  |
+| `IDocumentStore`   | `deleteNote`           | `(noteId: string) → Promise<void>`                                                                                                                                          | Remove a note and all its nodes                |
+| `IDocumentStore`   | `upsertSummary`        | `(nodeId: string, summary: string, model: string) → Promise<void>`                                                                                                          | Store a generated summary                      |
+| `IDocumentStore`   | `upsertEmbedding`      | `(nodeId: string, type: VectorType, vector: Float32Array, meta: EmbedMeta) → Promise<void>`                                                                                 | Store an embedding vector                      |
+| `IDocumentStore`   | `searchSummaryVectors` | `(query: Float32Array, k: number) → Promise<VectorMatch[]>`                                                                                                                 | ANN search on summary embeddings               |
+| `IDocumentStore`   | `searchContentVectors` | `(query: Float32Array, k: number, filter?: NodeFilter) → Promise<VectorMatch[]>`                                                                                            | ANN search on content embeddings               |
+| `IDocumentStore`   | `getAncestors`         | `(nodeId: string) → Promise<DocumentNode[]>`                                                                                                                                | Walk up to root for context assembly           |
+| `IDocumentStore`   | `getSiblings`          | `(nodeId: string) → Promise<DocumentNode[]>`                                                                                                                                | Get sibling nodes for context                  |
+| `IDocumentStore`   | `getNoteMeta`          | `(noteId: string) → Promise<NoteMeta \| null>`                                                                                                                              | Get note-level metadata                        |
+| `IDocumentStore`   | `upsertNoteMeta`       | `(meta: NoteMeta) → Promise<void>`                                                                                                                                          | Store note-level metadata                      |
+| `IQueuePort<T>`    | `enqueue`              | `(items: T[]) → Promise<void>`                                                                                                                                              | Add items to the queue                         |
+| `IQueuePort<T>`    | `dequeue`              | `(batchSize: number) → Promise<QueueItem<T>[]>`                                                                                                                             | Pull items for processing                      |
+| `IQueuePort<T>`    | `ack`                  | `(itemId: string) → Promise<void>`                                                                                                                                          | Acknowledge successful processing              |
+| `IQueuePort<T>`    | `nack`                 | `(itemId: string, reason: string) → Promise<void>`                                                                                                                          | Report failure (triggers retry or dead-letter) |
+| `IQueuePort<T>`    | `peek`                 | `() → Promise<number>`                                                                                                                                                      | Get pending item count                         |
+| `IEmbeddingPort`   | `embed`                | `(texts: string[], apiKey?: string) → Promise<Float32Array[]>`                                                                                                              | Embed text into vectors                        |
+| `IChatPort`        | `complete`             | `(messages, context, apiKey?, options?) → AsyncIterable<string>`; `options`: `{ signal?, timeoutMs? }` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md)) | Streaming chat completion; cancel/timeout      |
+| `IVaultAccessPort` | `listFiles`            | `(folders: string[]) → Promise<VaultFile[]>`                                                                                                                                | List vault files in configured folders         |
+| `IVaultAccessPort` | `readFile`             | `(path: string) → Promise<string>`                                                                                                                                          | Read a vault file's content                    |
+| `IProgressPort`    | `emit`                 | `(event: ProgressEvent) → void`                                                                                                                                             | Emit a progress event to the UI                |
 
 ### Sidecar Message Protocol
 
 These messages are sent between the plugin and sidecar over the transport layer. The same message shapes work over both stdio (NDJSON) and HTTP transports.
 
-| Message / Route     | Direction        | Payload                                                               | Response                                                                  |
-| ------------------- | ---------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `index/full`        | Plugin → Sidecar | `{ files: [{path, content, hash}], apiKey? }`                         | `{ runId, noteCount }` + progress stream                                  |
-| `index/incremental` | Plugin → Sidecar | `{ files: [{path, content, hash}], deletedPaths: string[], apiKey? }` | `{ runId, noteCount }` + progress stream                                  |
-| `index/status`      | Plugin → Sidecar | `{}`                                                                  | `{ pending, processing, completed, failed, deadLetter, jobs: JobStep[] }` |
-| `search`            | Plugin → Sidecar | `{ query, k?, apiKey?, tags? }` (optional tag filter, OR / case-insensitive) | `{ results: SearchResult[] }`                                             |
+| Message / Route     | Direction        | Payload                                                                                                                                                           | Response                                                                                                        |
+| ------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `index/full`        | Plugin → Sidecar | `{ files: [{path, content, hash}], apiKey? }`                                                                                                                     | `{ runId, noteCount }` + progress stream                                                                        |
+| `index/incremental` | Plugin → Sidecar | `{ files: [{path, content, hash}], deletedPaths: string[], apiKey? }`                                                                                             | `{ runId, noteCount }` + progress stream                                                                        |
+| `index/status`      | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ pending, processing, completed, failed, deadLetter, jobs: JobStep[] }`                                       |
+| `search`            | Plugin → Sidecar | `{ query, k?, apiKey?, tags? }` (optional tag filter, OR / case-insensitive)                                                                                      | `{ results: SearchResult[] }`                                                                                   |
 | `chat`              | Plugin → Sidecar | `{ messages, apiKey?, context?, timeoutMs? }` + transport `streamChat(payload, { signal? })` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md)) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[] }`; cancel/timeout via `signal` / `timeoutMs` |
-| `chat/clear`        | Plugin → Sidecar | `{}`                                                                  | `{ ok: true }`                                                            |
-| `health`            | Plugin → Sidecar | `{}`                                                                  | `{ status: 'ok', uptime, dbReady }`                                       |
-| `progress`          | Sidecar → Plugin | `{ event: IndexProgressEvent }`                                       | — (push notification)                                                     |
+| `chat/clear`        | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ ok: true }`                                                                                                  |
+| `health`            | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ status: 'ok', uptime, dbReady }`                                                                             |
+| `progress`          | Sidecar → Plugin | `{ event: IndexProgressEvent }`                                                                                                                                   | — (push notification)                                                                                           |
 
 When using **HTTP transport**, these map to REST routes (`POST /index/full`, `GET /index/status`, etc.) with WebSocket for progress events. When using **stdio transport**, they are NDJSON messages with a `type` field corresponding to the route name.
 
@@ -1016,115 +1021,115 @@ Stories are listed in a recommended dependency order within each epic. Run `/pla
 
 Repository layout, builds, quality gates, and portable core boundaries per hexagonal architecture ([§1](#1-hexagonal-architecture-ports-and-adapters), [REQUIREMENTS §13](docs/requirements/REQUIREMENTS.md)).
 
-| ID                              | Status      | Story                                                                          | Size | Notes                                                                            |
-| ------------------------------- | ----------- | ------------------------------------------------------------------------------ | ---- | -------------------------------------------------------------------------------- |
-| [FND-1](docs/features/FND-1.md) | Complete    | Monorepo layout, `tsconfig` split, esbuild for plugin and sidecar, npm scripts | M    | Matches [Project Structure](#project-structure); no native code in plugin bundle |
-| [FND-2](docs/features/FND-2.md) | Complete    | ESLint, Prettier, Vitest config, CI-friendly `test` / `typecheck` / `lint`     | S    | Align with [Available Scripts](#available-scripts)                               |
-| [FND-3](docs/features/FND-3.md) | Complete    | Core `ports/*` interfaces and `domain/types.ts`                                | M    | No Obsidian/SQLite imports in `src/core/`                                        |
+| ID                              | Status   | Story                                                                          | Size | Notes                                                                            |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------ | ---- | -------------------------------------------------------------------------------- |
+| [FND-1](docs/features/FND-1.md) | Complete | Monorepo layout, `tsconfig` split, esbuild for plugin and sidecar, npm scripts | M    | Matches [Project Structure](#project-structure); no native code in plugin bundle |
+| [FND-2](docs/features/FND-2.md) | Complete | ESLint, Prettier, Vitest config, CI-friendly `test` / `typecheck` / `lint`     | S    | Align with [Available Scripts](#available-scripts)                               |
+| [FND-3](docs/features/FND-3.md) | Complete | Core `ports/*` interfaces and `domain/types.ts`                                | M    | No Obsidian/SQLite imports in `src/core/`                                        |
 
 ### Epic 2: Hierarchical chunking and note metadata
 
 Parsing pipeline for [§4 hierarchical model](#4-hierarchical-document-model), [ADR-002](docs/decisions/ADR-002-hierarchical-document-model.md), and REQUIREMENTS §5.
 
-| ID    | Status      | Story                                                                 | Size | Notes                                                      |
-| ----- | ----------- | --------------------------------------------------------------------- | ---- | ---------------------------------------------------------- |
-| [CHK-1](docs/features/CHK-1.md) | Complete    | Hierarchical chunker (headings, paragraphs, ordering, heading trails) | L    | `chunkNote` pipeline in `src/core/domain/chunker.ts`        |
-| [CHK-2](docs/features/CHK-2.md) | Complete    | Sentence-boundary splitting for embedding limits                      | M    | `sentenceSplitter.ts`, `tokenEstimator.ts`                  |
-| [CHK-3](docs/features/CHK-3.md) | Complete    | Bullet groups and nested bullets                                      | M    | `bullet_group` in chunker                                   |
-| [CHK-4](docs/features/CHK-4.md) | Complete    | Wikilinks and markdown links → `cross_refs`                           | M    | `wikilinkParser.ts`; `ChunkNoteResult`                      |
-| [CHK-5](docs/features/CHK-5.md) | Complete    | Scoped tags (frontmatter on note, inline on enclosing nodes)          | M    | `frontmatterTags.ts`, `inlineTags.ts`                       |
+| ID                              | Status   | Story                                                                 | Size | Notes                                                |
+| ------------------------------- | -------- | --------------------------------------------------------------------- | ---- | ---------------------------------------------------- |
+| [CHK-1](docs/features/CHK-1.md) | Complete | Hierarchical chunker (headings, paragraphs, ordering, heading trails) | L    | `chunkNote` pipeline in `src/core/domain/chunker.ts` |
+| [CHK-2](docs/features/CHK-2.md) | Complete | Sentence-boundary splitting for embedding limits                      | M    | `sentenceSplitter.ts`, `tokenEstimator.ts`           |
+| [CHK-3](docs/features/CHK-3.md) | Complete | Bullet groups and nested bullets                                      | M    | `bullet_group` in chunker                            |
+| [CHK-4](docs/features/CHK-4.md) | Complete | Wikilinks and markdown links → `cross_refs`                           | M    | `wikilinkParser.ts`; `ChunkNoteResult`               |
+| [CHK-5](docs/features/CHK-5.md) | Complete | Scoped tags (frontmatter on note, inline on enclosing nodes)          | M    | `frontmatterTags.ts`, `inlineTags.ts`                |
 
 ### Epic 3: SQLite store, vectors, and indexing persistence
 
 `SqliteDocumentStore`, schema, sqlite-vec, per-vault paths ([ADR-004](docs/decisions/ADR-004-per-vault-index-storage.md)), queue and job tables ([ADR-007](docs/decisions/ADR-007-queue-abstraction.md), [ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)).
 
-| ID                              | Status      | Story                                                                                                  | Size | Notes                                                                                                       |
-| ------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------ | ---- | ----------------------------------------------------------------------------------------------------------- |
-| [STO-1](docs/features/STO-1.md) | Complete    | SQLite migrations: `nodes`, `summaries`, `tags`, `cross_refs`, `note_meta`, `queue_items`, `job_steps` | M    | [§8 SQLite Schema](#8-sqlite-schema)                                                                        |
-| [STO-2](docs/features/STO-2.md) | Complete    | `vec0` virtual tables + `embedding_meta`; dimension aligned with settings                              | M    | `better-sqlite3` + `sqlite-vec` in sidecar only                                                             |
-| [STO-3](docs/features/STO-3.md) | Complete    | `SqliteDocumentStore` implementing `IDocumentStore`                                                    | L    | CRUD, ANN search, ancestors/siblings, note meta                                                             |
-| [QUE-1](docs/features/QUE-1.md) | Complete    | `InProcessQueue` + `IQueuePort` with crash-safe `queue_items`                                          | M    | Configurable concurrency; ack/nack/dead-letter                                                              |
-| [QUE-2](docs/features/QUE-2.md) | Complete    | `job_steps` integration: idempotent steps, resume, retry cap                                           | L    | Emit step transitions for progress ([ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)) |
+| ID                              | Status   | Story                                                                                                  | Size | Notes                                                                                                       |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------ | ---- | ----------------------------------------------------------------------------------------------------------- |
+| [STO-1](docs/features/STO-1.md) | Complete | SQLite migrations: `nodes`, `summaries`, `tags`, `cross_refs`, `note_meta`, `queue_items`, `job_steps` | M    | [§8 SQLite Schema](#8-sqlite-schema)                                                                        |
+| [STO-2](docs/features/STO-2.md) | Complete | `vec0` virtual tables + `embedding_meta`; dimension aligned with settings                              | M    | `better-sqlite3` + `sqlite-vec` in sidecar only                                                             |
+| [STO-3](docs/features/STO-3.md) | Complete | `SqliteDocumentStore` implementing `IDocumentStore`                                                    | L    | CRUD, ANN search, ancestors/siblings, note meta                                                             |
+| [QUE-1](docs/features/QUE-1.md) | Complete | `InProcessQueue` + `IQueuePort` with crash-safe `queue_items`                                          | M    | Configurable concurrency; ack/nack/dead-letter                                                              |
+| [QUE-2](docs/features/QUE-2.md) | Complete | `job_steps` integration: idempotent steps, resume, retry cap                                           | L    | Emit step transitions for progress ([ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)) |
 
 ### Epic 4: Index, summary, and embedding workflows
 
 Orchestration in core workflows; incremental behavior ([§13](#13-incremental-summaries), REQUIREMENTS §5).
 
-| ID                              | Status      | Story                                                                            | Size | Notes                                                                  |
-| ------------------------------- | ----------- | -------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------- |
-| [WKF-1](docs/features/WKF-1.md) | Complete    | `SummaryWorkflow` bottom-up LLM summaries                                        | L    | Uses `IChatPort`; skip redundant work when hashes unchanged            |
-| [WKF-2](docs/features/WKF-2.md) | Complete    | `IndexWorkflow` state machine: queue dequeue → parse → store → summarize → embed | L    | Wire `IQueuePort`, `IDocumentStore`, `IEmbeddingPort`, `IProgressPort` |
-| [WKF-3](docs/features/WKF-3.md) | Complete    | Incremental indexing: changed-note detection, partial embed/summary reuse        | M    | Deleted notes: direct cleanup without full state machine               |
+| ID                              | Status   | Story                                                                            | Size | Notes                                                                  |
+| ------------------------------- | -------- | -------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------- |
+| [WKF-1](docs/features/WKF-1.md) | Complete | `SummaryWorkflow` bottom-up LLM summaries                                        | L    | Uses `IChatPort`; skip redundant work when hashes unchanged            |
+| [WKF-2](docs/features/WKF-2.md) | Complete | `IndexWorkflow` state machine: queue dequeue → parse → store → summarize → embed | L    | Wire `IQueuePort`, `IDocumentStore`, `IEmbeddingPort`, `IProgressPort` |
+| [WKF-3](docs/features/WKF-3.md) | Complete | Incremental indexing: changed-note detection, partial embed/summary reuse        | M    | Deleted notes: direct cleanup without full state machine               |
 
 ### Epic 5: Retrieval, search workflow, and chat workflow
 
 Three-phase search ([ADR-003](docs/decisions/ADR-003-phased-retrieval-strategy.md)), structured context ([§10](#10-structured-context-formatting)), RAG chat (REQUIREMENTS §6), chat cancel/timeout ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md)).
 
-| ID                                      | Status      | Story                                                                     | Size | Notes                                                                              |
-| --------------------------------------- | ----------- | ------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------- |
-| [RET-1](docs/features/RET-1.md)         | Complete    | `SearchWorkflow`: coarse summary ANN → drill-down content → assembly      | L    | Same embedding space for query and vectors; expose `k` / result shape for plugin   |
-| [RET-2](docs/features/RET-2.md)         | Complete    | Token budgets and structured snippet formatting                           | M    | Config fractions: matched / sibling / parent ([Plugin Settings](#plugin-settings)) |
-| [RET-3](docs/features/RET-3.md)         | Complete    | Tag-aware filtering in search (where index exposes tags)                  | S    | REQUIREMENTS §5 tags; optional MVP tightening                                      |
-| [CHAT-1](docs/features/CHAT-1.md)       | Complete    | `ChatWorkflow`: retrieve → assemble context → stream completion → sources | L    | Vault-only retrieval path; conversation history in payload                         |
-| [CHAT-2](docs/features/CHAT-2.md)       | Complete    | Chat cancel/timeout behavior end-to-end                                   | S    | [ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md); configurable timeout; cancel through transport |
+| ID                                | Status   | Story                                                                     | Size | Notes                                                                                                              |
+| --------------------------------- | -------- | ------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------ |
+| [RET-1](docs/features/RET-1.md)   | Complete | `SearchWorkflow`: coarse summary ANN → drill-down content → assembly      | L    | Same embedding space for query and vectors; expose `k` / result shape for plugin                                   |
+| [RET-2](docs/features/RET-2.md)   | Complete | Token budgets and structured snippet formatting                           | M    | Config fractions: matched / sibling / parent ([Plugin Settings](#plugin-settings))                                 |
+| [RET-3](docs/features/RET-3.md)   | Complete | Tag-aware filtering in search (where index exposes tags)                  | S    | REQUIREMENTS §5 tags; optional MVP tightening                                                                      |
+| [CHAT-1](docs/features/CHAT-1.md) | Complete | `ChatWorkflow`: retrieve → assemble context → stream completion → sources | L    | Vault-only retrieval path; conversation history in payload                                                         |
+| [CHAT-2](docs/features/CHAT-2.md) | Complete | Chat cancel/timeout behavior end-to-end                                   | S    | [ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md); configurable timeout; cancel through transport |
 
 ### Epic 6: Provider adapters
 
 OpenAI and Ollama behind ports ([ADR-005](docs/decisions/ADR-005-provider-abstraction.md), REQUIREMENTS §7).
 
-| ID                                      | Status      | Story                                               | Size | Notes                                    |
-| --------------------------------------- | ----------- | --------------------------------------------------- | ---- | ---------------------------------------- |
-| [PRV-1](docs/features/PRV-1.md)         | Complete    | `OpenAIEmbeddingAdapter` / `OllamaEmbeddingAdapter` | M    | Batch embed; API key optional in payload |
-| [PRV-2](docs/features/PRV-2.md)         | Complete    | `OpenAIChatAdapter` / `OllamaChatAdapter` streaming | M    | Base URL and model from settings         |
+| ID                              | Status   | Story                                               | Size | Notes                                    |
+| ------------------------------- | -------- | --------------------------------------------------- | ---- | ---------------------------------------- |
+| [PRV-1](docs/features/PRV-1.md) | Complete | `OpenAIEmbeddingAdapter` / `OllamaEmbeddingAdapter` | M    | Batch embed; API key optional in payload |
+| [PRV-2](docs/features/PRV-2.md) | Complete | `OpenAIChatAdapter` / `OllamaChatAdapter` streaming | M    | Base URL and model from settings         |
 
 ### Epic 7: Sidecar server, routes, and observability
 
 Message router, protocol parity across transports ([ADR-006](docs/decisions/ADR-006-sidecar-architecture.md)), [§20](#20-logging-and-observability), logging ([ADR-010](docs/decisions/ADR-010-structured-logging-sidecar.md)).
 
-| ID                                      | Status      | Story                                                                | Size | Notes                                                           |
-| --------------------------------------- | ----------- | -------------------------------------------------------------------- | ---- | --------------------------------------------------------------- |
-| [SRV-1](docs/features/SRV-1.md)         | Complete    | `server.ts` + route modules; stdio NDJSON framing                    | L    | Map message `type` to handlers; lazy DB open on first use       |
-| [SRV-2](docs/features/SRV-2.md)         | Complete    | HTTP adapter surface: REST + WebSocket progress; `127.0.0.1` + token | M    | Same payloads as stdio; [API Contract](#api-contract)           |
-| [SRV-3](docs/features/SRV-3.md)         | Complete    | `health` route and startup handshake fields (`dbReady`, uptime)      | S    | Plugin startup under 2s budget ([§15](#15-startup-performance)) |
-| [SRV-4](docs/features/SRV-4.md)         | Complete    | Structured logging, `runId` / `jobId`, redaction policy              | M    | Pino sidecar ([ADR-010](docs/decisions/ADR-010-structured-logging-sidecar.md)); plugin logger compatible with Obsidian console |
-| [SRV-5](docs/features/SRV-5.md)         | Complete    | `ProgressAdapter` / push path for `IndexProgressEvent`               | M    | Real-time slideout feed                                         |
+| ID                              | Status   | Story                                                                | Size | Notes                                                                                                                          |
+| ------------------------------- | -------- | -------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------ |
+| [SRV-1](docs/features/SRV-1.md) | Complete | `server.ts` + route modules; stdio NDJSON framing                    | L    | Map message `type` to handlers; lazy DB open on first use                                                                      |
+| [SRV-2](docs/features/SRV-2.md) | Complete | HTTP adapter surface: REST + WebSocket progress; `127.0.0.1` + token | M    | Same payloads as stdio; [API Contract](#api-contract)                                                                          |
+| [SRV-3](docs/features/SRV-3.md) | Complete | `health` route and startup handshake fields (`dbReady`, uptime)      | S    | Plugin startup under 2s budget ([§15](#15-startup-performance))                                                                |
+| [SRV-4](docs/features/SRV-4.md) | Complete | Structured logging, `runId` / `jobId`, redaction policy              | M    | Pino sidecar ([ADR-010](docs/decisions/ADR-010-structured-logging-sidecar.md)); plugin logger compatible with Obsidian console |
+| [SRV-5](docs/features/SRV-5.md) | Complete | `ProgressAdapter` / push path for `IndexProgressEvent`               | M    | Real-time slideout feed                                                                                                        |
 
 ### Epic 8: Plugin client, settings, secrets, and vault I/O
 
 Thin client: lifecycle, transport, settings, per-request secrets (REQUIREMENTS §2–3, §8).
 
-| ID                                      | Status      | Story                                                                | Size | Notes                                         |
-| --------------------------------------- | ----------- | -------------------------------------------------------------------- | ---- | --------------------------------------------- |
-| [PLG-1](docs/features/PLG-1.md)         | Complete    | `SidecarLifecycle`: spawn, async health, shutdown on unload          | M    | Sidecar binary path / packaged `dist/sidecar` |
-| [PLG-2](docs/features/PLG-2.md)         | Complete    | `StdioTransportAdapter` (NDJSON)                                     | M    | Default transport                             |
-| [PLG-3](docs/features/PLG-3.md)         | Complete    | `HttpTransportAdapter` (REST + WS, session token)                    | L    | Opt-in setting                                |
-| [PLG-4](docs/features/PLG-4.md)         | Complete    | Settings tab: providers, folders, DB path, transport, budgets, queue | M    | Mirror [Plugin Settings](#plugin-settings)    |
-| [PLG-5](docs/features/PLG-5.md)         | Complete    | Obsidian `SecretStorage` read; pass secrets per message only         | S    | Never persist keys in sidecar                 |
-| [PLG-6](docs/features/PLG-6.md)         | Complete    | Vault listing/reading for index commands; hash computation           | M    | `IVaultAccessPort` implementation in plugin   |
+| ID                              | Status   | Story                                                                | Size | Notes                                         |
+| ------------------------------- | -------- | -------------------------------------------------------------------- | ---- | --------------------------------------------- |
+| [PLG-1](docs/features/PLG-1.md) | Complete | `SidecarLifecycle`: spawn, async health, shutdown on unload          | M    | Sidecar binary path / packaged `dist/sidecar` |
+| [PLG-2](docs/features/PLG-2.md) | Complete | `StdioTransportAdapter` (NDJSON)                                     | M    | Default transport                             |
+| [PLG-3](docs/features/PLG-3.md) | Complete | `HttpTransportAdapter` (REST + WS, session token)                    | L    | Opt-in setting                                |
+| [PLG-4](docs/features/PLG-4.md) | Complete | Settings tab: providers, folders, DB path, transport, budgets, queue | M    | Mirror [Plugin Settings](#plugin-settings)    |
+| [PLG-5](docs/features/PLG-5.md) | Complete | Obsidian `SecretStorage` read; pass secrets per message only         | S    | Never persist keys in sidecar                 |
+| [PLG-6](docs/features/PLG-6.md) | Complete | Vault listing/reading for index commands; hash computation           | M    | `IVaultAccessPort` implementation in plugin   |
 
 ### Epic 9: Plugin UI, commands, and agent file operations
 
 Panes and command palette (REQUIREMENTS §3, §6, §10); agent writes ([§16](#16-agent-file-operations)).
 
-| ID                                      | Status      | Story                                                                  | Size | Notes                          |
-| --------------------------------------- | ----------- | ---------------------------------------------------------------------- | ---- | ------------------------------ |
-| [UI-1](docs/features/UI-1.md)           | Complete    | `SearchView`: query, results cards, navigation, selectable text        | L    | Reuse single pane instance     |
-| [UI-2](docs/features/UI-2.md)           | Complete    | Semantic search selection command                                      | S    | Pre-fill from editor selection |
-| [UI-3](docs/features/UI-3.md)           | Complete    | `ChatView`: history, streaming, sources, copy, new conversation        | L    | Theme variables; bottom input  |
-| [UI-4](docs/features/UI-4.md)           | Complete    | `ProgressSlideout`: per-note steps + aggregate + errors/dead-letter    | M    | Poll `index/status` while open   |
-| [UI-5](docs/features/UI-5.md)           | Complete    | Commands: reindex vault, incremental index, open search/chat panes     | S    | Discoverable palette entries   |
-| [AGT-1](docs/features/AGT-1.md)         | Complete    | Agent create/update notes via Obsidian API; allowed folders + max size | M    | Distinct from `indexedFolders` |
+| ID                              | Status   | Story                                                                  | Size | Notes                          |
+| ------------------------------- | -------- | ---------------------------------------------------------------------- | ---- | ------------------------------ |
+| [UI-1](docs/features/UI-1.md)   | Complete | `SearchView`: query, results cards, navigation, selectable text        | L    | Reuse single pane instance     |
+| [UI-2](docs/features/UI-2.md)   | Complete | Semantic search selection command                                      | S    | Pre-fill from editor selection |
+| [UI-3](docs/features/UI-3.md)   | Complete | `ChatView`: history, streaming, sources, copy, new conversation        | L    | Theme variables; bottom input  |
+| [UI-4](docs/features/UI-4.md)   | Complete | `ProgressSlideout`: per-note steps + aggregate + errors/dead-letter    | M    | Poll `index/status` while open |
+| [UI-5](docs/features/UI-5.md)   | Complete | Commands: reindex vault, incremental index, open search/chat panes     | S    | Discoverable palette entries   |
+| [AGT-1](docs/features/AGT-1.md) | Complete | Agent create/update notes via Obsidian API; allowed folders + max size | M    | Distinct from `indexedFolders` |
 
 ### Epic 10: Testing, authoring guide, and release hardening
 
 MVP quality bar (REQUIREMENTS §5 user docs, §8–§9). Guides: [Authoring for indexing](docs/guides/authoring-for-ai-indexing.md), [Storage and uninstall](docs/guides/user-storage-and-uninstall.md).
 
-| ID                                        | Status    | Story                                                             | Size | Notes                                     |
-| ----------------------------------------- | --------- | ----------------------------------------------------------------- | ---- | ----------------------------------------- |
-| [TST-1](docs/features/TST-1.md)           | Complete  | `test:unit`: core + plugin only (no `src/sidecar` tests)          | M    | [Available Scripts](#available-scripts)   |
-| [TST-2](docs/features/TST-2.md)           | Complete  | `test:integration`: `src/sidecar` (SQLite + sqlite-vec)           | M    | Pairs with TST-1                          |
-| [DOC-1](docs/features/DOC-1.md)           | Complete  | Authoring-oriented guide (headings, bullets, tags, links)         | M    | [docs/guides/authoring-for-ai-indexing.md](docs/guides/authoring-for-ai-indexing.md) |
-| [DOC-2](docs/features/DOC-2.md)           | Complete  | User docs: DB location, sync warnings, uninstall / reindex recovery | S    | [docs/guides/user-storage-and-uninstall.md](docs/guides/user-storage-and-uninstall.md) |
+| ID                              | Status   | Story                                                               | Size | Notes                                                                                  |
+| ------------------------------- | -------- | ------------------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------- |
+| [TST-1](docs/features/TST-1.md) | Complete | `test:unit`: core + plugin only (no `tests/sidecar` tests)          | M    | [Available Scripts](#available-scripts)                                                |
+| [TST-2](docs/features/TST-2.md) | Complete | `test:integration`: `tests/sidecar` (SQLite + sqlite-vec)           | M    | Pairs with TST-1                                                                       |
+| [DOC-1](docs/features/DOC-1.md) | Complete | Authoring-oriented guide (headings, bullets, tags, links)           | M    | [docs/guides/authoring-for-ai-indexing.md](docs/guides/authoring-for-ai-indexing.md)   |
+| [DOC-2](docs/features/DOC-2.md) | Complete | User docs: DB location, sync warnings, uninstall / reindex recovery | S    | [docs/guides/user-storage-and-uninstall.md](docs/guides/user-storage-and-uninstall.md) |
 
 ---
 

@@ -33,12 +33,12 @@ Pointers: [IndexIncrementalRequest](../../src/core/domain/types.ts); README [§1
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md) | §6 incremental rules; deleted-note direct cleanup. |
-| [ADR-007](../decisions/ADR-007-queue-abstraction.md) | Only changed items enqueued; queue remains source of durable work. |
-| [ADR-004](../decisions/ADR-004-per-vault-index-storage.md) | `note_meta` is per-vault DB; no cross-vault deletes. |
-| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Vault bytes are supplied by caller; core function stays testable. |
+| ADR                                                                  | Why it binds this story                                            |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md) | §6 incremental rules; deleted-note direct cleanup.                 |
+| [ADR-007](../decisions/ADR-007-queue-abstraction.md)                 | Only changed items enqueued; queue remains source of durable work. |
+| [ADR-004](../decisions/ADR-004-per-vault-index-storage.md)           | `note_meta` is per-vault DB; no cross-vault deletes.               |
+| [ADR-006](../decisions/ADR-006-sidecar-architecture.md)              | Vault bytes are supplied by caller; core function stays testable.  |
 
 ---
 
@@ -123,18 +123,18 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/core/workflows/IncrementalIndexPlanner.ts` | Diff vs `note_meta`, enqueue, delete orchestration. |
-| 2 | `src/core/workflows/IncrementalIndexPlanner.test.ts` | Unit tests with in-memory fakes. |
+| #   | Path                                                   | Purpose                                             |
+| --- | ------------------------------------------------------ | --------------------------------------------------- |
+| 1   | `src/core/workflows/IncrementalIndexPlanner.ts`        | Diff vs `note_meta`, enqueue, delete orchestration. |
+| 2   | `tests/core/workflows/IncrementalIndexPlanner.test.ts` | Unit tests with in-memory fakes.                    |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/ports/IJobStepPort.ts` | Add `deleteJobForNotePath` (or separate port file if WKF-2 not merged yet — coordinate with WKF-2 implementer). |
-| 2 | `src/sidecar/adapters/JobStepService.ts` | Implement `deleteJobForNotePath` with `DELETE FROM job_steps WHERE note_path = ?`. |
-| 3 | `src/sidecar/adapters/JobStepService.test.ts` | Assert delete removes row. |
+| #   | Path                                            | Change                                                                                                          |
+| --- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1   | `src/core/ports/IJobStepPort.ts`                | Add `deleteJobForNotePath` (or separate port file if WKF-2 not merged yet — coordinate with WKF-2 implementer). |
+| 2   | `src/sidecar/adapters/JobStepService.ts`        | Implement `deleteJobForNotePath` with `DELETE FROM job_steps WHERE note_path = ?`.                              |
+| 3   | `tests/sidecar/adapters/JobStepService.test.ts` | Assert delete removes row.                                                                                      |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -148,23 +148,23 @@ Not applicable.
 ### Phase A: Diff logic
 
 - [x] **A1** — Given `files` where hash equals `getNoteMeta(noteId)?.contentHash`, the planner **does not** call `enqueue`.
-  - Evidence: `src/core/workflows/IncrementalIndexPlanner.test.ts::A1_skip_unchanged(vitest)`
+  - Evidence: `tests/core/workflows/IncrementalIndexPlanner.test.ts::A1_skip_unchanged(vitest)`
 - [x] **A2** — Given a file with **new** hash vs meta, planner enqueues **exactly one** `NoteIndexJob` with `contentHash` matching the file’s hash.
-  - Evidence: `src/core/workflows/IncrementalIndexPlanner.test.ts::A2_enqueue_changed(vitest)`
+  - Evidence: `tests/core/workflows/IncrementalIndexPlanner.test.ts::A2_enqueue_changed(vitest)`
 - [x] **A3** — Given a path in `files` with **no** `note_meta` row, planner enqueues (treat as new).
-  - Evidence: `src/core/workflows/IncrementalIndexPlanner.test.ts::A3_enqueue_new_note(vitest)`
+  - Evidence: `tests/core/workflows/IncrementalIndexPlanner.test.ts::A3_enqueue_new_note(vitest)`
 
 ### Phase B: Deletes
 
 - [x] **B1** — For each `deletedPaths` entry, planner calls `store.deleteNote(noteId)` with `noteId === path`.
-  - Evidence: `src/core/workflows/IncrementalIndexPlanner.test.ts::B1_delete_note_store(vitest)`
+  - Evidence: `tests/core/workflows/IncrementalIndexPlanner.test.ts::B1_delete_note_store(vitest)`
 - [x] **B2** — Same delete batch calls `jobSteps.deleteJobForNotePath(path)` so `job_steps` has no row with that `note_path`.
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::B2_delete_job_by_path(vitest)`
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::B2_delete_job_by_path(vitest)`
 
 ### Phase C: Integration-shaped DB test (optional but recommended)
 
 - [x] **C1** — With real `better-sqlite3` temp DB (migrations applied), insert `note_meta` + `job_steps`, run `planAndApplyIncrementalIndex` with `deletedPaths`, assert both tables no longer reference the note.
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::C1_incremental_delete_integration(vitest)` **or** new `IncrementalIndexPlanner.integration.test.ts`
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::C1_incremental_delete_integration(vitest)` **or** new `IncrementalIndexPlanner.integration.test.ts`
 
 ### Phase Y: Binding & stack compliance
 
@@ -183,11 +183,11 @@ Not applicable.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Queue still holds pending job for deleted path | Add `InProcessQueue` purge by path **or** document that dequeue + nack cleans up; prefer purge helper in sidecar if user deletes many notes. |
-| 2 | `noteId` vs `vaultPath` mismatch | Standardize on path string in planner JSDoc and WKF-2 payloads. |
-| 3 | Renamed files look like delete + add | MVP treats as two operations; future story may add rename detection. |
+| #   | Risk / Tradeoff                                | Mitigation                                                                                                                                   |
+| --- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Queue still holds pending job for deleted path | Add `InProcessQueue` purge by path **or** document that dequeue + nack cleans up; prefer purge helper in sidecar if user deletes many notes. |
+| 2   | `noteId` vs `vaultPath` mismatch               | Standardize on path string in planner JSDoc and WKF-2 payloads.                                                                              |
+| 3   | Renamed files look like delete + add           | MVP treats as two operations; future story may add rename detection.                                                                         |
 
 ---
 
@@ -201,4 +201,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: WKF-3 | Epic: 4 — Index, summary, and embedding workflows*
+_Created: 2026-04-05 | Story: WKF-3 | Epic: 4 — Index, summary, and embedding workflows_

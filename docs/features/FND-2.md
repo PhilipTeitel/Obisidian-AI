@@ -78,13 +78,13 @@ Not applicable.
 
 ### Files to CREATE
 
-| #   | Path                                                          | Purpose                                                                                             |
-| --- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 1   | `eslint.config.js` or `eslint.config.mjs`                     | Flat config (ESLint 9+) with TypeScript parser/plugin; overrides for `src/plugin` vs `src/sidecar`. |
-| 2   | `.prettierrc` or `prettier` key in `package.json`             | Formatting defaults.                                                                                |
-| 3   | `.prettierignore`                                             | Exclude build outputs, `node_modules`, Obsidian `main.js` if generated at root.                     |
-| 4   | `vitest.config.ts`                                            | Vitest projects or `include` for `src/**/*.test.ts`.                                                |
-| 5   | `src/core/health.test.ts` (or `src/__tests__/health.test.ts`) | Minimal always-pass smoke test so `npm test` has deterministic body.                                |
+| #   | Path                                                            | Purpose                                                                                             |
+| --- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | `eslint.config.js` or `eslint.config.mjs`                       | Flat config (ESLint 9+) with TypeScript parser/plugin; overrides for `src/plugin` vs `src/sidecar`. |
+| 2   | `.prettierrc` or `prettier` key in `package.json`               | Formatting defaults.                                                                                |
+| 3   | `.prettierignore`                                               | Exclude build outputs, `node_modules`, Obsidian `main.js` if generated at root.                     |
+| 4   | `vitest.config.ts`                                              | Vitest projects or `include` for `tests/**/*.test.ts`.                                              |
+| 5   | `tests/core/health.test.ts` (or `src/__tests__/health.test.ts`) | Minimal always-pass smoke test so `npm test` has deterministic body.                                |
 
 ### Files to MODIFY
 
@@ -110,7 +110,7 @@ Not applicable.
 
 ### Phase B: ESLint
 
-- [x] **B1** — `npm run lint` runs ESLint on all `src/**/*.ts` (and config files if included) with zero errors.
+- [x] **B1** — `npm run lint` runs ESLint on all `src/**/*.ts` and `tests/**/*.ts` (and config files if included) with zero errors.
   - Verification: Local and CI.
   - Evidence: `eslint.config.mjs(npm run lint)`
 
@@ -128,7 +128,7 @@ Not applicable.
 
 - [x] **D1** — `npm run test` runs Vitest; at least one test file exists and passes.
   - Verification: CI runs `npm test`.
-  - Evidence: `src/core/health.test.ts::smoke(vitest)` (exact test name as implemented)
+  - Evidence: `tests/core/health.test.ts::smoke(vitest)` (exact test name as implemented)
 
 ### Phase Y: Binding & stack compliance
 
@@ -138,7 +138,7 @@ Not applicable.
 
 - [x] **Y2** — **(binding)** Default `npm test` does not hit the network (no live API tests in this story).
   - Verification: Grep vitest files for `fetch(` / `axios` — none; or run tests with network disabled.
-  - Evidence: `rg "fetch\\(|axios" src/**/*.test.ts` exit 1 or CI env `NODE_OPTIONS` documented
+  - Evidence: `rg "fetch\\(|axios" tests/**/*.test.ts` exit 1 or CI env `NODE_OPTIONS` documented
 
 ### Phase Z: Quality Gates
 

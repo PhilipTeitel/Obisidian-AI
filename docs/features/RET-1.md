@@ -19,12 +19,12 @@ Downstream **UI-1** and **CHAT-1** depend on stable `SearchResult` / assembly te
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md) | Mandates summary → drill-down → assembly; comparable embedding space for query vs stored vectors. |
-| [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Node types, `headingTrail`, parent/child semantics for walks. |
-| [docs/decisions/ADR-005-provider-abstraction.md](../decisions/ADR-005-provider-abstraction.md) | Query embeddings only through **`IEmbeddingPort`**; optional `apiKey` from caller. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Core workflow has no `better-sqlite3` / filesystem vault access. |
+| ADR                                                                                                          | Why it binds this story                                                                           |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md)     | Mandates summary → drill-down → assembly; comparable embedding space for query vs stored vectors. |
+| [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Node types, `headingTrail`, parent/child semantics for walks.                                     |
+| [docs/decisions/ADR-005-provider-abstraction.md](../decisions/ADR-005-provider-abstraction.md)               | Query embeddings only through **`IEmbeddingPort`**; optional `apiKey` from caller.                |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)               | Core workflow has no `better-sqlite3` / filesystem vault access.                                  |
 
 ---
 
@@ -47,7 +47,7 @@ _Planning note: No **Tensions / conflicts** identified between README, REQUIREME
 4. **Y4** — If Phase 1 returns **no** summary hits, the workflow returns **empty** `results` (no fallback to global content ANN in this story — avoids violating phased strategy).
 5. **Y5** — Each `SearchResult` includes resolvable **`notePath`** via **`getNoteMeta(node.noteId)`** / stored vault path convention already used in indexing (`noteId` ↔ `note_meta`).
 6. **Y6** — Assembly snippet text must preserve **list/heading structure** at least at the level of [README §10](../../README.md#10-structured-context-formatting) (headings + labeled tiers: matched / sibling / parent summary); exact whitespace may follow implementer preference but must remain stable for tests.
-7. **Y7** — Default **`k`**: if `SearchRequest.k` is omitted, use **`searchResultCount`** from settings is **out of scope** in core; use documented constant **`DEFAULT_SEARCH_K = 20`** in workflow module unless caller passes `k` (sidecar maps plugin settings → `k` in SRV-*).
+7. **Y7** — Default **`k`**: if `SearchRequest.k` is omitted, use **`searchResultCount`** from settings is **out of scope** in core; use documented constant **`DEFAULT_SEARCH_K = 20`** in workflow module unless caller passes `k` (sidecar maps plugin settings → `k` in SRV-\*).
 
 ---
 
@@ -99,14 +99,14 @@ Not applicable. This story is core + sidecar store filtering only. **UI-1** cons
 ### 6b. Props & Contracts
 
 | Component / Hook | Props / Signature | State | Notes |
-|------------------|-------------------|-------|-------|
-| — | — | — | — |
+| ---------------- | ----------------- | ----- | ----- |
+| —                | —                 | —     | —     |
 
 ### 6c. States (Loading / Error / Empty / Success)
 
-| State   | UI Behavior |
-|---------|-------------|
-| — | — |
+| State | UI Behavior |
+| ----- | ----------- |
+| —     | —           |
 
 ---
 
@@ -114,19 +114,19 @@ Not applicable. This story is core + sidecar store filtering only. **UI-1** cons
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/core/workflows/SearchWorkflow.ts` | Three-phase orchestration + assembly (default budgets). |
-| 2 | `src/core/workflows/SearchWorkflow.test.ts` | Port fakes; phase ordering; empty Phase 1; snippet shape. |
+| #   | Path                                          | Purpose                                                   |
+| --- | --------------------------------------------- | --------------------------------------------------------- |
+| 1   | `src/core/workflows/SearchWorkflow.ts`        | Three-phase orchestration + assembly (default budgets).   |
+| 2   | `tests/core/workflows/SearchWorkflow.test.ts` | Port fakes; phase ordering; empty Phase 1; snippet shape. |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/domain/types.ts` | Extend `NodeFilter` with `subtreeRootNodeIds`. |
-| 2 | `src/sidecar/adapters/SqliteDocumentStore.ts` | Implement subtree restriction in `searchContentVectors` SQL (recursive CTE or equivalent). |
-| 3 | `src/sidecar/adapters/SqliteDocumentStore.test.ts` | Coverage: subtree filter narrows hits vs unfiltered. |
-| 4 | `src/core/index.ts` | Export workflow entry if public API requires it. |
+| #   | Path                                                 | Change                                                                                     |
+| --- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1   | `src/core/domain/types.ts`                           | Extend `NodeFilter` with `subtreeRootNodeIds`.                                             |
+| 2   | `src/sidecar/adapters/SqliteDocumentStore.ts`        | Implement subtree restriction in `searchContentVectors` SQL (recursive CTE or equivalent). |
+| 3   | `tests/sidecar/adapters/SqliteDocumentStore.test.ts` | Coverage: subtree filter narrows hits vs unfiltered.                                       |
+| 4   | `src/core/index.ts`                                  | Export workflow entry if public API requires it.                                           |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -140,21 +140,21 @@ Not applicable. This story is core + sidecar store filtering only. **UI-1** cons
 ### Phase A: Phase ordering and embedding
 
 - [x] **A1** — For a non-empty index fake, `runSearch` calls **`embedder.embed`** exactly once with an array whose sole element is the trimmed `SearchRequest.query`.
-  - Evidence: `src/core/workflows/SearchWorkflow.test.ts::A1_single_embed_call(vitest)`
+  - Evidence: `tests/core/workflows/SearchWorkflow.test.ts::A1_single_embed_call(vitest)`
 
 - [x] **A2** — After embedding, the workflow calls **`searchSummaryVectors`** before any **`searchContentVectors`**.
-  - Evidence: `src/core/workflows/SearchWorkflow.test.ts::A2_summary_before_content(vitest)`
+  - Evidence: `tests/core/workflows/SearchWorkflow.test.ts::A2_summary_before_content(vitest)`
 
 - [x] **A3** — When Phase 1 returns zero summary matches, **`searchContentVectors` is not invoked** and `results` is `[]`.
-  - Evidence: `src/core/workflows/SearchWorkflow.test.ts::A3_no_coarse_no_drilldown(vitest)`
+  - Evidence: `tests/core/workflows/SearchWorkflow.test.ts::A3_no_coarse_no_drilldown(vitest)`
 
 ### Phase B: Results shape
 
 - [x] **B1** — Each `SearchResult` includes **`nodeId`**, **`notePath`** (vault-relative string), **`score`** (numeric, from content match or documented merge rule), **`snippet`** (non-empty string for hits), **`headingTrail`** (string array, may be empty for note-level).
-  - Evidence: `src/core/workflows/SearchWorkflow.test.ts::B1_result_shape(vitest)`
+  - Evidence: `tests/core/workflows/SearchWorkflow.test.ts::B1_result_shape(vitest)`
 
 - [x] **B2** — **`SearchRequest.k`** caps the number of results returned (≤ `k` when more candidates exist in fake data).
-  - Evidence: `src/core/workflows/SearchWorkflow.test.ts::B2_respects_k_cap(vitest)`
+  - Evidence: `tests/core/workflows/SearchWorkflow.test.ts::B2_respects_k_cap(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -162,7 +162,7 @@ Not applicable. This story is core + sidecar store filtering only. **UI-1** cons
   - Evidence: `scripts/check-source-boundaries.mjs(npm run check:boundaries)` or `rg --glob 'SearchWorkflow.ts' 'better-sqlite3|obsidian|/sidecar/'` exiting non-zero if matched
 
 - [x] **Y2** — **(binding)** `searchContentVectors` with `subtreeRootNodeIds` set returns **only** rows whose `nodes.id` is the root or a descendant (transitive) of one of the roots in a populated SQLite fixture.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::Y2_subtree_filter_sqlite(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::Y2_subtree_filter_sqlite(vitest)`
 
 ### Phase Z: Quality Gates
 
@@ -176,23 +176,23 @@ Not applicable. This story is core + sidecar store filtering only. **UI-1** cons
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Subtree SQL complexity vs sqlite-vec `MATCH` row order | Prototype CTE early in `SqliteDocumentStore.test.ts`; keep k small in Phase 2. |
-| 2 | Duplicate assembly logic vs CHAT-1 | Extract shared pure functions in `src/core/domain/` in RET-2 if RET-1 assembly grows large. |
-| 3 | `k` semantics across two ANN calls | Document and test mapping; avoid silent over-fetch in production. |
+| #   | Risk / Tradeoff                                        | Mitigation                                                                                  |
+| --- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| 1   | Subtree SQL complexity vs sqlite-vec `MATCH` row order | Prototype CTE early in `SqliteDocumentStore.test.ts`; keep k small in Phase 2.              |
+| 2   | Duplicate assembly logic vs CHAT-1                     | Extract shared pure functions in `src/core/domain/` in RET-2 if RET-1 assembly grows large. |
+| 3   | `k` semantics across two ANN calls                     | Document and test mapping; avoid silent over-fetch in production.                           |
 
 ---
 
 ## Implementation Order
 
 1. `src/core/domain/types.ts` — add `subtreeRootNodeIds` to `NodeFilter`.
-2. `src/sidecar/adapters/SqliteDocumentStore.ts` + `.test.ts` — subtree filter **(Y2)**.
+2. `src/sidecar/adapters/SqliteDocumentStore.ts` + `tests/sidecar/adapters/SqliteDocumentStore.test.ts` — subtree filter **(Y2)**.
 3. `src/core/workflows/SearchWorkflow.ts` — implement phases + assembly with default 60/25/15 budgets.
-4. `src/core/workflows/SearchWorkflow.test.ts` — **A1–B2**, port ordering fakes.
+4. `tests/core/workflows/SearchWorkflow.test.ts` — **A1–B2**, port ordering fakes.
 5. **Verify** — `npm run check:boundaries` (if applicable), `npm run build`, targeted `vitest` for new tests.
 6. **Final verify** — full `npm test` / CI parity.
 
 ---
 
-*Created: 2026-04-05 | Story: RET-1 | Epic: 5 — Retrieval, search workflow, and chat workflow*
+_Created: 2026-04-05 | Story: RET-1 | Epic: 5 — Retrieval, search workflow, and chat workflow_

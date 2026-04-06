@@ -17,10 +17,10 @@ When `OBSIDIAN_AI_HTTP_PORT` is set to a non-empty value **or** a dedicated flag
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | 127.0.0.1, random port, Bearer token, parity with stdio payloads. |
-| [ADR-009](../decisions/ADR-009-chat-cancellation-and-timeout.md) | Chat streaming + `AbortSignal` on disconnect. |
+| ADR                                                              | Why it binds this story                                           |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [ADR-006](../decisions/ADR-006-sidecar-architecture.md)          | 127.0.0.1, random port, Bearer token, parity with stdio payloads. |
+| [ADR-009](../decisions/ADR-009-chat-cancellation-and-timeout.md) | Chat streaming + `AbortSignal` on disconnect.                     |
 
 ---
 
@@ -45,16 +45,16 @@ When `OBSIDIAN_AI_HTTP_PORT` is set to a non-empty value **or** a dedicated flag
 
 ## 5. API Endpoints + Schemas
 
-| Method | Path | Auth | Body / response |
-|--------|------|------|-----------------|
-| POST | `/index/full` | Bearer | `IndexFullRequest` → `IndexRunAck` |
-| POST | `/index/incremental` | Bearer | `IndexIncrementalRequest` → `IndexRunAck` |
-| GET | `/index/status` | Bearer | → `IndexStatusResponse` |
-| POST | `/search` | Bearer | `SearchRequest` → `SearchResponse` |
-| POST | `/chat` | Bearer | stream (WS or SSE) per implementation note in §1 |
-| POST | `/chat/clear` | Bearer | → `{ ok: true }` |
-| GET | `/health` | Bearer | → `HealthResponse` |
-| GET | `/ws` | Bearer (query `token=` or header upgrade) | WebSocket for push |
+| Method | Path                 | Auth                                      | Body / response                                  |
+| ------ | -------------------- | ----------------------------------------- | ------------------------------------------------ |
+| POST   | `/index/full`        | Bearer                                    | `IndexFullRequest` → `IndexRunAck`               |
+| POST   | `/index/incremental` | Bearer                                    | `IndexIncrementalRequest` → `IndexRunAck`        |
+| GET    | `/index/status`      | Bearer                                    | → `IndexStatusResponse`                          |
+| POST   | `/search`            | Bearer                                    | `SearchRequest` → `SearchResponse`               |
+| POST   | `/chat`              | Bearer                                    | stream (WS or SSE) per implementation note in §1 |
+| POST   | `/chat/clear`        | Bearer                                    | → `{ ok: true }`                                 |
+| GET    | `/health`            | Bearer                                    | → `HealthResponse`                               |
+| GET    | `/ws`                | Bearer (query `token=` or header upgrade) | WebSocket for push                               |
 
 ---
 
@@ -72,18 +72,18 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/http/httpServer.ts` | HTTP + WS wiring |
-| 2 | `src/sidecar/http/httpServer.test.ts` | Auth + one route smoke |
+| #   | Path                                    | Purpose                |
+| --- | --------------------------------------- | ---------------------- |
+| 1   | `src/sidecar/http/httpServer.ts`        | HTTP + WS wiring       |
+| 2   | `tests/sidecar/http/httpServer.test.ts` | Auth + one route smoke |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/sidecar/server.ts` | Branch: stdio vs HTTP from env |
-| 2 | `package.json` | Add `ws` + `@types/ws` |
-| 3 | `esbuild.sidecar.mjs` | External `ws` if not bundled |
+| #   | Path                    | Change                         |
+| --- | ----------------------- | ------------------------------ |
+| 1   | `src/sidecar/server.ts` | Branch: stdio vs HTTP from env |
+| 2   | `package.json`          | Add `ws` + `@types/ws`         |
+| 3   | `esbuild.sidecar.mjs`   | External `ws` if not bundled   |
 
 ---
 
@@ -92,15 +92,15 @@ Not applicable.
 ### Phase A: Security + binding
 
 - [x] **A1** — Server binds to **127.0.0.1** only (assert in test via listen address or connection refusal to non-local).
-  - Evidence: `src/sidecar/http/httpServer.test.ts::A1_localhost_only(vitest)`
+  - Evidence: `tests/sidecar/http/httpServer.test.ts::A1_localhost_only(vitest)`
 
 - [x] **A2** — Request without Bearer returns **401** for a protected route.
-  - Evidence: `src/sidecar/http/httpServer.test.ts::A2_bearer_required(vitest)`
+  - Evidence: `tests/sidecar/http/httpServer.test.ts::A2_bearer_required(vitest)`
 
 ### Phase B: Parity
 
 - [x] **B1** — `GET /health` with valid token returns JSON matching `HealthResponse` shape.
-  - Evidence: `src/sidecar/http/httpServer.test.ts::B1_health_json(vitest)`
+  - Evidence: `tests/sidecar/http/httpServer.test.ts::B1_health_json(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -119,9 +119,9 @@ Not applicable.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | SSE vs WS for chat | Pick one in implementation; document in README row if needed. |
+| #   | Risk               | Mitigation                                                    |
+| --- | ------------------ | ------------------------------------------------------------- |
+| 1   | SSE vs WS for chat | Pick one in implementation; document in README row if needed. |
 
 ---
 
@@ -135,4 +135,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: SRV-2 | Epic: 7 — Sidecar server, routes, and observability*
+_Created: 2026-04-05 | Story: SRV-2 | Epic: 7 — Sidecar server, routes, and observability_

@@ -21,10 +21,10 @@ Pointers: [ADR-002](../decisions/ADR-002-hierarchical-document-model.md) (struct
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Links attach to **structural** content units in the tree. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Parsing stays in **core**; vault file I/O stays plugin-side—paths are **strings** only. |
+| ADR                                                                                                          | Why it binds this story                                                                 |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Links attach to **structural** content units in the tree.                               |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)               | Parsing stays in **core**; vault file I/O stays plugin-side—paths are **strings** only. |
 
 **None additional.**
 
@@ -55,10 +55,10 @@ Pointers: [ADR-002](../decisions/ADR-002-hierarchical-document-model.md) (struct
 
 No HTTP routes.
 
-| Attribute | Value |
-|-----------|-------|
-| Surface | `chunkNote`, `ChunkNoteInput`, `ChunkNoteResult`, `ParsedCrossRef` |
-| Auth | N/A |
+| Attribute | Value                                                              |
+| --------- | ------------------------------------------------------------------ |
+| Surface   | `chunkNote`, `ChunkNoteInput`, `ChunkNoteResult`, `ParsedCrossRef` |
+| Auth      | N/A                                                                |
 
 ```ts
 // Add to src/core/domain/types.ts (or chunker.ts if team prefers colocation—prefer types.ts for STO-3 import stability)
@@ -127,18 +127,18 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/core/domain/wikilinkParser.ts` | Extract link spans from plain strings (wikilink + md link patterns); unit-testable without full MD AST. |
+| #   | Path                                | Purpose                                                                                                 |
+| --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 1   | `src/core/domain/wikilinkParser.ts` | Extract link spans from plain strings (wikilink + md link patterns); unit-testable without full MD AST. |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/domain/types.ts` | Add `ParsedCrossRef`, `ParsedTag`, `ChunkNoteResult`; extend `ChunkNoteInput` with `vaultPath`. |
-| 2 | `src/core/domain/chunker.ts` | Rename/refactor primary API to `chunkNote` → `ChunkNoteResult`; invoke wikilink parser when emitting node `content`; attach `crossRefs`. |
-| 3 | `src/core/domain/chunker.test.ts` | Assert `crossRefs` + refactor prior assertions to `result.nodes`. |
-| 4 | `src/core/index.ts` | Export new types + `chunkNote`. |
+| #   | Path                                | Change                                                                                                                                   |
+| --- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `src/core/domain/types.ts`          | Add `ParsedCrossRef`, `ParsedTag`, `ChunkNoteResult`; extend `ChunkNoteInput` with `vaultPath`.                                          |
+| 2   | `src/core/domain/chunker.ts`        | Rename/refactor primary API to `chunkNote` → `ChunkNoteResult`; invoke wikilink parser when emitting node `content`; attach `crossRefs`. |
+| 3   | `tests/core/domain/chunker.test.ts` | Assert `crossRefs` + refactor prior assertions to `result.nodes`.                                                                        |
+| 4   | `src/core/index.ts`                 | Export new types + `chunkNote`.                                                                                                          |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -152,24 +152,24 @@ Not applicable.
 ### Phase A: Extraction correctness
 
 - [ ] **A1** — **`[[Simple]]`** in a paragraph yields one `ParsedCrossRef` with `linkText` per Y4 strategy and `sourceNodeId` equal to that paragraph’s id.
-  - Evidence: `src/core/domain/chunker.test.ts::A1_wikilink_simple(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A1_wikilink_simple(vitest)`
 
 - [ ] **A2** — **`[[Target|Alias]]`** yields `linkText === 'Alias'` and `targetPath` resolving to `Target` per normalization rules.
-  - Evidence: `src/core/domain/chunker.test.ts::A2_wikilink_pipe_alias(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A2_wikilink_pipe_alias(vitest)`
 
 - [ ] **A3** — **Markdown link** `[label](./other.md)` resolves `targetPath` relative to `vaultPath`’s directory.
-  - Evidence: `src/core/domain/chunker.test.ts::A3_markdown_relative_link(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A3_markdown_relative_link(vitest)`
 
 - [ ] **A4** — **HTTP URL skipped:** `[x](https://example.com/a.md)` does **not** produce a `ParsedCrossRef` (or documented alternative—must match binding Y3).
-  - Evidence: `src/core/domain/chunker.test.ts::A4_http_skipped(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A4_http_skipped(vitest)`
 
 ### Phase B: API shape
 
 - [ ] **B1** — **`chunkNote` returns `ChunkNoteResult`** with `nodes` matching prior structural invariants from CHK-1/2/3 (single root, etc.).
-  - Evidence: `src/core/domain/chunker.test.ts::B1_result_shape_nodes(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::B1_result_shape_nodes(vitest)`
 
 - [ ] **B2** — **`tags` always `[]` in CHK-4.**
-  - Evidence: `src/core/domain/chunker.test.ts::B2_tags_empty_until_chk5(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::B2_tags_empty_until_chk5(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -177,7 +177,7 @@ Not applicable.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` and `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
 - [ ] **Y2** — **(binding)** Every `crossRefs[i].sourceNodeId` exists in `nodes` (automated assertion over all fixtures).
-  - Evidence: `src/core/domain/chunker.test.ts::Y2_all_source_ids_resolve(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::Y2_all_source_ids_resolve(vitest)`
 
 ### Phase Z: Quality Gates
 
@@ -199,10 +199,10 @@ Not applicable.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Wikilink edge cases (`[[#heading]]`, embeds `![[`) | Document unsupported forms; strip embed/blocks in parser tests. |
-| 2 | API rename breaks unmerged callers | Repo currently spec-only; document rename in PR and CHK-1 follow-up note if needed. |
+| #   | Risk / Tradeoff                                    | Mitigation                                                                          |
+| --- | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 1   | Wikilink edge cases (`[[#heading]]`, embeds `![[`) | Document unsupported forms; strip embed/blocks in parser tests.                     |
+| 2   | API rename breaks unmerged callers                 | Repo currently spec-only; document rename in PR and CHK-1 follow-up note if needed. |
 
 ---
 
@@ -216,4 +216,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: CHK-4 | Epic: 2 — Hierarchical chunking and note metadata*
+_Created: 2026-04-05 | Story: CHK-4 | Epic: 2 — Hierarchical chunking and note metadata_

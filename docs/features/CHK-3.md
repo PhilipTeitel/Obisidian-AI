@@ -19,10 +19,10 @@ Pointers: [ADR-002](../decisions/ADR-002-hierarchical-document-model.md); [CHK-1
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                                                                          | Why it binds this story                                         |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
 | [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Explicit **bullet_group** grouping and nested bullet semantics. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Grouping logic remains in **core** only. |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)               | Grouping logic remains in **core** only.                        |
 
 **None additional.**
 
@@ -53,10 +53,10 @@ Pointers: [ADR-002](../decisions/ADR-002-hierarchical-document-model.md); [CHK-1
 
 No HTTP routes. **No change** to the CHK-1 `ChunkNoteInput` / function name required by this story alone (see [CHK-4](CHK-4.md) for a later unified result type).
 
-| Attribute | Value |
-|-----------|-------|
-| Surface | `chunkNoteToDocumentNodes` output shape only (tree structure) |
-| Auth | N/A |
+| Attribute | Value                                                         |
+| --------- | ------------------------------------------------------------- |
+| Surface   | `chunkNoteToDocumentNodes` output shape only (tree structure) |
+| Auth      | N/A                                                           |
 
 ```ts
 // No new exported types required if bullet_group uses existing NodeType + DocumentNode.
@@ -87,16 +87,16 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | _(none required)_ | Logic may live entirely in `chunker.ts` unless Implementer factors `listGroupBuilder.ts` for clarity. |
+| #   | Path              | Purpose                                                                                               |
+| --- | ----------------- | ----------------------------------------------------------------------------------------------------- |
+| 1   | _(none required)_ | Logic may live entirely in `chunker.ts` unless Implementer factors `listGroupBuilder.ts` for clarity. |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/domain/chunker.ts` | Insert `bullet_group` parents for list blocks; re-parent bullets; recompute `siblingOrder` for affected siblings. |
-| 2 | `src/core/domain/chunker.test.ts` | Replace/adjust CHK-1 list fixtures to expect `bullet_group`; add separation + nesting fixtures. |
+| #   | Path                                | Change                                                                                                            |
+| --- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | `src/core/domain/chunker.ts`        | Insert `bullet_group` parents for list blocks; re-parent bullets; recompute `siblingOrder` for affected siblings. |
+| 2   | `tests/core/domain/chunker.test.ts` | Replace/adjust CHK-1 list fixtures to expect `bullet_group`; add separation + nesting fixtures.                   |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -110,24 +110,24 @@ Not applicable.
 ### Phase A: Group structure
 
 - [ ] **A1** — **Top-level list:** A single unordered list under a section yields `… → bullet_group → bullet+` with **no** `bullet` whose parent is the section node.
-  - Evidence: `src/core/domain/chunker.test.ts::A1_list_wrapped_in_bullet_group(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A1_list_wrapped_in_bullet_group(vitest)`
 
 - [ ] **A2** — **Nested list:** Nested items are `bullet` children of the parent `bullet`, not siblings in the outer `bullet_group`.
-  - Evidence: `src/core/domain/chunker.test.ts::A2_nested_bullets_under_parent_bullet(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A2_nested_bullets_under_parent_bullet(vitest)`
 
 - [ ] **A3** — **Blank line separates groups:** Two lists separated by a blank line produce **two** `bullet_group` siblings under the same parent.
-  - Evidence: `src/core/domain/chunker.test.ts::A3_two_groups_blank_line(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A3_two_groups_blank_line(vitest)`
 
 - [ ] **A4** — **Interleaved paragraph and list:** A paragraph followed by a list under the same heading produces `paragraph` and `bullet_group` **siblings** with `siblingOrder` matching source order.
-  - Evidence: `src/core/domain/chunker.test.ts::A4_paragraph_then_list_order(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A4_paragraph_then_list_order(vitest)`
 
 ### Phase B: Metadata
 
 - [ ] **B1** — **`headingTrail` on bullets:** A `bullet` under `bullet_group` has the same `headingTrail` as a `paragraph` sibling in the same section (for the same note fixture).
-  - Evidence: `src/core/domain/chunker.test.ts::B1_bullet_trail_matches_paragraph_sibling(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::B1_bullet_trail_matches_paragraph_sibling(vitest)`
 
 - [ ] **B2** — **Unique ids + hashes:** All nodes remain unique `id`; `contentHash` rules satisfied for `bullet_group` per Y3.
-  - Evidence: `src/core/domain/chunker.test.ts::B2_group_hashes_and_ids(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::B2_group_hashes_and_ids(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -135,7 +135,7 @@ Not applicable.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` and `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
 - [ ] **Y2** — **(binding)** Output contains **`bullet_group`** for every Markdown-derived list in test fixtures (no “orphan” top-level bullets).
-  - Evidence: `src/core/domain/chunker.test.ts::Y2_no_orphan_top_level_bullets(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::Y2_no_orphan_top_level_bullets(vitest)`
 
 ### Phase Z: Quality Gates
 
@@ -157,10 +157,10 @@ Not applicable.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Parser AST differs (mdast vs markdown-it) | Anchor tests to concrete fixtures; adjust walker only in chunker. |
-| 2 | CHK-1 tests heavily assume pre-group shape | Update fixtures in this story; keep CHK-1 spec as historical—implementation follows latest epic order. |
+| #   | Risk / Tradeoff                            | Mitigation                                                                                             |
+| --- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| 1   | Parser AST differs (mdast vs markdown-it)  | Anchor tests to concrete fixtures; adjust walker only in chunker.                                      |
+| 2   | CHK-1 tests heavily assume pre-group shape | Update fixtures in this story; keep CHK-1 spec as historical—implementation follows latest epic order. |
 
 ---
 
@@ -173,4 +173,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: CHK-3 | Epic: 2 — Hierarchical chunking and note metadata*
+_Created: 2026-04-05 | Story: CHK-3 | Epic: 2 — Hierarchical chunking and note metadata_

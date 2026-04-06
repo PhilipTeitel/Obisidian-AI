@@ -15,8 +15,8 @@ Parity with SRV-1 framing. **`send`** maps to RPC lines; **`streamChat`** consum
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                     | Why it binds this story  |
+| ------------------------------------------------------- | ------------------------ |
 | [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Default stdio transport. |
 
 ---
@@ -51,10 +51,10 @@ Parity with SRV-1 framing. **`send`** maps to RPC lines; **`streamChat`** consum
 
 ## 7. File Touchpoints
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/plugin/client/StdioTransportAdapter.ts` | ISidecarTransport |
-| 2 | `src/plugin/client/StdioTransportAdapter.test.ts` | mock streams |
+| #   | Path                                                | Purpose           |
+| --- | --------------------------------------------------- | ----------------- |
+| 1   | `src/plugin/client/StdioTransportAdapter.ts`        | ISidecarTransport |
+| 2   | `tests/plugin/client/StdioTransportAdapter.test.ts` | mock streams      |
 
 ---
 
@@ -63,7 +63,7 @@ Parity with SRV-1 framing. **`send`** maps to RPC lines; **`streamChat`** consum
 ### Phase A
 
 - [x] **A1** — `send({ type: 'health' })` resolves with `HealthResponse` against mock stdout.
-  - Evidence: `src/plugin/client/StdioTransportAdapter.test.ts::A1_health_roundtrip(vitest)`
+  - Evidence: `tests/plugin/client/StdioTransportAdapter.test.ts::A1_health_roundtrip(vitest)`
 
 ### Phase Y
 
@@ -82,9 +82,9 @@ Parity with SRV-1 framing. **`send`** maps to RPC lines; **`streamChat`** consum
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | Line buffer fragmentation | Use readline. |
+| #   | Risk                      | Mitigation    |
+| --- | ------------------------- | ------------- |
+| 1   | Line buffer fragmentation | Use readline. |
 
 ---
 
@@ -96,4 +96,4 @@ Parity with SRV-1 framing. **`send`** maps to RPC lines; **`streamChat`** consum
 
 ---
 
-*Created: 2026-04-05 | Story: PLG-2 | Epic: 8*
+_Created: 2026-04-05 | Story: PLG-2 | Epic: 8_

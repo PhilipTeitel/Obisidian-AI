@@ -15,8 +15,8 @@ ADR-006 requires a **thin plugin** that owns process lifecycle. The sidecar entr
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                     | Why it binds this story                      |
+| ------------------------------------------------------- | -------------------------------------------- |
 | [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Sidecar process; plugin spawns Node sidecar. |
 
 ---
@@ -59,15 +59,15 @@ Not applicable (lifecycle only).
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/plugin/client/SidecarLifecycle.ts` | spawn, env, health promise, shutdown |
+| #   | Path                                    | Purpose                              |
+| --- | --------------------------------------- | ------------------------------------ |
+| 1   | `src/plugin/client/SidecarLifecycle.ts` | spawn, env, health promise, shutdown |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/plugin/main.ts` | construct lifecycle + transport |
+| #   | Path                 | Change                          |
+| --- | -------------------- | ------------------------------- |
+| 1   | `src/plugin/main.ts` | construct lifecycle + transport |
 
 ---
 
@@ -76,7 +76,7 @@ Not applicable (lifecycle only).
 ### Phase A
 
 - [x] **A1** — `SidecarLifecycle.start()` resolves only after **health ok** (stdio `send` or HTTP fetch); verified via **StdioTransportAdapter** round-trip plus manual spawn in dev.
-  - Evidence: `src/plugin/client/StdioTransportAdapter.test.ts::A1_health_roundtrip(vitest)` + `SidecarLifecycle` used from `main.ts`
+  - Evidence: `tests/plugin/client/StdioTransportAdapter.test.ts::A1_health_roundtrip(vitest)` + `SidecarLifecycle` used from `main.ts`
 
 ### Phase Y
 
@@ -95,9 +95,9 @@ Not applicable (lifecycle only).
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | Missing `dist/sidecar` in user install | Document `npm run build`; optional notice in settings. |
+| #   | Risk                                   | Mitigation                                             |
+| --- | -------------------------------------- | ------------------------------------------------------ |
+| 1   | Missing `dist/sidecar` in user install | Document `npm run build`; optional notice in settings. |
 
 ---
 
@@ -109,4 +109,4 @@ Not applicable (lifecycle only).
 
 ---
 
-*Created: 2026-04-05 | Story: PLG-1 | Epic: 8*
+_Created: 2026-04-05 | Story: PLG-1 | Epic: 8_

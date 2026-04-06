@@ -17,11 +17,11 @@
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                                                                              | Why it binds this story                                               |
+| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | [docs/decisions/ADR-009-chat-cancellation-and-timeout.md](../decisions/ADR-009-chat-cancellation-and-timeout.md) | Source of truth for `signal`, `timeoutMs`, and transport propagation. |
-| [docs/decisions/ADR-005-provider-abstraction.md](../decisions/ADR-005-provider-abstraction.md) | Chat remains behind **`IChatPort`**; adapters honor abort. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Transport and sidecar lifecycle boundaries. |
+| [docs/decisions/ADR-005-provider-abstraction.md](../decisions/ADR-005-provider-abstraction.md)                   | Chat remains behind **`IChatPort`**; adapters honor abort.            |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)                   | Transport and sidecar lifecycle boundaries.                           |
 
 ---
 
@@ -90,14 +90,14 @@ Not applicable in core repo slice; **UI-3** passes `AbortSignal` when implemente
 ### 6b. Props & Contracts
 
 | Component / Hook | Props / Signature | State | Notes |
-|------------------|-------------------|-------|-------|
-| — | — | — | — |
+| ---------------- | ----------------- | ----- | ----- |
+| —                | —                 | —     | —     |
 
 ### 6c. States (Loading / Error / Empty / Success)
 
-| State   | UI Behavior |
-|---------|-------------|
-| — | — |
+| State | UI Behavior |
+| ----- | ----------- |
+| —     | —           |
 
 ---
 
@@ -105,20 +105,20 @@ Not applicable in core repo slice; **UI-3** passes `AbortSignal` when implemente
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| — | — | None required; place slow-stream fakes next to `*.test.ts` if needed. |
+| #   | Path | Purpose                                                               |
+| --- | ---- | --------------------------------------------------------------------- |
+| —   | —    | None required; place slow-stream fakes next to `*.test.ts` if needed. |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/ports/IChatPort.ts` | Add `ChatCompletionOptions`; extend `complete` signature. |
-| 2 | `src/core/ports/ISidecarTransport.ts` | Second arg on `streamChat`. |
-| 3 | `src/core/workflows/ChatWorkflow.ts` | Thread `options` from caller / sidecar route into `IChatPort.complete`. |
-| 4 | `src/core/workflows/ChatWorkflow.test.ts` | Abort + timeout cases. |
-| 5 | `src/sidecar/adapters/*ChatAdapter*.ts` | Honor `signal` / `timeoutMs` when PRV-2 files exist; else document stub. |
-| 6 | `README.md` | API Contract table + Architecture decisions list: ADR-009 link (**Y5**). |
+| #   | Path                                        | Change                                                                   |
+| --- | ------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | `src/core/ports/IChatPort.ts`               | Add `ChatCompletionOptions`; extend `complete` signature.                |
+| 2   | `src/core/ports/ISidecarTransport.ts`       | Second arg on `streamChat`.                                              |
+| 3   | `src/core/workflows/ChatWorkflow.ts`        | Thread `options` from caller / sidecar route into `IChatPort.complete`.  |
+| 4   | `tests/core/workflows/ChatWorkflow.test.ts` | Abort + timeout cases.                                                   |
+| 5   | `src/sidecar/adapters/*ChatAdapter*.ts`     | Honor `signal` / `timeoutMs` when PRV-2 files exist; else document stub. |
+| 6   | `README.md`                                 | API Contract table + Architecture decisions list: ADR-009 link (**Y5**). |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -136,12 +136,12 @@ Not applicable in core repo slice; **UI-3** passes `AbortSignal` when implemente
 ### Phase B: Timeout
 
 - [x] **B1** — Fake chat port that never yields respects **`timeoutMs`** and **stops** within a bounded window (workflow uses `withChatCompletionControls`; test uses **150ms**).
-  - Evidence: `src/core/workflows/ChatWorkflow.test.ts::B1_timeout_stops_stream(vitest)` or adapter test file if logic lives only in adapter
+  - Evidence: `tests/core/workflows/ChatWorkflow.test.ts::B1_timeout_stops_stream(vitest)` or adapter test file if logic lives only in adapter
 
 ### Phase C: Cancel
 
 - [x] **C1** — When **`AbortSignal.abort()`** is called after the first delta, **no further deltas** are observed from `complete(...)`.
-  - Evidence: `src/core/workflows/ChatWorkflow.test.ts::C1_abort_stops_deltas(vitest)`
+  - Evidence: `tests/core/workflows/ChatWorkflow.test.ts::C1_abort_stops_deltas(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -160,10 +160,10 @@ Not applicable in core repo slice; **UI-3** passes `AbortSignal` when implemente
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Ollama stream cancel weaker than OpenAI | Document best-effort; close reader/socket in adapter. |
-| 2 | Stdio cancel framing undefined until SRV-1 | ADR-009 explicit non-decision; plugin-side abort still stops client read. |
+| #   | Risk / Tradeoff                            | Mitigation                                                                |
+| --- | ------------------------------------------ | ------------------------------------------------------------------------- |
+| 1   | Ollama stream cancel weaker than OpenAI    | Document best-effort; close reader/socket in adapter.                     |
+| 2   | Stdio cancel framing undefined until SRV-1 | ADR-009 explicit non-decision; plugin-side abort still stops client read. |
 
 ---
 
@@ -178,4 +178,4 @@ Not applicable in core repo slice; **UI-3** passes `AbortSignal` when implemente
 
 ---
 
-*Created: 2026-04-05 | Story: CHAT-2 | Epic: 5 — Retrieval, search workflow, and chat workflow*
+_Created: 2026-04-05 | Story: CHAT-2 | Epic: 5 — Retrieval, search workflow, and chat workflow_

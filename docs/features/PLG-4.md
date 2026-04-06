@@ -15,8 +15,8 @@ Persist via `Plugin.loadData` / `saveData`. Changing transport requires sidecar 
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                     | Why it binds this story                    |
+| ------------------------------------------------------- | ------------------------------------------ |
 | [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Transport and provider config at boundary. |
 
 ---
@@ -77,8 +77,8 @@ SettingsTab → Plugin.saveSettings()
 
 ### 6b
 
-| Component | Props | Notes |
-|-----------|-------|-------|
+| Component            | Props  | Notes                    |
+| -------------------- | ------ | ------------------------ |
 | ObsidianAISettingTab | plugin | extends PluginSettingTab |
 
 ### 6c
@@ -89,11 +89,11 @@ SettingsTab → Plugin.saveSettings()
 
 ## 7. File Touchpoints
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/plugin/settings/types.ts` | `ObsidianAISettings` |
-| 2 | `src/plugin/settings/defaults.ts` | README defaults |
-| 3 | `src/plugin/settings/SettingsTab.ts` | UI |
+| #   | Path                                 | Purpose              |
+| --- | ------------------------------------ | -------------------- |
+| 1   | `src/plugin/settings/types.ts`       | `ObsidianAISettings` |
+| 2   | `src/plugin/settings/defaults.ts`    | README defaults      |
+| 3   | `src/plugin/settings/SettingsTab.ts` | UI                   |
 
 ---
 
@@ -102,7 +102,7 @@ SettingsTab → Plugin.saveSettings()
 ### Phase A
 
 - [x] **A1** — `DEFAULT_SETTINGS` matches README numeric/string defaults (spot-check 5 keys in test).
-  - Evidence: `src/plugin/settings/defaults.test.ts::A1_readme_defaults(vitest)`
+  - Evidence: `tests/plugin/settings/defaults.test.ts::A1_readme_defaults(vitest)`
 
 ### Phase Y
 
@@ -121,9 +121,9 @@ SettingsTab → Plugin.saveSettings()
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | Too many fields | Group sections in tab. |
+| #   | Risk            | Mitigation             |
+| --- | --------------- | ---------------------- |
+| 1   | Too many fields | Group sections in tab. |
 
 ---
 
@@ -135,4 +135,4 @@ SettingsTab → Plugin.saveSettings()
 
 ---
 
-*Created: 2026-04-05 | Story: PLG-4 | Epic: 8*
+_Created: 2026-04-05 | Story: PLG-4 | Epic: 8_

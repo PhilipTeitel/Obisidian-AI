@@ -18,7 +18,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'tests/**/*.ts'],
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -37,6 +37,22 @@ export default tseslint.config(
   },
   {
     files: ['src/sidecar/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
+    files: ['tests/plugin/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+  },
+  {
+    files: ['tests/sidecar/**/*.ts'],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -92,6 +108,65 @@ export default tseslint.config(
                 '../../../../sidecar/**',
               ],
               message: 'Core must not import plugin or sidecar adapter paths (FND-3 Y1).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['tests/core/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'obsidian',
+              message: 'Core tests must not depend on Obsidian (FND-1 / FND-2).',
+            },
+            {
+              name: 'better-sqlite3',
+              message: 'Core tests must not depend on better-sqlite3 (FND-1 / FND-2).',
+            },
+            {
+              name: 'electron',
+              message: 'Core tests must not depend on Electron (FND-3 Y1).',
+            },
+            {
+              name: '@sqlite.org/sqlite-wasm',
+              message: 'Core tests must not depend on wa-sqlite stack (FND-3 Y1).',
+            },
+          ],
+          patterns: [
+            {
+              group: ['obsidian/*'],
+              message: 'Core tests must not depend on Obsidian (FND-1 / FND-2).',
+            },
+            {
+              group: ['better-sqlite3/*'],
+              message: 'Core tests must not depend on better-sqlite3 (FND-1 / FND-2).',
+            },
+            {
+              group: ['electron/*'],
+              message: 'Core tests must not depend on Electron (FND-3 Y1).',
+            },
+            {
+              group: [
+                '../plugin/**',
+                '../../plugin/**',
+                '../../../plugin/**',
+                '../../../../plugin/**',
+                '../sidecar/**',
+                '../../sidecar/**',
+                '../../../sidecar/**',
+                '../../../../sidecar/**',
+              ],
+              message: 'Core tests must not import plugin or sidecar adapter paths (FND-3 Y1).',
+            },
+            {
+              group: ['@src/plugin', '@src/plugin/**', '@src/sidecar', '@src/sidecar/**'],
+              message: 'Core tests must not import plugin or sidecar via @src (FND-3 Y1).',
             },
           ],
         },

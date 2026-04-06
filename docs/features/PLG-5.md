@@ -15,8 +15,8 @@ ADR-006 §5: sidecar never stores secrets. Plugin uses `this.app.saveSecret` / `
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                     | Why it binds this story |
+| ------------------------------------------------------- | ----------------------- |
 | [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Secrets in plugin only. |
 
 ---
@@ -50,10 +50,10 @@ Settings: masked inputs calling `saveSecret` on change; optional clear.
 
 ## 7. File Touchpoints
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/plugin/settings/secretSettings.ts` | load/save helpers |
-| 2 | `src/plugin/settings/SettingsTab.ts` | secret inputs |
+| #   | Path                                    | Purpose           |
+| --- | --------------------------------------- | ----------------- |
+| 1   | `src/plugin/settings/secretSettings.ts` | load/save helpers |
+| 2   | `src/plugin/settings/SettingsTab.ts`    | secret inputs     |
 
 ---
 
@@ -62,7 +62,7 @@ Settings: masked inputs calling `saveSecret` on change; optional clear.
 ### Phase A
 
 - [x] **A1** — Helper `getOpenAIApiKey(app): Promise<string | undefined>` uses `loadSecret`.
-  - Evidence: `src/plugin/settings/secretSettings.test.ts::A1_uses_loadSecret(vitest)` with mock App
+  - Evidence: `tests/plugin/settings/secretSettings.test.ts::A1_uses_loadSecret(vitest)` with mock App
 
 ### Phase Y
 
@@ -81,9 +81,9 @@ Settings: masked inputs calling `saveSecret` on change; optional clear.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | Obsidian API variance | Use `loadSecret` from Obsidian 1.2+. |
+| #   | Risk                  | Mitigation                           |
+| --- | --------------------- | ------------------------------------ |
+| 1   | Obsidian API variance | Use `loadSecret` from Obsidian 1.2+. |
 
 ---
 
@@ -94,4 +94,4 @@ Settings: masked inputs calling `saveSecret` on change; optional clear.
 
 ---
 
-*Created: 2026-04-05 | Story: PLG-5 | Epic: 8*
+_Created: 2026-04-05 | Story: PLG-5 | Epic: 8_

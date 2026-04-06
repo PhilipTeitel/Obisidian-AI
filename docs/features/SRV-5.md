@@ -15,10 +15,10 @@
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                                  | Why it binds this story              |
+| -------------------------------------------------------------------- | ------------------------------------ |
 | [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md) | Progress events per step transition. |
-| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Push path for both transports. |
+| [ADR-006](../decisions/ADR-006-sidecar-architecture.md)              | Push path for both transports.       |
 
 ---
 
@@ -54,16 +54,16 @@
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/adapters/ProgressAdapter.ts` | `IProgressPort` impl |
-| 2 | `src/sidecar/adapters/ProgressAdapter.test.ts` | Sink invocation |
+| #   | Path                                             | Purpose              |
+| --- | ------------------------------------------------ | -------------------- |
+| 1   | `src/sidecar/adapters/ProgressAdapter.ts`        | `IProgressPort` impl |
+| 2   | `tests/sidecar/adapters/ProgressAdapter.test.ts` | Sink invocation      |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/sidecar/runtime/SidecarRuntime.ts` | Construct `ProgressAdapter`, pass to `JobStepService` |
+| #   | Path                                    | Change                                                |
+| --- | --------------------------------------- | ----------------------------------------------------- |
+| 1   | `src/sidecar/runtime/SidecarRuntime.ts` | Construct `ProgressAdapter`, pass to `JobStepService` |
 
 ---
 
@@ -72,10 +72,10 @@
 ### Phase A
 
 - [x] **A1** — Calling `emit` on `ProgressAdapter` invokes registered stdout callback with serialized event containing `jobId`, `runId`, `notePath`, `step`.
-  - Evidence: `src/sidecar/adapters/ProgressAdapter.test.ts::A1_stdout_sink(vitest)`
+  - Evidence: `tests/sidecar/adapters/ProgressAdapter.test.ts::A1_stdout_sink(vitest)`
 
 - [x] **A2** — Second sink (WS mock) receives same event when registered.
-  - Evidence: `src/sidecar/adapters/ProgressAdapter.test.ts::A2_dual_sink(vitest)`
+  - Evidence: `tests/sidecar/adapters/ProgressAdapter.test.ts::A2_dual_sink(vitest)`
 
 ### Phase Y
 
@@ -94,9 +94,9 @@
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | stdout flooding | Document; future backpressure in PLG. |
+| #   | Risk            | Mitigation                            |
+| --- | --------------- | ------------------------------------- |
+| 1   | stdout flooding | Document; future backpressure in PLG. |
 
 ---
 
@@ -108,4 +108,4 @@
 
 ---
 
-*Created: 2026-04-05 | Story: SRV-5 | Epic: 7 — Sidecar server, routes, and observability*
+_Created: 2026-04-05 | Story: SRV-5 | Epic: 7 — Sidecar server, routes, and observability_

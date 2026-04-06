@@ -15,7 +15,7 @@ Indexing and search already depend on **`IEmbeddingPort`** ([ADR-005](../decisio
 
 **Vector dimension** must match the **sqlite-vec** schema for the vault DB (see [`getEmbeddingDimension`](../../src/sidecar/db/migrate.ts)); mismatches surface as **clear errors** at `upsertEmbedding` time today — adapters should return **`Float32Array`** with lengths exactly as returned by the provider for the configured model.
 
-**Downstream:** [WKF-2](WKF-2.md) / [RET-1](RET-1.md) / [CHAT-1](CHAT-1.md) continue to use the port; **SRV-*** stories bind settings → adapter instances.
+**Downstream:** [WKF-2](WKF-2.md) / [RET-1](RET-1.md) / [CHAT-1](CHAT-1.md) continue to use the port; **SRV-\*** stories bind settings → adapter instances.
 
 Pointers: [IEmbeddingPort](../../src/core/ports/IEmbeddingPort.ts), [REQUIREMENTS §7](../requirements/REQUIREMENTS.md), [ADR-005](../decisions/ADR-005-provider-abstraction.md), [ADR-006](../decisions/ADR-006-sidecar-architecture.md).
 
@@ -23,10 +23,10 @@ Pointers: [IEmbeddingPort](../../src/core/ports/IEmbeddingPort.ts), [REQUIREMENT
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                                                            | Why it binds this story                                                                                                  |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | [docs/decisions/ADR-005-provider-abstraction.md](../decisions/ADR-005-provider-abstraction.md) | Embeddings only through **`IEmbeddingPort`**; OpenAI/Ollama as **adapters**; registry/factory pattern; MVP provider set. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Provider HTTP calls run in the **sidecar**, not the Obsidian plugin; core stays free of infrastructure. |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Provider HTTP calls run in the **sidecar**, not the Obsidian plugin; core stays free of infrastructure.                  |
 
 ---
 
@@ -54,7 +54,7 @@ _Planning note: No **Tensions / conflicts** identified between README, REQUIREME
 
 ## 5. API Endpoints + Schemas
 
-No new **plugin ↔ sidecar** routes are required in this story (SRV-* owns HTTP/stdio routing). Adapters call **external** provider HTTP APIs only.
+No new **plugin ↔ sidecar** routes are required in this story (SRV-\* owns HTTP/stdio routing). Adapters call **external** provider HTTP APIs only.
 
 **Optional** shared config type (place in `src/core/domain/types.ts` **only** if already used by wire payloads; otherwise keep **`EmbeddingAdapterConfig`** local to sidecar adapter files to avoid unnecessary core churn):
 
@@ -83,14 +83,14 @@ Not applicable. **PLG-4** surfaces embedding provider settings in the Obsidian U
 ### 6b. Props & Contracts
 
 | Component / Hook | Props / Signature | State | Notes |
-|------------------|-------------------|-------|-------|
-| — | — | — | — |
+| ---------------- | ----------------- | ----- | ----- |
+| —                | —                 | —     | —     |
 
 ### 6c. States (Loading / Error / Empty / Success)
 
-| State   | UI Behavior |
-|---------|-------------|
-| — | — |
+| State | UI Behavior |
+| ----- | ----------- |
+| —     | —           |
 
 ---
 
@@ -98,19 +98,19 @@ Not applicable. **PLG-4** surfaces embedding provider settings in the Obsidian U
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/adapters/OpenAIEmbeddingAdapter.ts` | `IEmbeddingPort` for OpenAI-compatible `/v1/embeddings`. |
-| 2 | `src/sidecar/adapters/OllamaEmbeddingAdapter.ts` | `IEmbeddingPort` for Ollama `/api/embeddings`. |
-| 3 | `src/sidecar/adapters/createEmbeddingPort.ts` | Factory: `createEmbeddingPort(kind: 'openai' \| 'ollama', config) → IEmbeddingPort`. |
-| 4 | `src/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts` | `fetch` stub; batch order; Bearer header when key present. |
-| 5 | `src/sidecar/adapters/OllamaEmbeddingAdapter.test.ts` | `fetch` stub; dimension + order. |
+| #   | Path                                                    | Purpose                                                                              |
+| --- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1   | `src/sidecar/adapters/OpenAIEmbeddingAdapter.ts`        | `IEmbeddingPort` for OpenAI-compatible `/v1/embeddings`.                             |
+| 2   | `src/sidecar/adapters/OllamaEmbeddingAdapter.ts`        | `IEmbeddingPort` for Ollama `/api/embeddings`.                                       |
+| 3   | `src/sidecar/adapters/createEmbeddingPort.ts`           | Factory: `createEmbeddingPort(kind: 'openai' \| 'ollama', config) → IEmbeddingPort`. |
+| 4   | `tests/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts` | `fetch` stub; batch order; Bearer header when key present.                           |
+| 5   | `tests/sidecar/adapters/OllamaEmbeddingAdapter.test.ts` | `fetch` stub; dimension + order.                                                     |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| — | — | *None required in this story; SRV-1 later imports factories/adapters from explicit paths or adds a barrel.* |
+| #   | Path | Change                                                                                                      |
+| --- | ---- | ----------------------------------------------------------------------------------------------------------- |
+| —   | —    | _None required in this story; SRV-1 later imports factories/adapters from explicit paths or adds a barrel._ |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -124,21 +124,21 @@ Not applicable. **PLG-4** surfaces embedding provider settings in the Obsidian U
 ### Phase A: OpenAI adapter behavior
 
 - [x] **A1** — For `texts.length === n`, a single mocked `fetch` invocation receives a JSON body whose `input` is an **array of length n** (OpenAI batch) and `model` equals configured model id.
-  - Evidence: `src/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts::A1_openai_batch_payload(vitest)`
+  - Evidence: `tests/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts::A1_openai_batch_payload(vitest)`
 
 - [x] **A2** — When `apiKey` is defined, the request headers include **`Authorization: Bearer <value>`** exactly once.
-  - Evidence: `src/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts::A2_openai_bearer_header(vitest)`
+  - Evidence: `tests/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts::A2_openai_bearer_header(vitest)`
 
 - [x] **A3** — Response parsing maps `data[i].embedding` to **`Float32Array`** entries **in order**; non-OK HTTP throws an error that includes **status** (and body snippet when JSON parse fails, optional).
-  - Evidence: `src/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts::A3_openai_order_and_errors(vitest)`
+  - Evidence: `tests/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts::A3_openai_order_and_errors(vitest)`
 
 ### Phase B: Ollama adapter behavior
 
 - [x] **B1** — Mocked `fetch` targets `{baseUrl}/api/embeddings` (normalized slash rules documented in code) with `model` and an `input` field appropriate to the implemented Ollama request shape.
-  - Evidence: `src/sidecar/adapters/OllamaEmbeddingAdapter.test.ts::B1_ollama_url_and_body(vitest)`
+  - Evidence: `tests/sidecar/adapters/OllamaEmbeddingAdapter.test.ts::B1_ollama_url_and_body(vitest)`
 
 - [x] **B2** — Returned vectors are **`Float32Array`** with length equal to the embedding returned by the mocked response; order matches `texts` for multi-call strategies.
-  - Evidence: `src/sidecar/adapters/OllamaEmbeddingAdapter.test.ts::B2_ollama_order(vitest)`
+  - Evidence: `tests/sidecar/adapters/OllamaEmbeddingAdapter.test.ts::B2_ollama_order(vitest)`
 
 ### Phase C: Factory
 
@@ -168,23 +168,23 @@ Not applicable. **PLG-4** surfaces embedding provider settings in the Obsidian U
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | OpenAI max inputs per request exceeded | Sub-batch in adapter; preserve order; test with n > limit using small limit constant in test. |
-| 2 | Ollama version differences for batch | Document sequential fallback; keep order deterministic. |
-| 3 | Embedding dimension vs sqlite-vec schema | Surface provider dimension in error metadata; align defaults with README embedding model defaults. |
+| #   | Risk / Tradeoff                          | Mitigation                                                                                         |
+| --- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 1   | OpenAI max inputs per request exceeded   | Sub-batch in adapter; preserve order; test with n > limit using small limit constant in test.      |
+| 2   | Ollama version differences for batch     | Document sequential fallback; keep order deterministic.                                            |
+| 3   | Embedding dimension vs sqlite-vec schema | Surface provider dimension in error metadata; align defaults with README embedding model defaults. |
 
 ---
 
 ## Implementation Order
 
 1. `src/sidecar/adapters/OpenAIEmbeddingAdapter.ts` — implement `embed` with `fetch` + OpenAI response mapping (**A1–A3**).
-2. `src/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts` — stub `fetch` (**A1–A3**).
-3. `src/sidecar/adapters/OllamaEmbeddingAdapter.ts` + `.test.ts` — (**B1–B2**).
+2. `tests/sidecar/adapters/OpenAIEmbeddingAdapter.test.ts` — stub `fetch` (**A1–A3**).
+3. `src/sidecar/adapters/OllamaEmbeddingAdapter.ts` + `tests/sidecar/adapters/OllamaEmbeddingAdapter.test.ts` — (**B1–B2**).
 4. `src/sidecar/adapters/createEmbeddingPort.ts` — factory (**C1**).
 5. **Verify** — `npm run verify:core-imports`, `npm run check:boundaries`, `rg` package.json (**Y1–Y3**), `npm run build`, `npm test` for new tests.
 6. **Final verify** — full test suite + lint.
 
 ---
 
-*Created: 2026-04-05 | Story: PRV-1 | Epic: 6 — Provider adapters*
+_Created: 2026-04-05 | Story: PRV-1 | Epic: 6 — Provider adapters_

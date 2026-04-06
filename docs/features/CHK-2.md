@@ -21,10 +21,10 @@ Pointers: [CHK-1](CHK-1.md) (baseline chunker); [docs/requirements/REQUIREMENTS.
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                                                                          | Why it binds this story                                       |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Sentence-boundary splits with stable ordering for reassembly. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Splitting logic stays in **core**; no sidecar/plugin imports. |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)               | Splitting logic stays in **core**; no sidecar/plugin imports. |
 
 **None additional** — no new persistence, embedding vendor, or transport decision is introduced here.
 
@@ -56,10 +56,10 @@ Pointers: [CHK-1](CHK-1.md) (baseline chunker); [docs/requirements/REQUIREMENTS.
 
 No HTTP routes. Extend the CHK-1 core API:
 
-| Attribute | Value |
-|-----------|-------|
-| Surface | `ChunkNoteInput`, `chunkNoteToDocumentNodes` in `src/core/domain/chunker.ts`; new helpers in `sentenceSplitter.ts`, `tokenEstimator.ts` |
-| Auth | N/A |
+| Attribute | Value                                                                                                                                   |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Surface   | `ChunkNoteInput`, `chunkNoteToDocumentNodes` in `src/core/domain/chunker.ts`; new helpers in `sentenceSplitter.ts`, `tokenEstimator.ts` |
+| Auth      | N/A                                                                                                                                     |
 
 ```ts
 export interface ChunkNoteInput {
@@ -102,18 +102,18 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/core/domain/sentenceSplitter.ts` | Split paragraph text into sentences (rule-based; exported for tests). |
-| 2 | `src/core/domain/tokenEstimator.ts` | `estimateTokens(text: string): number` — documented heuristic used consistently for split decisions. |
+| #   | Path                                  | Purpose                                                                                              |
+| --- | ------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 1   | `src/core/domain/sentenceSplitter.ts` | Split paragraph text into sentences (rule-based; exported for tests).                                |
+| 2   | `src/core/domain/tokenEstimator.ts`   | `estimateTokens(text: string): number` — documented heuristic used consistently for split decisions. |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/domain/chunker.ts` | After paragraph node creation, run token estimate + optional split into `sentence_part` children; recompute `siblingOrder` under affected parents if needed. |
-| 2 | `src/core/domain/chunker.test.ts` | Fixtures for split, no-split, abbreviation edge cases, hash invariants. |
-| 3 | `src/core/index.ts` | Re-export `DEFAULT_MAX_EMBEDDING_TOKENS` (and splitter/estimator if useful to adapters). |
+| #   | Path                                | Change                                                                                                                                                       |
+| --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `src/core/domain/chunker.ts`        | After paragraph node creation, run token estimate + optional split into `sentence_part` children; recompute `siblingOrder` under affected parents if needed. |
+| 2   | `tests/core/domain/chunker.test.ts` | Fixtures for split, no-split, abbreviation edge cases, hash invariants.                                                                                      |
+| 3   | `src/core/index.ts`                 | Re-export `DEFAULT_MAX_EMBEDDING_TOKENS` (and splitter/estimator if useful to adapters).                                                                     |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -127,27 +127,27 @@ Not applicable.
 ### Phase A: Sentence splitting behavior
 
 - [ ] **A1** — **No split when under threshold:** Given a paragraph whose `estimateTokens` is ≤ `maxEmbeddingTokens`, output contains **no** `sentence_part` nodes under that paragraph.
-  - Evidence: `src/core/domain/chunker.test.ts::A1_no_split_under_threshold(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A1_no_split_under_threshold(vitest)`
 
 - [ ] **A2** — **Split when over threshold:** Given a paragraph whose content exceeds the threshold, the paragraph has ≥1 child of type `sentence_part` and **no** other child types.
-  - Evidence: `src/core/domain/chunker.test.ts::A2_split_over_threshold(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A2_split_over_threshold(vitest)`
 
 - [ ] **A3** — **Reassembly:** For every split paragraph, joined `sentence_part` contents in `siblingOrder` order equal the parent’s canonical paragraph body per documented normalization.
-  - Evidence: `src/core/domain/chunker.test.ts::A3_reassembly_matches_parent_content(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A3_reassembly_matches_parent_content(vitest)`
 
 - [ ] **A4** — **Sibling order contiguous:** Under each split paragraph, `sentence_part` nodes have `siblingOrder` 0..n-1.
-  - Evidence: `src/core/domain/chunker.test.ts::A4_sentence_part_sibling_order(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A4_sentence_part_sibling_order(vitest)`
 
 - [ ] **A5** — **Abbreviation guard:** Fixture containing `Dr. Smith went to Washington. He stayed.` produces **two** sentences (not three at `Dr.`).
-  - Evidence: `src/core/domain/chunker.test.ts::A5_abbreviation_dr(vitest)` _(may call `sentenceSplitter` module directly or via split paragraph)_
+  - Evidence: `tests/core/domain/chunker.test.ts::A5_abbreviation_dr(vitest)` _(may call `sentenceSplitter` module directly or via split paragraph)_
 
 ### Phase B: Metadata + hashing
 
 - [ ] **B1** — **`headingTrail` / `depth`:** For `sentence_part` under a paragraph, `headingTrail` equals the parent paragraph’s `headingTrail`; `depth === parent.depth + 1`.
-  - Evidence: `src/core/domain/chunker.test.ts::B1_trail_and_depth_inherit(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::B1_trail_and_depth_inherit(vitest)`
 
 - [ ] **B2** — **Hashes:** Parent `contentHash` verifies against full paragraph text; each part’s `contentHash` verifies against that part’s `content`.
-  - Evidence: `src/core/domain/chunker.test.ts::B2_contenthash_split_nodes(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::B2_contenthash_split_nodes(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -155,7 +155,7 @@ Not applicable.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` and `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
 - [ ] **Y2** — **(binding)** `estimateTokens` implementation is **pure TypeScript** in `src/core/domain/tokenEstimator.ts` with **no** native-only tokenizer dependencies (no WASM/native addons in core for this story).
-  - Evidence: `package.json` inspection + `src/core/domain/tokenEstimator.ts` import scan; `src/core/domain/chunker.test.ts::Y2_token_estimator_has_no_native_tokenizer(vitest)` (static assertion or comment-backed test listing forbidden patterns)
+  - Evidence: `package.json` inspection + `src/core/domain/tokenEstimator.ts` import scan; `tests/core/domain/chunker.test.ts::Y2_token_estimator_has_no_native_tokenizer(vitest)` (static assertion or comment-backed test listing forbidden patterns)
 
 ### Phase Z: Quality Gates
 
@@ -177,10 +177,10 @@ Not applicable.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Heuristic `estimateTokens` ≠ real tokenizer | Document margin; default threshold conservative; WKF can re-check before API call. |
-| 2 | Regex sentence split wrong on URLs, decimals, ellipses | Add targeted fixtures as bugs are found; keep splitter module focused and testable. |
+| #   | Risk / Tradeoff                                        | Mitigation                                                                          |
+| --- | ------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| 1   | Heuristic `estimateTokens` ≠ real tokenizer            | Document margin; default threshold conservative; WKF can re-check before API call.  |
+| 2   | Regex sentence split wrong on URLs, decimals, ellipses | Add targeted fixtures as bugs are found; keep splitter module focused and testable. |
 
 ---
 
@@ -194,4 +194,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: CHK-2 | Epic: 2 — Hierarchical chunking and note metadata*
+_Created: 2026-04-05 | Story: CHK-2 | Epic: 2 — Hierarchical chunking and note metadata_

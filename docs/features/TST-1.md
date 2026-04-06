@@ -1,15 +1,15 @@
 # TST-1: Unit test scope — core and plugin without native sidecar stack
 
-**Story**: Define and script **`npm run test:unit`** to run Vitest for **`src/core/**/*.test.ts`** and **`src/plugin/**/*.test.ts`** only, so CI and local runs can execute **fast, portable** tests without loading **`better-sqlite3` / sqlite-vec** (those stay under TST-2).
+**Story**: Define and script **`npm run test:unit`** to run Vitest for **`tests/core/**/_.test.ts`** and **`tests/plugin/\*\*/_.test.ts`** only, so CI and local runs can execute **fast, portable** tests without loading **`better-sqlite3` / sqlite-vec** (those stay under TST-2).
 **Epic**: 10 — Testing, authoring guide, and release hardening
 **Size**: Medium
-**Status**: Complete
+**Status\*\*: Complete
 
 ---
 
 ## 1. Summary
 
-Core workflows and the chunker already run against **in-memory fakes** (see existing tests under `src/core/`). Plugin adapters mock `fetch` or avoid Obsidian runtime. This story **locks that split in `package.json` and README** so “unit” has a single obvious meaning: no sidecar directory tests.
+Core workflows and the chunker already run against **in-memory fakes** (see existing tests under `tests/core/`). Plugin adapters mock `fetch` or avoid Obsidian runtime. This story **locks that split in `package.json` and README** so “unit” has a single obvious meaning: no sidecar directory tests.
 
 Pointers: [REQUIREMENTS §9](../requirements/REQUIREMENTS.md) quality bar; [ADR-006](../decisions/ADR-006-sidecar-architecture.md) native stack in sidecar only.
 
@@ -17,10 +17,10 @@ Pointers: [REQUIREMENTS §9](../requirements/REQUIREMENTS.md) quality bar; [ADR-
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Native SQLite/sqlite-vec is sidecar-only; unit slice excludes that tree. |
-| [ADR-001](../decisions/ADR-001-wasm-sqlite-vec-shipped-plugin.md) | Historical context; iter-2 sidecar owns native modules. |
+| ADR                                                               | Why it binds this story                                                  |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [ADR-006](../decisions/ADR-006-sidecar-architecture.md)           | Native SQLite/sqlite-vec is sidecar-only; unit slice excludes that tree. |
+| [ADR-001](../decisions/ADR-001-wasm-sqlite-vec-shipped-plugin.md) | Historical context; iter-2 sidecar owns native modules.                  |
 
 ---
 
@@ -35,7 +35,7 @@ Pointers: [REQUIREMENTS §9](../requirements/REQUIREMENTS.md) quality bar; [ADR-
 
 ## 4. Binding constraints (non-negotiable)
 
-1. **Y1** — `test:unit` must **not** execute any test file under `src/sidecar/`.
+1. **Y1** — `test:unit` must **not** execute any test file under `tests/sidecar/`.
 2. **Y2** — `npm run test` remains the **full** suite (unit + integration directories), unless README explicitly documents a different aggregate (default: unchanged `vitest run`).
 
 ---
@@ -54,10 +54,10 @@ Pointers: [REQUIREMENTS §9](../requirements/REQUIREMENTS.md) quality bar; [ADR-
 
 ## 7. File Touchpoints
 
-| Path | Purpose |
-|------|---------|
-| `package.json` | Add `test:unit` script |
-| `README.md` | Document `test:unit` in [Available Scripts](../../README.md#available-scripts) |
+| Path           | Purpose                                                                        |
+| -------------- | ------------------------------------------------------------------------------ |
+| `package.json` | Add `test:unit` script                                                         |
+| `README.md`    | Document `test:unit` in [Available Scripts](../../README.md#available-scripts) |
 
 ---
 
@@ -65,13 +65,13 @@ Pointers: [REQUIREMENTS §9](../requirements/REQUIREMENTS.md) quality bar; [ADR-
 
 ### Phase A
 
-- [x] **A1** — `npm run test:unit` completes successfully and runs only `src/core` and `src/plugin` tests.
+- [x] **A1** — `npm run test:unit` completes successfully and runs only `tests/core` and `tests/plugin` tests.
   - Evidence: `package.json` script + `npm run test:unit`
 
 ### Phase Y
 
-- [x] **Y1** — **(binding)** No `src/sidecar/**/*.test.ts` is invoked by `test:unit`.
-  - Evidence: `vitest run src/core src/plugin` (or equivalent) with no `src/sidecar` path
+- [x] **Y1** — **(binding)** No `tests/sidecar/**/*.test.ts` is invoked by `test:unit`.
+  - Evidence: `vitest run tests/core tests/plugin` (or equivalent) with no `tests/sidecar` path
 
 ### Phase Z
 
@@ -85,9 +85,9 @@ Pointers: [REQUIREMENTS §9](../requirements/REQUIREMENTS.md) quality bar; [ADR-
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | Future tests misplaced under `src/core` that import native modules | Code review; boundary check script |
+| #   | Risk                                                                 | Mitigation                         |
+| --- | -------------------------------------------------------------------- | ---------------------------------- |
+| 1   | Future tests misplaced under `tests/core` that import native modules | Code review; boundary check script |
 
 ---
 
@@ -98,4 +98,4 @@ Pointers: [REQUIREMENTS §9](../requirements/REQUIREMENTS.md) quality bar; [ADR-
 
 ---
 
-*Created: 2026-04-05 | Story: TST-1 | Epic: 10*
+_Created: 2026-04-05 | Story: TST-1 | Epic: 10_

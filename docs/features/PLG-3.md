@@ -15,8 +15,8 @@ SRV-2 maps routes; plugin mirrors: Bearer on REST; WS `?token=` for pushes; chat
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                     | Why it binds this story         |
+| ------------------------------------------------------- | ------------------------------- |
 | [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | HTTP opt-in; 127.0.0.1 + token. |
 
 ---
@@ -50,10 +50,10 @@ SRV-2 maps routes; plugin mirrors: Bearer on REST; WS `?token=` for pushes; chat
 
 ## 7. File Touchpoints
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/plugin/client/HttpTransportAdapter.ts` | ISidecarTransport |
-| 2 | `src/plugin/client/HttpTransportAdapter.test.ts` | mock fetch (minimal) |
+| #   | Path                                               | Purpose              |
+| --- | -------------------------------------------------- | -------------------- |
+| 1   | `src/plugin/client/HttpTransportAdapter.ts`        | ISidecarTransport    |
+| 2   | `tests/plugin/client/HttpTransportAdapter.test.ts` | mock fetch (minimal) |
 
 ---
 
@@ -62,12 +62,12 @@ SRV-2 maps routes; plugin mirrors: Bearer on REST; WS `?token=` for pushes; chat
 ### Phase A
 
 - [x] **A1** — `send` health uses `Authorization: Bearer` and parses JSON body.
-  - Evidence: `src/plugin/client/HttpTransportAdapter.test.ts::A1_health_fetch(vitest)` or manual integration note in test skip
+  - Evidence: `tests/plugin/client/HttpTransportAdapter.test.ts::A1_health_fetch(vitest)` or manual integration note in test skip
 
 ### Phase Y
 
 - [x] **Y1** — **(binding)** Rejects base URL not starting with `http://127.0.0.1`.
-  - Evidence: `src/plugin/client/HttpTransportAdapter.test.ts::Y1_localhost_only(vitest)`
+  - Evidence: `tests/plugin/client/HttpTransportAdapter.test.ts::Y1_localhost_only(vitest)`
 
 ### Phase Z
 
@@ -81,9 +81,9 @@ SRV-2 maps routes; plugin mirrors: Bearer on REST; WS `?token=` for pushes; chat
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | WS in Obsidian Electron | Use browser WebSocket API. |
+| #   | Risk                    | Mitigation                 |
+| --- | ----------------------- | -------------------------- |
+| 1   | WS in Obsidian Electron | Use browser WebSocket API. |
 
 ---
 
@@ -95,4 +95,4 @@ SRV-2 maps routes; plugin mirrors: Bearer on REST; WS `?token=` for pushes; chat
 
 ---
 
-*Created: 2026-04-05 | Story: PLG-3 | Epic: 8*
+_Created: 2026-04-05 | Story: PLG-3 | Epic: 8_

@@ -23,10 +23,10 @@ Pointers: [REQUIREMENTS §5](../requirements/REQUIREMENTS.md) (tags scoped to hi
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                                                                          | Why it binds this story                                                   |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
 | [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Hierarchical note model implies **scoped** metadata, not only note-level. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Tag extraction stays in **core**; no vault FS access. |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)               | Tag extraction stays in **core**; no vault FS access.                     |
 
 **None additional.**
 
@@ -48,7 +48,7 @@ Pointers: [REQUIREMENTS §5](../requirements/REQUIREMENTS.md) (tags scoped to hi
 2. **Y2** — Every `ParsedTag.nodeId` **must** exist in `ChunkNoteResult.nodes` **except** if documented otherwise—**no exceptions**: frontmatter tags use **`note`** node id.
 3. **Y3** — **Tag string normalization:** Store **without** leading `#`; preserve case as written in source (Obsidian allows mixed case). **Collapse** internal whitespace in tag body per documented rule (e.g. `#two words` illegal in Obsidian—document skip or error).
 4. **Y4** — **Frontmatter keys:** Support at minimum `tags:` as YAML **array** or **comma-separated scalar** (document which); optional `tag:` singular string—tests lock supported shapes.
-5. **Y5** — **Inline tag regex** must **exclude** matches inside **fenced code blocks** (``` … ```) and **inline code** (backticks); tests must include negative cases.
+5. **Y5** — **Inline tag regex** must **exclude** matches inside **fenced code blocks** (`…`) and **inline code** (backticks); tests must include negative cases.
 6. **Y6** — **Duplicate** `(nodeId, tag, source)` in output: **dedupe** in chunker output **or** allow duplicates—**choose one** and test (recommend **dedupe** for stable STO upserts).
 
 ---
@@ -57,10 +57,10 @@ Pointers: [REQUIREMENTS §5](../requirements/REQUIREMENTS.md) (tags scoped to hi
 
 No HTTP routes. Types **`ParsedTag`** and **`ChunkNoteResult`** are defined in CHK-4; this story **fills `tags`**.
 
-| Attribute | Value |
-|-----------|-------|
-| Surface | `chunkNote` behavior extension only |
-| Auth | N/A |
+| Attribute | Value                               |
+| --------- | ----------------------------------- |
+| Surface   | `chunkNote` behavior extension only |
+| Auth      | N/A                                 |
 
 ```ts
 // ParsedTag already in types.ts from CHK-4:
@@ -113,18 +113,18 @@ Not applicable.
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/core/domain/frontmatterTags.ts` | Parse YAML frontmatter for tag keys only (minimal surface); pure functions + tests. |
-| 2 | `src/core/domain/inlineTags.ts` | Scan text for `#tag` tokens with code-fence awareness; unit tests. |
+| #   | Path                                 | Purpose                                                                             |
+| --- | ------------------------------------ | ----------------------------------------------------------------------------------- |
+| 1   | `src/core/domain/frontmatterTags.ts` | Parse YAML frontmatter for tag keys only (minimal surface); pure functions + tests. |
+| 2   | `src/core/domain/inlineTags.ts`      | Scan text for `#tag` tokens with code-fence awareness; unit tests.                  |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/domain/chunker.ts` | Parse frontmatter before strip; populate `result.tags`; run inline scan on relevant node `content` strings. |
-| 2 | `src/core/domain/chunker.test.ts` | Frontmatter + inline + exclusion fixtures. |
-| 3 | `package.json` | Add **pure JS** YAML parser dependency (e.g. `yaml`) if Implementer does not use a minimal hand-rolled parser—**no** native addons. |
+| #   | Path                                | Change                                                                                                                              |
+| --- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `src/core/domain/chunker.ts`        | Parse frontmatter before strip; populate `result.tags`; run inline scan on relevant node `content` strings.                         |
+| 2   | `tests/core/domain/chunker.test.ts` | Frontmatter + inline + exclusion fixtures.                                                                                          |
+| 3   | `package.json`                      | Add **pure JS** YAML parser dependency (e.g. `yaml`) if Implementer does not use a minimal hand-rolled parser—**no** native addons. |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -138,29 +138,29 @@ Not applicable.
 ### Phase A: Frontmatter
 
 - [ ] **A1** — Note with `tags: [a, b]` in frontmatter yields two `ParsedTag` rows with `source: 'frontmatter'`, both referencing the **`note`** node id, `tag` values `a` and `b` (after normalization per Y3).
-  - Evidence: `src/core/domain/chunker.test.ts::A1_frontmatter_tags_array(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A1_frontmatter_tags_array(vitest)`
 
 - [ ] **A2** — Singular `tag: foo` yields one frontmatter tag on **`note`**.
-  - Evidence: `src/core/domain/chunker.test.ts::A2_frontmatter_tag_singular(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A2_frontmatter_tag_singular(vitest)`
 
 - [ ] **A3** — Frontmatter does not appear in any `paragraph`/`bullet` `content` (CHK-1 invariant preserved).
-  - Evidence: `src/core/domain/chunker.test.ts::A3_frontmatter_not_in_body_nodes(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::A3_frontmatter_not_in_body_nodes(vitest)`
 
 ### Phase B: Inline
 
 - [ ] **B1** — Paragraph text `Hello #idea world` yields `ParsedTag` `{ tag: 'idea', source: 'inline' }` on that **paragraph**’s id.
-  - Evidence: `src/core/domain/chunker.test.ts::B1_inline_paragraph_tag(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::B1_inline_paragraph_tag(vitest)`
 
 - [ ] **B2** — `#tag` inside fenced code block does **not** produce `ParsedTag`.
-  - Evidence: `src/core/domain/chunker.test.ts::B2_no_tag_in_fence(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::B2_no_tag_in_fence(vitest)`
 
 - [ ] **B3** — `#tag` inside inline `` `code` `` does **not** produce `ParsedTag`.
-  - Evidence: `src/core/domain/chunker.test.ts::B3_no_tag_in_inline_code(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::B3_no_tag_in_inline_code(vitest)`
 
 ### Phase C: Integration
 
 - [ ] **C1** — `chunkNote` returns non-empty `tags` when both frontmatter and inline tags exist in one note; `crossRefs` still correct per CHK-4.
-  - Evidence: `src/core/domain/chunker.test.ts::C1_combined_tags_and_links(vitest)`
+  - Evidence: `tests/core/domain/chunker.test.ts::C1_combined_tags_and_links(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -190,10 +190,10 @@ Not applicable.
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | YAML edge cases (anchors, complex types) | Restrict to simple scalars/arrays; ignore unknown with test. |
-| 2 | Inline `#` in URLs | URL exclusion or regex boundary rules + tests. |
+| #   | Risk / Tradeoff                          | Mitigation                                                   |
+| --- | ---------------------------------------- | ------------------------------------------------------------ |
+| 1   | YAML edge cases (anchors, complex types) | Restrict to simple scalars/arrays; ignore unknown with test. |
+| 2   | Inline `#` in URLs                       | URL exclusion or regex boundary rules + tests.               |
 
 ---
 
@@ -206,4 +206,4 @@ Not applicable.
 
 ---
 
-*Created: 2026-04-05 | Story: CHK-5 | Epic: 2 — Hierarchical chunking and note metadata*
+_Created: 2026-04-05 | Story: CHK-5 | Epic: 2 — Hierarchical chunking and note metadata_

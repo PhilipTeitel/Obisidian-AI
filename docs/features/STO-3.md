@@ -90,10 +90,10 @@ Not applicable.
 
 ### Files to CREATE
 
-| #   | Path                                               | Purpose                                                                                                                                                                                   |
-| --- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `src/sidecar/adapters/SqliteDocumentStore.ts`      | `IDocumentStore` implementation.                                                                                                                                                          |
-| 2   | `src/sidecar/adapters/SqliteDocumentStore.test.ts` | Unit/integration tests with `:memory:` DB + migrations + vec extension (or mocked vec layer only if Y-binding still covered by integration sibling test — prefer real vec when feasible). |
+| #   | Path                                                 | Purpose                                                                                                                                                                                   |
+| --- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `src/sidecar/adapters/SqliteDocumentStore.ts`        | `IDocumentStore` implementation.                                                                                                                                                          |
+| 2   | `tests/sidecar/adapters/SqliteDocumentStore.test.ts` | Unit/integration tests with `:memory:` DB + migrations + vec extension (or mocked vec layer only if Y-binding still covered by integration sibling test — prefer real vec when feasible). |
 
 ### Files to MODIFY
 
@@ -113,32 +113,32 @@ Not applicable.
 ### Phase A: CRUD and note metadata
 
 - [x] **A1** — `upsertNodes` + `getNodesByNote` round-trip: persisted `DocumentNode` fields match input (including `headingTrail` JSON and timestamps).
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A1_nodes_roundtrip(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::A1_nodes_roundtrip(vitest)`
 
 - [x] **A2** — `deleteNote` removes all nodes for `note_id` and dependent summaries, tags, cross_refs, embedding rows (vec + meta) — verified by absence in queries.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A2_delete_note_cascade(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::A2_delete_note_cascade(vitest)`
 
 - [x] **A3** — `upsertSummary` and `upsertNoteMeta` / `getNoteMeta` round-trip per README columns.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::A3_summary_note_meta(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::A3_summary_note_meta(vitest)`
 
 ### Phase B: Vector search and filters
 
 - [x] **B1** — `upsertEmbedding` + `searchSummaryVectors` returns top-`k` matches with **finite** scores ordered best-first (sqlite-vec distance semantics documented in test).
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B1_summary_ann(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::B1_summary_ann(vitest)`
 
 - [x] **B2** — `searchContentVectors` with `NodeFilter.noteIds` returns only hits inside those notes.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B2_content_filter_note_ids(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::B2_content_filter_note_ids(vitest)`
 
 - [x] **B3** — `searchContentVectors` with `NodeFilter.nodeTypes` restricts to those `type` values.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B3_content_filter_node_types(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::B3_content_filter_node_types(vitest)`
 
 ### Phase C: Tree navigation
 
 - [x] **C1** — `getAncestors` returns correct ordered chain for a small synthetic tree.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::C1_ancestors(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::C1_ancestors(vitest)`
 
 - [x] **C2** — `getSiblings` returns ordered siblings excluding self.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::C2_siblings(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::C2_siblings(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -146,7 +146,7 @@ Not applicable.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` + `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
 - [x] **Y2** — **(binding)** `SqliteDocumentStore` source file path is under `src/sidecar/`.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::Y2_adapter_path(vitest)` or filesystem assertion in test
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::Y2_adapter_path(vitest)` or filesystem assertion in test
 
 ### Phase Z: Quality Gates
 

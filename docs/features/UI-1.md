@@ -15,8 +15,8 @@ Implements [README SearchView](../../README.md#searchview). Reuses **single leaf
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                     | Why it binds this story              |
+| ------------------------------------------------------- | ------------------------------------ |
 | [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Transport + vault context in plugin. |
 
 ---
@@ -53,25 +53,25 @@ SearchView → plugin.lifecycle.getTransport()?.send
 
 ### 6b
 
-| Component | Notes |
-|-----------|-------|
+| Component  | Notes                                                    |
+| ---------- | -------------------------------------------------------- |
 | SearchView | `ItemView`; holds `input`, `button`, `results` container |
 
 ### 6c
 
-| State | UI |
-|-------|-----|
-| Empty | placeholder |
-| Error | `Notice` or inline |
-| Success | cards |
+| State   | UI                 |
+| ------- | ------------------ |
+| Empty   | placeholder        |
+| Error   | `Notice` or inline |
+| Success | cards              |
 
 ---
 
 ## 7. File Touchpoints
 
-| Path | Purpose |
-|------|---------|
-| `src/plugin/ui/SearchView.ts` | View |
+| Path                           | Purpose                               |
+| ------------------------------ | ------------------------------------- |
+| `src/plugin/ui/SearchView.ts`  | View                                  |
 | `src/plugin/ui/searchView.css` | optional inline styles via `addClass` |
 
 ---
@@ -100,9 +100,9 @@ SearchView → plugin.lifecycle.getTransport()?.send
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | No transport | Disable button + Notice |
+| #   | Risk         | Mitigation              |
+| --- | ------------ | ----------------------- |
+| 1   | No transport | Disable button + Notice |
 
 ---
 
@@ -113,4 +113,4 @@ SearchView → plugin.lifecycle.getTransport()?.send
 
 ---
 
-*Created: 2026-04-05 | Story: UI-1 | Epic: 9*
+_Created: 2026-04-05 | Story: UI-1 | Epic: 9_

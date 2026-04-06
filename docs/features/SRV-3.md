@@ -15,10 +15,10 @@ Plugin startup budget ([README §15](../../README.md#15-startup-performance)) re
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                        | Why it binds this story                  |
+| ---------------------------------------------------------- | ---------------------------------------- |
 | [ADR-004](../decisions/ADR-004-per-vault-index-storage.md) | Lazy DB → `dbReady` reflects open state. |
-| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Same payload stdio/HTTP. |
+| [ADR-006](../decisions/ADR-006-sidecar-architecture.md)    | Same payload stdio/HTTP.                 |
 
 ---
 
@@ -64,17 +64,17 @@ export interface HealthResponse {
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/domain/types.ts` | JSDoc / unit for `uptime` |
-| 2 | `src/sidecar/runtime/SidecarRuntime.ts` | Expose `isDbReady()`, `getUptimeSeconds()` |
-| 3 | `src/sidecar/stdio/stdioServer.ts` + `http` | Health handler uses runtime |
+| #   | Path                                        | Change                                     |
+| --- | ------------------------------------------- | ------------------------------------------ |
+| 1   | `src/core/domain/types.ts`                  | JSDoc / unit for `uptime`                  |
+| 2   | `src/sidecar/runtime/SidecarRuntime.ts`     | Expose `isDbReady()`, `getUptimeSeconds()` |
+| 3   | `src/sidecar/stdio/stdioServer.ts` + `http` | Health handler uses runtime                |
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/runtime/SidecarRuntime.test.ts` | `A1`/`A2` dbReady + uptime (merged into runtime tests) |
+| #   | Path                                           | Purpose                                                |
+| --- | ---------------------------------------------- | ------------------------------------------------------ |
+| 1   | `tests/sidecar/runtime/SidecarRuntime.test.ts` | `A1`/`A2` dbReady + uptime (merged into runtime tests) |
 
 ---
 
@@ -83,10 +83,10 @@ export interface HealthResponse {
 ### Phase A
 
 - [x] **A1** — Before any DB operation, `health` returns `dbReady: false` and numeric `uptime >= 0`.
-  - Evidence: `src/sidecar/runtime/SidecarRuntime.test.ts::A1_db_not_ready_initially(vitest)`
+  - Evidence: `tests/sidecar/runtime/SidecarRuntime.test.ts::A1_db_not_ready_initially(vitest)`
 
 - [x] **A2** — After successful lazy open (or `openDatabase` in test), `health` returns `dbReady: true`.
-  - Evidence: `src/sidecar/runtime/SidecarRuntime.test.ts::A2_db_ready_after_open(vitest)`
+  - Evidence: `tests/sidecar/runtime/SidecarRuntime.test.ts::A2_db_ready_after_open(vitest)`
 
 ### Phase Y
 
@@ -105,9 +105,9 @@ export interface HealthResponse {
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | README silent on uptime unit | Use seconds; one-line README tweak optional in DOC-2. |
+| #   | Risk                         | Mitigation                                            |
+| --- | ---------------------------- | ----------------------------------------------------- |
+| 1   | README silent on uptime unit | Use seconds; one-line README tweak optional in DOC-2. |
 
 ---
 
@@ -120,4 +120,4 @@ export interface HealthResponse {
 
 ---
 
-*Created: 2026-04-05 | Story: SRV-3 | Epic: 7 — Sidecar server, routes, and observability*
+_Created: 2026-04-05 | Story: SRV-3 | Epic: 7 — Sidecar server, routes, and observability_

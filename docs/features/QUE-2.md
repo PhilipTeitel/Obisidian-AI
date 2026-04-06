@@ -117,10 +117,10 @@ Not applicable.
 
 ### Files to CREATE
 
-| #   | Path                                          | Purpose                                                                               |
-| --- | --------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 1   | `src/sidecar/adapters/JobStepService.ts`      | `job_steps` access + progress emit.                                                   |
-| 2   | `src/sidecar/adapters/JobStepService.test.ts` | State transitions, idempotency, retry cap, recoverable listing, fake `IProgressPort`. |
+| #   | Path                                            | Purpose                                                                               |
+| --- | ----------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 1   | `src/sidecar/adapters/JobStepService.ts`        | `job_steps` access + progress emit.                                                   |
+| 2   | `tests/sidecar/adapters/JobStepService.test.ts` | State transitions, idempotency, retry cap, recoverable listing, fake `IProgressPort`. |
 
 ### Files to MODIFY
 
@@ -139,31 +139,31 @@ Not applicable.
 ### Phase A: Persistence and state machine
 
 - [x] **A1** — `ensureJob` inserts a row with `current_step = 'queued'` (or documented initial) and sets `content_hash`, `note_path`, `job_id`.
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::A1_ensure_job(vitest)`
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::A1_ensure_job(vitest)`
 
 - [x] **A2** — `transitionStep` advances along the ADR-008 ordering (e.g. `queued` → `parsing` → `parsed` → …) and rejects impossible skips unless explicitly allowed with test justification.
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::A2_valid_transitions(vitest)`
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::A2_valid_transitions(vitest)`
 
 - [x] **A3** — Idempotent behavior: calling `transitionStep` to the **same** `to` step twice does not corrupt row (second call no-op or safe).
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::A3_idempotent_repeat(vitest)`
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::A3_idempotent_repeat(vitest)`
 
 ### Phase B: Failure, retry, dead-letter
 
 - [x] **B1** — `markFailed` sets `failed` state, stores `error_message`, emits progress with `status: 'failed'`.
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::B1_mark_failed(vitest)`
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::B1_mark_failed(vitest)`
 
 - [x] **B2** — Retry path increments `retry_count` and can return job toward `queued` until cap; beyond cap → `dead_letter` and no further automatic retry.
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::B2_retry_and_dead_letter(vitest)`
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::B2_retry_and_dead_letter(vitest)`
 
 ### Phase C: Resume listing
 
 - [x] **C1** — `listRecoverableJobs` excludes `embedded` and `dead_letter` but includes `failed` and in-progress states per ADR-008 restart narrative.
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::C1_recoverable_jobs(vitest)`
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::C1_recoverable_jobs(vitest)`
 
 ### Phase D: Progress emissions
 
 - [x] **D1** — For a linear happy-path transition sequence, the fake `IProgressPort` receives events with correct `jobId`, `runId`, `notePath`, `step`, and `status` values.
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::D1_progress_sequence(vitest)`
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::D1_progress_sequence(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -171,7 +171,7 @@ Not applicable.
   - Evidence: `scripts/check-core-imports.mjs(npm run verify:core-imports)` + `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
 - [x] **Y2** — **(binding)** SQL uses `job_steps` column names exactly as README §8 (`job_id`, `note_path`, `current_step`, `content_hash`, `retry_count`, `error_message`, `updated_at`).
-  - Evidence: `src/sidecar/adapters/JobStepService.test.ts::Y2_column_roundtrip(vitest)` (pragma `table_info` or typed read)
+  - Evidence: `tests/sidecar/adapters/JobStepService.test.ts::Y2_column_roundtrip(vitest)` (pragma `table_info` or typed read)
 
 ### Phase Z: Quality Gates
 

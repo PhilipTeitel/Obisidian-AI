@@ -99,7 +99,7 @@ Not applicable.
 | --- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | 1   | `src/sidecar/db/migrations/002_vectors.sql` (or dynamic DDL in TS) | `vec_content`, `vec_summary`, `embedding_meta` with parameterized dimension.                       |
 | 2   | `src/sidecar/db/load-sqlite-vec.ts`                                | Locate and `loadExtension` for sqlite-vec native binary in Node.                                   |
-| 3   | `src/sidecar/db/vector-migrate.test.ts`                            | Dimension correctness, extension load (skip in CI if no binary — document `vitest` `skip` policy). |
+| 3   | `tests/sidecar/db/vector-migrate.test.ts`                          | Dimension correctness, extension load (skip in CI if no binary — document `vitest` `skip` policy). |
 
 ### Files to MODIFY
 
@@ -121,18 +121,18 @@ Not applicable.
 ### Phase A: Schema and dimension
 
 - [x] **A1** — After STO-1 + STO-2 migrations with `dimension = 1536`, both `vec_content` and `vec_summary` exist and accept inserts of 1536-dimensional vectors bound to `node_id` keys present in `nodes`.
-  - Evidence: `src/sidecar/db/vector-migrate.test.ts::A1_vec_tables_roundtrip(vitest)` _(may be integration-only if extension load required)_
+  - Evidence: `tests/sidecar/db/vector-migrate.test.ts::A1_vec_tables_roundtrip(vitest)` _(may be integration-only if extension load required)_
 
 - [x] **A2** — `embedding_meta` enforces PK `(node_id, vector_type)` and valid `vector_type` CHECK; FK cascade deletes when parent node removed.
-  - Evidence: `src/sidecar/db/vector-migrate.test.ts::A2_embedding_meta_fk(vitest)`
+  - Evidence: `tests/sidecar/db/vector-migrate.test.ts::A2_embedding_meta_fk(vitest)`
 
 - [x] **A3** — Creating a new DB with `dimension = 768` (example alternate) produces vec DDL with `FLOAT[768]` (inspect generated SQL or pragma — exact introspection method documented in test comment).
-  - Evidence: `src/sidecar/db/vector-migrate.test.ts::A3_dimension_parameterized(vitest)`
+  - Evidence: `tests/sidecar/db/vector-migrate.test.ts::A3_dimension_parameterized(vitest)`
 
 ### Phase B: Misconfiguration guard
 
 - [x] **B1** — Opening a DB that was created with dimension D and passing dimension D′ ≠ D causes a **thrown** or **Result** error before any write (per section 4 Y5).
-  - Evidence: `src/sidecar/db/vector-migrate.test.ts::B1_dimension_mismatch_fails(vitest)`
+  - Evidence: `tests/sidecar/db/vector-migrate.test.ts::B1_dimension_mismatch_fails(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -140,7 +140,7 @@ Not applicable.
   - Evidence: `package.json lists "sqlite-vec"` + `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
 - [x] **Y2** — **(binding)** Sidecar source loads sqlite-vec via `src/sidecar/**` only; `rg "sqlite-vec|loadExtension" src/core src/plugin` returns no matches (or only documented false positives).
-  - Evidence: `src/sidecar/db/vector-migrate.test.ts::Y2_sidecar_only_load(vitest)` or CI grep step
+  - Evidence: `tests/sidecar/db/vector-migrate.test.ts::Y2_sidecar_only_load(vitest)` or CI grep step
 
 - [x] **Y3** — **(binding)** `npm run verify:plugin-bundle` passes.
   - Evidence: `scripts/verify-plugin-bundle.mjs(npm run verify:plugin-bundle)`

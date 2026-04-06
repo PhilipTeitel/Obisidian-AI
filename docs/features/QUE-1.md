@@ -101,10 +101,10 @@ Not applicable.
 
 ### Files to CREATE
 
-| #   | Path                                          | Purpose                                          |
-| --- | --------------------------------------------- | ------------------------------------------------ |
-| 1   | `src/sidecar/adapters/InProcessQueue.ts`      | `IQueuePort` implementation.                     |
-| 2   | `src/sidecar/adapters/InProcessQueue.test.ts` | Persistence, ack/nack, restart simulation, peek. |
+| #   | Path                                            | Purpose                                          |
+| --- | ----------------------------------------------- | ------------------------------------------------ |
+| 1   | `src/sidecar/adapters/InProcessQueue.ts`        | `IQueuePort` implementation.                     |
+| 2   | `tests/sidecar/adapters/InProcessQueue.test.ts` | Persistence, ack/nack, restart simulation, peek. |
 
 ### Files to MODIFY
 
@@ -124,29 +124,29 @@ Not applicable.
 ### Phase A: Core semantics
 
 - [x] **A1** — `enqueue` then `dequeue(10)` returns items with correct typed payload round-trip (e.g. `{ notePath: string, noteId: string }`).
-  - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::A1_enqueue_dequeue_roundtrip(vitest)`
+  - Evidence: `tests/sidecar/adapters/InProcessQueue.test.ts::A1_enqueue_dequeue_roundtrip(vitest)`
 
 - [x] **A2** — `ack` removes item from further dequeues; DB row shows `completed`.
-  - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::A2_ack_completes(vitest)`
+  - Evidence: `tests/sidecar/adapters/InProcessQueue.test.ts::A2_ack_completes(vitest)`
 
 - [x] **A3** — `nack` with sub-threshold retries returns item to `pending` and preserves/updates `error_message`.
-  - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::A3_nack_retries(vitest)`
+  - Evidence: `tests/sidecar/adapters/InProcessQueue.test.ts::A3_nack_retries(vitest)`
 
 - [x] **A4** — `nack` beyond `maxRetries` sets `dead_letter`; item never dequeues again.
-  - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::A4_dead_letter(vitest)`
+  - Evidence: `tests/sidecar/adapters/InProcessQueue.test.ts::A4_dead_letter(vitest)`
 
 ### Phase B: Recovery and visibility
 
 - [x] **B1** — After items are left `processing`, constructing a **new** `InProcessQueue` against the same DB requeues them as `pending` and they dequeue again.
-  - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::B1_restart_reclaims_processing(vitest)`
+  - Evidence: `tests/sidecar/adapters/InProcessQueue.test.ts::B1_restart_reclaims_processing(vitest)`
 
 - [x] **B2** — `peek()` matches the number of pending items before dequeue in a multi-item scenario.
-  - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::B2_peek_matches_pending(vitest)`
+  - Evidence: `tests/sidecar/adapters/InProcessQueue.test.ts::B2_peek_matches_pending(vitest)`
 
 ### Phase C: Concurrency (lightweight)
 
 - [x] **C1** — With `queueConcurrency` > 1, the adapter does not exceed the configured number of concurrent `processing` slots when driven by parallel dequeue callers **or** documents a single-threaded dequeue driver pattern and enforces slot limit internally — **must** be explicit in implementation + test.
-  - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::C1_concurrency_cap(vitest)`
+  - Evidence: `tests/sidecar/adapters/InProcessQueue.test.ts::C1_concurrency_cap(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -154,7 +154,7 @@ Not applicable.
   - Evidence: `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
 - [x] **Y2** — **(binding)** Queue persistence uses `queue_items` columns as per README §8 (no ad-hoc extra statuses).
-  - Evidence: `src/sidecar/adapters/InProcessQueue.test.ts::Y2_status_values_only_readme(vitest)` (assert CHECK passes / invalid status rejected)
+  - Evidence: `tests/sidecar/adapters/InProcessQueue.test.ts::Y2_status_values_only_readme(vitest)` (assert CHECK passes / invalid status rejected)
 
 ### Phase Z: Quality Gates
 

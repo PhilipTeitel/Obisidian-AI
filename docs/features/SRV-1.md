@@ -21,13 +21,13 @@
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | Sidecar process; stdio NDJSON; vault/secrets boundaries. |
-| [ADR-004](../decisions/ADR-004-per-vault-index-storage.md) | Lazy DB open; per-vault path from env. |
-| [ADR-007](../decisions/ADR-007-queue-abstraction.md) | `InProcessQueue` + worker dequeue loop. |
-| [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md) | `JobStepService` + progress events. |
-| [ADR-005](../decisions/ADR-005-provider-abstraction.md) | Embedding/chat only via ports/factories. |
+| ADR                                                                  | Why it binds this story                                  |
+| -------------------------------------------------------------------- | -------------------------------------------------------- |
+| [ADR-006](../decisions/ADR-006-sidecar-architecture.md)              | Sidecar process; stdio NDJSON; vault/secrets boundaries. |
+| [ADR-004](../decisions/ADR-004-per-vault-index-storage.md)           | Lazy DB open; per-vault path from env.                   |
+| [ADR-007](../decisions/ADR-007-queue-abstraction.md)                 | `InProcessQueue` + worker dequeue loop.                  |
+| [ADR-008](../decisions/ADR-008-idempotent-indexing-state-machine.md) | `JobStepService` + progress events.                      |
+| [ADR-005](../decisions/ADR-005-provider-abstraction.md)              | Embedding/chat only via ports/factories.                 |
 
 ---
 
@@ -82,14 +82,14 @@ Not applicable (sidecar only).
 ### 6b. Props & Contracts
 
 | Component / Hook | Props / Signature | State | Notes |
-|------------------|-------------------|-------|-------|
-| — | — | — | — |
+| ---------------- | ----------------- | ----- | ----- |
+| —                | —                 | —     | —     |
 
 ### 6c. States (Loading / Error / Empty / Success)
 
-| State   | UI Behavior |
-|---------|-------------|
-| — | — |
+| State | UI Behavior |
+| ----- | ----------- |
+| —     | —           |
 
 ---
 
@@ -97,23 +97,23 @@ Not applicable (sidecar only).
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/stdio/ndjsonProtocol.ts` | Request/response line types + stringify helpers |
-| 2 | `src/sidecar/stdio/stdioServer.ts` | Readline loop, dispatch, push writer |
-| 3 | `src/sidecar/runtime/SidecarRuntime.ts` | Lazy deps: db, store, queue, jobSteps, progress, worker |
-| 4 | `src/sidecar/routes/*.ts` | Per-type handlers (or single `dispatch.ts`) |
-| 5 | `src/sidecar/stdio/stdioServer.test.ts` | Protocol + lazy open smoke |
+| #   | Path                                      | Purpose                                                 |
+| --- | ----------------------------------------- | ------------------------------------------------------- |
+| 1   | `src/sidecar/stdio/ndjsonProtocol.ts`     | Request/response line types + stringify helpers         |
+| 2   | `src/sidecar/stdio/stdioServer.ts`        | Readline loop, dispatch, push writer                    |
+| 3   | `src/sidecar/runtime/SidecarRuntime.ts`   | Lazy deps: db, store, queue, jobSteps, progress, worker |
+| 4   | `src/sidecar/routes/*.ts`                 | Per-type handlers (or single `dispatch.ts`)             |
+| 5   | `tests/sidecar/stdio/stdioServer.test.ts` | Protocol + lazy open smoke                              |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/sidecar/server.ts` | Entry: start stdio server |
-| 2 | `src/core/domain/types.ts` | Add `runId` to `NoteIndexJob` |
-| 3 | `src/core/workflows/IncrementalIndexPlanner.ts` | Require `runId` on input; set on jobs |
-| 4 | `src/core/workflows/IndexWorkflow.ts` | Use `job.runId` in `processOneJob` |
-| 5 | `src/core/workflows/*.test.ts` / `JobStepService.test.ts` | Jobs include `runId` |
+| #   | Path                                                        | Change                                |
+| --- | ----------------------------------------------------------- | ------------------------------------- |
+| 1   | `src/sidecar/server.ts`                                     | Entry: start stdio server             |
+| 2   | `src/core/domain/types.ts`                                  | Add `runId` to `NoteIndexJob`         |
+| 3   | `src/core/workflows/IncrementalIndexPlanner.ts`             | Require `runId` on input; set on jobs |
+| 4   | `src/core/workflows/IndexWorkflow.ts`                       | Use `job.runId` in `processOneJob`    |
+| 5   | `tests/core/workflows/*.test.ts` / `JobStepService.test.ts` | Jobs include `runId`                  |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -126,20 +126,20 @@ Not applicable (sidecar only).
 ### Phase A: Protocol + routing
 
 - [x] **A1** — A valid `{id,type:'health'}` line produces a response line with `body.status === 'ok'` and numeric `uptime` without opening SQLite (no file at dummy path required).
-  - Evidence: `src/sidecar/stdio/stdioServer.test.ts::A1_health_without_db(vitest)`
+  - Evidence: `tests/sidecar/stdio/stdioServer.test.ts::A1_health_without_db(vitest)`
 
 - [x] **A2** — Unknown `type` yields an error line with the same `id` and a non-empty `error.message`.
-  - Evidence: `src/sidecar/stdio/stdioServer.test.ts::A2_unknown_type_error(vitest)`
+  - Evidence: `tests/sidecar/stdio/stdioServer.test.ts::A2_unknown_type_error(vitest)`
 
 ### Phase B: Lazy database
 
 - [x] **B1** — First `index/status` (or `search`) with valid `OBSIDIAN_AI_DB_PATH` triggers `openDatabase` exactly once; second call reuses the same connection (assert with spy or counter in test module).
-  - Evidence: `src/sidecar/runtime/SidecarRuntime.test.ts::B1_lazy_open_once(vitest)`
+  - Evidence: `tests/sidecar/runtime/SidecarRuntime.test.ts::B1_lazy_open_once(vitest)`
 
 ### Phase C: Index enqueue + worker
 
 - [x] **C1** — `index/full` with in-memory or temp DB path enqueues jobs whose payloads include `runId` matching the ack `runId`, and `noteCount` equals enqueued count; worker runs `processOneJob` to completion for a tiny fixture (fake embed/chat or existing test fakes in sidecar tests).
-  - Evidence: `src/sidecar/runtime/SidecarRuntime.test.ts::C1_index_full_ack(vitest)`
+  - Evidence: `tests/sidecar/runtime/SidecarRuntime.test.ts::C1_index_full_ack(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -147,7 +147,7 @@ Not applicable (sidecar only).
   - Evidence: `npm run verify:core-imports`
 
 - [x] **Y2** — **(binding)** `NoteIndexJob` in `src/core/domain/types.ts` requires `runId`; `rg "NoteIndexJob"` in core shows updated struct literals in tests/planner.
-  - Evidence: `npm run typecheck` + `src/core/workflows/IncrementalIndexPlanner.test.ts` updated
+  - Evidence: `npm run typecheck` + `tests/core/workflows/IncrementalIndexPlanner.test.ts` updated
 
 ### Phase Z: Quality Gates
 
@@ -161,10 +161,10 @@ Not applicable (sidecar only).
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Stdio chat streaming interleaving | Document `requestId` on push lines; single-threaded Node writes lines atomically. |
-| 2 | Concurrent index runs | MVP: one worker; jobs tagged with `runId`; optional future mutex per vault. |
+| #   | Risk / Tradeoff                   | Mitigation                                                                        |
+| --- | --------------------------------- | --------------------------------------------------------------------------------- |
+| 1   | Stdio chat streaming interleaving | Document `requestId` on push lines; single-threaded Node writes lines atomically. |
+| 2   | Concurrent index runs             | MVP: one worker; jobs tagged with `runId`; optional future mutex per vault.       |
 
 ---
 
@@ -178,4 +178,4 @@ Not applicable (sidecar only).
 
 ---
 
-*Created: 2026-04-05 | Story: SRV-1 | Epic: 7 — Sidecar server, routes, and observability*
+_Created: 2026-04-05 | Story: SRV-1 | Epic: 7 — Sidecar server, routes, and observability_

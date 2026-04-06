@@ -102,7 +102,7 @@ Not applicable.
 | 1   | `src/sidecar/db/migrations/001_relational.sql` (or `.ts` embedded SQL) | STO-1 DDL matching README §8 (non-vector tables only).                                               |
 | 2   | `src/sidecar/db/migrate.ts`                                            | Version tracking (`PRAGMA user_version` or `_migrations` table), ordered apply, idempotent behavior. |
 | 3   | `src/sidecar/db/open.ts` (optional)                                    | `better-sqlite3` open helper for tests and future SRV-1.                                             |
-| 4   | `src/sidecar/db/migrate.test.ts`                                       | Applies migrations to `:memory:` DB and asserts tables/indexes exist.                                |
+| 4   | `tests/sidecar/db/migrate.test.ts`                                     | Applies migrations to `:memory:` DB and asserts tables/indexes exist.                                |
 
 ### Files to MODIFY
 
@@ -124,23 +124,23 @@ Not applicable.
 
 - [x] **A1** — After running STO-1 migrations on a fresh database, `sqlite_master` (or pragma) shows all seven tables: `nodes`, `summaries`, `tags`, `cross_refs`, `note_meta`, `queue_items`, `job_steps`.
   - Verification: Programmatic introspection or `PRAGMA table_info` for each name.
-  - Evidence: `src/sidecar/db/migrate.test.ts::A1_tables_exist(vitest)`
+  - Evidence: `tests/sidecar/db/migrate.test.ts::A1_tables_exist(vitest)`
 
 - [x] **A2** — Indexes from README §8 exist for `nodes` (note, parent, type, hash), `tags`, `cross_refs`, `queue_items`, and `job_steps`.
   - Verification: Query `sqlite_master` for expected index names or indexed columns.
-  - Evidence: `src/sidecar/db/migrate.test.ts::A2_indexes_exist(vitest)`
+  - Evidence: `tests/sidecar/db/migrate.test.ts::A2_indexes_exist(vitest)`
 
 - [x] **A3** — Inserting invalid `nodes.type`, `queue_items.status`, or `job_steps.current_step` values fails at the database layer (CHECK constraint).
   - Verification: Wrapped `INSERT` expectations for rejection.
-  - Evidence: `src/sidecar/db/migrate.test.ts::A3_check_constraints(vitest)`
+  - Evidence: `tests/sidecar/db/migrate.test.ts::A3_check_constraints(vitest)`
 
 ### Phase B: Idempotency and ordering
 
 - [x] **B1** — Running the migration runner twice on the same database file does not throw and leaves schema unchanged.
-  - Evidence: `src/sidecar/db/migrate.test.ts::B1_idempotent(vitest)`
+  - Evidence: `tests/sidecar/db/migrate.test.ts::B1_idempotent(vitest)`
 
 - [x] **B2** — Migration version metadata records completion of STO-1 baseline (e.g. `user_version >= 1` or dedicated migrations table row).
-  - Evidence: `src/sidecar/db/migrate.test.ts::B2_version_recorded(vitest)`
+  - Evidence: `tests/sidecar/db/migrate.test.ts::B2_version_recorded(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -149,7 +149,7 @@ Not applicable.
   - Evidence: `scripts/check-source-boundaries.mjs(npm run check:boundaries)` and `package.json lists "better-sqlite3"`
 
 - [x] **Y2** — **(binding)** STO-1 migration artifacts contain **no** substring `vec0` and **no** `CREATE VIRTUAL TABLE` for vectors (grep of migration sources).
-  - Evidence: `src/sidecar/db/migrate.test.ts::Y2_no_vec_ddl(vitest)` or `rg "vec0|CREATE VIRTUAL TABLE" src/sidecar/db/migrations` exits 1
+  - Evidence: `tests/sidecar/db/migrate.test.ts::Y2_no_vec_ddl(vitest)` or `rg "vec0|CREATE VIRTUAL TABLE" src/sidecar/db/migrations` exits 1
 
 - [x] **Y3** — **(binding)** `npm run verify:plugin-bundle` still passes — plugin output must not pick up native SQLite stack markers.
   - Evidence: `scripts/verify-plugin-bundle.mjs(npm run verify:plugin-bundle)`

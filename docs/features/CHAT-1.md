@@ -19,11 +19,11 @@
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md) | RAG context must follow phased retrieval, not ad-hoc grep. |
-| [docs/decisions/ADR-005-provider-abstraction.md](../decisions/ADR-005-provider-abstraction.md) | Chat only via **`IChatPort`**; embeddings via **`IEmbeddingPort`**. |
-| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md) | Core stays free of Obsidian and vault FS; `ChatWorkflow` is sidecar-callable. |
+| ADR                                                                                                      | Why it binds this story                                                       |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md) | RAG context must follow phased retrieval, not ad-hoc grep.                    |
+| [docs/decisions/ADR-005-provider-abstraction.md](../decisions/ADR-005-provider-abstraction.md)           | Chat only via **`IChatPort`**; embeddings via **`IEmbeddingPort`**.           |
+| [docs/decisions/ADR-006-sidecar-architecture.md](../decisions/ADR-006-sidecar-architecture.md)           | Core stays free of Obsidian and vault FS; `ChatWorkflow` is sidecar-callable. |
 
 ---
 
@@ -96,14 +96,14 @@ Not applicable (UI-3 consumes transport stream later).
 ### 6b. Props & Contracts
 
 | Component / Hook | Props / Signature | State | Notes |
-|------------------|-------------------|-------|-------|
-| — | — | — | — |
+| ---------------- | ----------------- | ----- | ----- |
+| —                | —                 | —     | —     |
 
 ### 6c. States (Loading / Error / Empty / Success)
 
-| State   | UI Behavior |
-|---------|-------------|
-| — | — |
+| State | UI Behavior |
+| ----- | ----------- |
+| —     | —           |
 
 ---
 
@@ -111,17 +111,17 @@ Not applicable (UI-3 consumes transport stream later).
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/core/workflows/ChatWorkflow.ts` | Orchestration: derive query → search/assembly → `IChatPort.complete` → map sources. |
-| 2 | `src/core/workflows/ChatWorkflow.test.ts` | Fakes for chat + store + embedder; history forwarded; sources length. |
+| #   | Path                                        | Purpose                                                                             |
+| --- | ------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 1   | `src/core/workflows/ChatWorkflow.ts`        | Orchestration: derive query → search/assembly → `IChatPort.complete` → map sources. |
+| 2   | `tests/core/workflows/ChatWorkflow.test.ts` | Fakes for chat + store + embedder; history forwarded; sources length.               |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/workflows/SearchWorkflow.ts` (or new `retrievalShared.ts`) | Export or share retrieval helper per **Y5** (avoid duplication). |
-| 2 | `src/core/index.ts` | Export if part of public core API. |
+| #   | Path                                                                 | Change                                                           |
+| --- | -------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1   | `src/core/workflows/SearchWorkflow.ts` (or new `retrievalShared.ts`) | Export or share retrieval helper per **Y5** (avoid duplication). |
+| 2   | `src/core/index.ts`                                                  | Export if part of public core API.                               |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -134,23 +134,23 @@ Not applicable (UI-3 consumes transport stream later).
 ### Phase A: Retrieval integration
 
 - [x] **A1** — For `messages` ending with `{ role: 'user', content: 'Q' }`, the workflow invokes the shared retrieval path with query **`'Q'`** (trimmed).
-  - Evidence: `src/core/workflows/ChatWorkflow.test.ts::A1_uses_last_user_message(vitest)`
+  - Evidence: `tests/core/workflows/ChatWorkflow.test.ts::A1_uses_last_user_message(vitest)`
 
 - [x] **A2** — When no `user` message exists, workflow **fails fast** with documented behavior (error or zero deltas).
-  - Evidence: `src/core/workflows/ChatWorkflow.test.ts::A2_no_user_message_fails(vitest)`
+  - Evidence: `tests/core/workflows/ChatWorkflow.test.ts::A2_no_user_message_fails(vitest)`
 
 ### Phase B: Chat port contract
 
 - [x] **B1** — `IChatPort.complete` receives **`messages`** identical to input and a **non-empty** `context` string when retrieval returns hits in the fake store.
-  - Evidence: `src/core/workflows/ChatWorkflow.test.ts::B1_context_passed_to_chat(vitest)`
+  - Evidence: `tests/core/workflows/ChatWorkflow.test.ts::B1_context_passed_to_chat(vitest)`
 
 - [x] **B2** — Every yielded chunk from the fake chat port is forwarded to the consumer in order until completion.
-  - Evidence: `src/core/workflows/ChatWorkflow.test.ts::B2_streams_deltas(vitest)`
+  - Evidence: `tests/core/workflows/ChatWorkflow.test.ts::B2_streams_deltas(vitest)`
 
 ### Phase C: Sources
 
 - [x] **C1** — Terminal result includes **`sources`** with `notePath` matching `SearchResult.notePath` for retrieved hits used in context.
-  - Evidence: `src/core/workflows/ChatWorkflow.test.ts::C1_sources_aligned(vitest)`
+  - Evidence: `tests/core/workflows/ChatWorkflow.test.ts::C1_sources_aligned(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
@@ -169,10 +169,10 @@ Not applicable (UI-3 consumes transport stream later).
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Long history + large context exceeds model window | RET-2 budgets + future PRV tuning; document `totalTokenBudget` source. |
-| 2 | Duplicated retrieval vs search | Enforce **Y5** in code review; add grep test for single `searchSummaryVectors` call site in shared helper. |
+| #   | Risk / Tradeoff                                   | Mitigation                                                                                                 |
+| --- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 1   | Long history + large context exceeds model window | RET-2 budgets + future PRV tuning; document `totalTokenBudget` source.                                     |
+| 2   | Duplicated retrieval vs search                    | Enforce **Y5** in code review; add grep test for single `searchSummaryVectors` call site in shared helper. |
 
 ---
 
@@ -185,4 +185,4 @@ Not applicable (UI-3 consumes transport stream later).
 
 ---
 
-*Created: 2026-04-05 | Story: CHAT-1 | Epic: 5 — Retrieval, search workflow, and chat workflow*
+_Created: 2026-04-05 | Story: CHAT-1 | Epic: 5 — Retrieval, search workflow, and chat workflow_

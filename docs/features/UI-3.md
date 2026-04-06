@@ -15,9 +15,9 @@
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [ADR-009](../decisions/ADR-009-chat-cancellation-and-timeout.md) | `signal` + `timeoutMs` |
+| ADR                                                              | Why it binds this story |
+| ---------------------------------------------------------------- | ----------------------- |
+| [ADR-009](../decisions/ADR-009-chat-cancellation-and-timeout.md) | `signal` + `timeoutMs`  |
 
 ---
 
@@ -50,9 +50,9 @@
 
 ## 7. File Touchpoints
 
-| Path | Purpose |
-|------|---------|
-| `src/plugin/ui/ChatView.ts` | View |
+| Path                        | Purpose |
+| --------------------------- | ------- |
+| `src/plugin/ui/ChatView.ts` | View    |
 
 ---
 
@@ -89,4 +89,4 @@
 
 ---
 
-*Created: 2026-04-05 | Story: UI-3 | Epic: 9*
+_Created: 2026-04-05 | Story: UI-3 | Epic: 9_

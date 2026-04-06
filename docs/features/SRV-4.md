@@ -3,7 +3,7 @@
 **Story**: Replace ad-hoc **`console.*`** in **`src/sidecar/**`** (except stdout protocol writes) with **Pino** per [ADR-010](../decisions/ADR-010-structured-logging-sidecar.md) and [README §20](../../README.md#20-logging-and-observability): **child loggers** with **`runId`**, **`jobId`**, **`scope`**; **stderr** output; level from **`OBSIDIAN_AI_LOG_LEVEL`**; never log **apiKey**, note **content**, or raw vectors.
 **Epic**: 7 — Sidecar server, routes, and observability
 **Size**: Medium
-**Status**: Complete
+**Status\*\*: Complete
 
 ---
 
@@ -15,8 +15,8 @@ Centralize **`createSidecarLogger()`** (or similar) in `src/sidecar/logging/logg
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
+| ADR                                                           | Why it binds this story                |
+| ------------------------------------------------------------- | -------------------------------------- |
 | [ADR-010](../decisions/ADR-010-structured-logging-sidecar.md) | Pino, stderr, levels, redaction rules. |
 
 ---
@@ -55,17 +55,17 @@ Centralize **`createSidecarLogger()`** (or similar) in `src/sidecar/logging/logg
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| 1 | `src/sidecar/logging/logger.ts` | `createSidecarLogger`, level from env |
-| 2 | `src/sidecar/logging/logger.test.ts` | Level parsing |
+| #   | Path                                   | Purpose                               |
+| --- | -------------------------------------- | ------------------------------------- |
+| 1   | `src/sidecar/logging/logger.ts`        | `createSidecarLogger`, level from env |
+| 2   | `tests/sidecar/logging/logger.test.ts` | Level parsing                         |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `package.json` | `pino` dependency; `pino-pretty` devDependency optional |
-| 2 | `src/sidecar/**` | Replace `console.warn`/`console.debug` in server paths with logger |
+| #   | Path             | Change                                                             |
+| --- | ---------------- | ------------------------------------------------------------------ |
+| 1   | `package.json`   | `pino` dependency; `pino-pretty` devDependency optional            |
+| 2   | `src/sidecar/**` | Replace `console.warn`/`console.debug` in server paths with logger |
 
 ---
 
@@ -74,7 +74,7 @@ Centralize **`createSidecarLogger()`** (or similar) in `src/sidecar/logging/logg
 ### Phase A
 
 - [x] **A1** — `createSidecarLogger()` produces a logger that respects `OBSIDIAN_AI_LOG_LEVEL=error` (info logs not emitted — use sink test or pino test helper).
-  - Evidence: `src/sidecar/logging/logger.test.ts::A1_log_level_env(vitest)`
+  - Evidence: `tests/sidecar/logging/logger.test.ts::A1_log_level_env(vitest)`
 
 ### Phase Y
 
@@ -96,9 +96,9 @@ Centralize **`createSidecarLogger()`** (or similar) in `src/sidecar/logging/logg
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk | Mitigation |
-|---|------|------------|
-| 1 | Bundle size | esbuild bundles pino; acceptable for sidecar. |
+| #   | Risk        | Mitigation                                    |
+| --- | ----------- | --------------------------------------------- |
+| 1   | Bundle size | esbuild bundles pino; acceptable for sidecar. |
 
 ---
 
@@ -110,4 +110,4 @@ Centralize **`createSidecarLogger()`** (or similar) in `src/sidecar/logging/logg
 
 ---
 
-*Created: 2026-04-05 | Story: SRV-4 | Epic: 7 — Sidecar server, routes, and observability*
+_Created: 2026-04-05 | Story: SRV-4 | Epic: 7 — Sidecar server, routes, and observability_

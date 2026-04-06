@@ -15,10 +15,10 @@ Storage expectations are easy to get wrong (sync services locking SQLite, multip
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [ADR-004](../decisions/ADR-004-per-vault-index-storage.md) | Per-vault DB location, lazy init, path override. |
-| [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | DB lives with sidecar process expectations, not in plugin WASM. |
+| ADR                                                        | Why it binds this story                                         |
+| ---------------------------------------------------------- | --------------------------------------------------------------- |
+| [ADR-004](../decisions/ADR-004-per-vault-index-storage.md) | Per-vault DB location, lazy init, path override.                |
+| [ADR-006](../decisions/ADR-006-sidecar-architecture.md)    | DB lives with sidecar process expectations, not in plugin WASM. |
 
 ---
 
@@ -43,10 +43,10 @@ Storage expectations are easy to get wrong (sync services locking SQLite, multip
 
 ## 7. File Touchpoints
 
-| Path | Purpose |
-|------|---------|
-| `docs/guides/user-storage-and-uninstall.md` | New guide |
-| `README.md` | Link from docs / Epic 10 |
+| Path                                        | Purpose                  |
+| ------------------------------------------- | ------------------------ |
+| `docs/guides/user-storage-and-uninstall.md` | New guide                |
+| `README.md`                                 | Link from docs / Epic 10 |
 
 ---
 
@@ -80,4 +80,4 @@ Storage expectations are easy to get wrong (sync services locking SQLite, multip
 
 ---
 
-*Created: 2026-04-05 | Story: DOC-2 | Epic: 10*
+_Created: 2026-04-05 | Story: DOC-2 | Epic: 10_

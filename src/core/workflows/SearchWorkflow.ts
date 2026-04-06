@@ -19,7 +19,7 @@ import type { IEmbeddingPort } from '../ports/IEmbeddingPort.js';
 export const DEFAULT_SEARCH_K = 20;
 
 /**
- * Maps final result cap `k` to ANN limits. Tested in `SearchWorkflow.test.ts`.
+ * Maps final result cap `k` to ANN limits. Tested in `tests/core/workflows/SearchWorkflow.test.ts`.
  * Summary search uses a smaller top-K to bound coarse candidates; content uses full `k`.
  */
 export function mapSearchK(k: number): { kSummary: number; kContent: number } {
@@ -148,4 +148,3 @@ export async function runSearch(
 
   return { results };
 }
-

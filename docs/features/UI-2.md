@@ -47,8 +47,8 @@ Palette command registered in [UI-5](UI-5.md) or here; depends on UI-1.
 
 ## 7. File Touchpoints
 
-| Path | Purpose |
-|------|---------|
+| Path                                      | Purpose                 |
+| ----------------------------------------- | ----------------------- |
 | `src/plugin/commands/registerCommands.ts` | selection → open search |
 
 ---
@@ -80,4 +80,4 @@ Palette command registered in [UI-5](UI-5.md) or here; depends on UI-1.
 
 ---
 
-*Created: 2026-04-05 | Story: UI-2 | Epic: 9*
+_Created: 2026-04-05 | Story: UI-2 | Epic: 9_

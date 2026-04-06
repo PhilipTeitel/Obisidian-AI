@@ -19,10 +19,10 @@
 
 ## 2. Linked architecture decisions (ADRs)
 
-| ADR | Why it binds this story |
-|-----|-------------------------|
-| [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Tags scoped to nodes; filter joins `tags` → `nodes`. |
-| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md) | Filtering must not replace phased retrieval; only constrains candidates. |
+| ADR                                                                                                          | Why it binds this story                                                  |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| [docs/decisions/ADR-002-hierarchical-document-model.md](../decisions/ADR-002-hierarchical-document-model.md) | Tags scoped to nodes; filter joins `tags` → `nodes`.                     |
+| [docs/decisions/ADR-003-phased-retrieval-strategy.md](../decisions/ADR-003-phased-retrieval-strategy.md)     | Filtering must not replace phased retrieval; only constrains candidates. |
 
 ---
 
@@ -66,7 +66,7 @@ export interface SearchRequest {
 }
 ```
 
-IPC / README table: extend `search` payload row when SRV-* updates docs in the same PR as implementation.
+IPC / README table: extend `search` payload row when SRV-\* updates docs in the same PR as implementation.
 
 ---
 
@@ -83,14 +83,14 @@ Not applicable (UI-1 may add tag chips later).
 ### 6b. Props & Contracts
 
 | Component / Hook | Props / Signature | State | Notes |
-|------------------|-------------------|-------|-------|
-| — | — | — | — |
+| ---------------- | ----------------- | ----- | ----- |
+| —                | —                 | —     | —     |
 
 ### 6c. States (Loading / Error / Empty / Success)
 
-| State   | UI Behavior |
-|---------|-------------|
-| — | — |
+| State | UI Behavior |
+| ----- | ----------- |
+| —     | —           |
 
 ---
 
@@ -98,19 +98,19 @@ Not applicable (UI-1 may add tag chips later).
 
 ### Files to CREATE
 
-| # | Path | Purpose |
-|---|------|---------|
-| — | — | (none required) |
+| #   | Path | Purpose         |
+| --- | ---- | --------------- |
+| —   | —    | (none required) |
 
 ### Files to MODIFY
 
-| # | Path | Change |
-|---|------|--------|
-| 1 | `src/core/domain/types.ts` | `NodeFilter.tagsAny`, `SearchRequest.tags`. |
-| 2 | `src/sidecar/adapters/SqliteDocumentStore.ts` | SQL `EXISTS`/join on `tags` when `tagsAny` set. |
-| 3 | `src/sidecar/adapters/SqliteDocumentStore.test.ts` | Fixture with tagged nodes; assert filter. |
-| 4 | `src/core/workflows/SearchWorkflow.ts` | Map `SearchRequest.tags` → filter; Phase 1 note-level prune. |
-| 5 | `src/core/workflows/SearchWorkflow.test.ts` | Fake store asserts `tagsAny` passed through. |
+| #   | Path                                                 | Change                                                       |
+| --- | ---------------------------------------------------- | ------------------------------------------------------------ |
+| 1   | `src/core/domain/types.ts`                           | `NodeFilter.tagsAny`, `SearchRequest.tags`.                  |
+| 2   | `src/sidecar/adapters/SqliteDocumentStore.ts`        | SQL `EXISTS`/join on `tags` when `tagsAny` set.              |
+| 3   | `tests/sidecar/adapters/SqliteDocumentStore.test.ts` | Fixture with tagged nodes; assert filter.                    |
+| 4   | `src/core/workflows/SearchWorkflow.ts`               | Map `SearchRequest.tags` → filter; Phase 1 note-level prune. |
+| 5   | `tests/core/workflows/SearchWorkflow.test.ts`        | Fake store asserts `tagsAny` passed through.                 |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -123,20 +123,20 @@ Not applicable (UI-1 may add tag chips later).
 ### Phase A: Request wiring
 
 - [x] **A1** — When `SearchRequest.tags` is `['foo']`, `searchContentVectors` receives `filter.tagsAny` containing `'foo'` (same casing as request).
-  - Evidence: `src/core/workflows/SearchWorkflow.test.ts::A1_tags_forwarded(vitest)`
+  - Evidence: `tests/core/workflows/SearchWorkflow.test.ts::A1_tags_forwarded(vitest)`
 
 ### Phase B: SQLite behavior
 
 - [x] **B1** — Given two content nodes only one of which has tag `#Foo`, ANN with `tagsAny: ['foo']` returns **only** the tagged node (distance ordering preserved among matches).
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B1_tag_filter_sqlite(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::B1_tag_filter_sqlite(vitest)`
 
 - [x] **B2** — `tagsAny: ['a', 'b']` returns nodes tagged **either** `a` or `b`.
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::B2_tag_or_semantics(vitest)`
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::B2_tag_or_semantics(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
 - [x] **Y1** — **(binding)** Tag filter SQL references the physical table name **`tags`** and joins through **`nodes`** (grep-based proof in review or comment in test file pointing to migration STO-1).
-  - Evidence: `src/sidecar/adapters/SqliteDocumentStore.test.ts::Y1_uses_tags_table(vitest)` (assert via prepared statement string snapshot or documented `toContain('tags')` on SQL builder output)
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.test.ts::Y1_uses_tags_table(vitest)` (assert via prepared statement string snapshot or documented `toContain('tags')` on SQL builder output)
 
 ### Phase Z: Quality Gates
 
@@ -150,10 +150,10 @@ Not applicable (UI-1 may add tag chips later).
 
 ## 9. Risks & Tradeoffs
 
-| # | Risk / Tradeoff | Mitigation |
-|---|-----------------|------------|
-| 1 | Phase 1 summary nodes rarely tagged | Note-level `EXISTS` prune documented in RET-3 §1. |
-| 2 | OR semantics vs user expectation of AND | Document in README Plugin Settings / user doc follow-up (DOC-1). |
+| #   | Risk / Tradeoff                         | Mitigation                                                       |
+| --- | --------------------------------------- | ---------------------------------------------------------------- |
+| 1   | Phase 1 summary nodes rarely tagged     | Note-level `EXISTS` prune documented in RET-3 §1.                |
+| 2   | OR semantics vs user expectation of AND | Document in README Plugin Settings / user doc follow-up (DOC-1). |
 
 ---
 
@@ -166,4 +166,4 @@ Not applicable (UI-1 may add tag chips later).
 
 ---
 
-*Created: 2026-04-05 | Story: RET-3 | Epic: 5 — Retrieval, search workflow, and chat workflow*
+_Created: 2026-04-05 | Story: RET-3 | Epic: 5 — Retrieval, search workflow, and chat workflow_
