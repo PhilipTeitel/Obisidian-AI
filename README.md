@@ -151,6 +151,7 @@ Since one of the main objectives of this plugin was to explore the concepts of A
 - [docs/decisions/ADR-007-queue-abstraction.md](docs/decisions/ADR-007-queue-abstraction.md) — Queue port and SQLite-backed in-process queue
 - [docs/decisions/ADR-008-idempotent-indexing-state-machine.md](docs/decisions/ADR-008-idempotent-indexing-state-machine.md) — Per-note job steps, retries, dead-letter
 - [docs/decisions/ADR-009-chat-cancellation-and-timeout.md](docs/decisions/ADR-009-chat-cancellation-and-timeout.md) — Chat streaming `AbortSignal` + `timeoutMs` across `IChatPort` and transport
+- [docs/decisions/ADR-010-structured-logging-sidecar.md](docs/decisions/ADR-010-structured-logging-sidecar.md) — Pino structured logging on the Node.js sidecar (stderr, levels, redaction)
 
 ---
 
@@ -1076,15 +1077,15 @@ OpenAI and Ollama behind ports ([ADR-005](docs/decisions/ADR-005-provider-abstra
 
 ### Epic 7: Sidecar server, routes, and observability
 
-Message router, protocol parity across transports ([ADR-006](docs/decisions/ADR-006-sidecar-architecture.md)), [§20](#20-logging-and-observability).
+Message router, protocol parity across transports ([ADR-006](docs/decisions/ADR-006-sidecar-architecture.md)), [§20](#20-logging-and-observability), logging ([ADR-010](docs/decisions/ADR-010-structured-logging-sidecar.md)).
 
-| ID    | Status      | Story                                                                | Size | Notes                                                           |
-| ----- | ----------- | -------------------------------------------------------------------- | ---- | --------------------------------------------------------------- |
-| SRV-1 | Not Started | `server.ts` + route modules; stdio NDJSON framing                    | L    | Map message `type` to handlers; lazy DB open on first use       |
-| SRV-2 | Not Started | HTTP adapter surface: REST + WebSocket progress; `127.0.0.1` + token | M    | Same payloads as stdio; [API Contract](#api-contract)           |
-| SRV-3 | Not Started | `health` route and startup handshake fields (`dbReady`, uptime)      | S    | Plugin startup under 2s budget ([§15](#15-startup-performance)) |
-| SRV-4 | Not Started | Structured logging, `runId` / `jobId`, redaction policy              | M    | Pino sidecar; plugin logger compatible with Obsidian console    |
-| SRV-5 | Not Started | `ProgressAdapter` / push path for `IndexProgressEvent`               | M    | Real-time slideout feed                                         |
+| ID                                      | Status      | Story                                                                | Size | Notes                                                           |
+| --------------------------------------- | ----------- | -------------------------------------------------------------------- | ---- | --------------------------------------------------------------- |
+| [SRV-1](docs/features/SRV-1.md)         | Not Started | `server.ts` + route modules; stdio NDJSON framing                    | L    | Map message `type` to handlers; lazy DB open on first use       |
+| [SRV-2](docs/features/SRV-2.md)         | Not Started | HTTP adapter surface: REST + WebSocket progress; `127.0.0.1` + token | M    | Same payloads as stdio; [API Contract](#api-contract)           |
+| [SRV-3](docs/features/SRV-3.md)         | Not Started | `health` route and startup handshake fields (`dbReady`, uptime)      | S    | Plugin startup under 2s budget ([§15](#15-startup-performance)) |
+| [SRV-4](docs/features/SRV-4.md)         | Not Started | Structured logging, `runId` / `jobId`, redaction policy              | M    | Pino sidecar ([ADR-010](docs/decisions/ADR-010-structured-logging-sidecar.md)); plugin logger compatible with Obsidian console |
+| [SRV-5](docs/features/SRV-5.md)         | Not Started | `ProgressAdapter` / push path for `IndexProgressEvent`               | M    | Real-time slideout feed                                         |
 
 ### Epic 8: Plugin client, settings, secrets, and vault I/O
 
