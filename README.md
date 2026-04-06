@@ -1115,14 +1115,14 @@ Panes and command palette (REQUIREMENTS §3, §6, §10); agent writes ([§16](#1
 
 ### Epic 10: Testing, authoring guide, and release hardening
 
-MVP quality bar (REQUIREMENTS §5 user docs, §9).
+MVP quality bar (REQUIREMENTS §5 user docs, §8–§9).
 
-| ID    | Status      | Story                                                             | Size | Notes                                     |
-| ----- | ----------- | ----------------------------------------------------------------- | ---- | ----------------------------------------- |
-| TST-1 | Not Started | Core unit tests with in-memory port fakes                         | M    | Chunker, workflows without SQLite/network |
-| TST-2 | Not Started | Integration tests: sidecar + SQLite + sqlite-vec                  | M    | Vitest `test:integration`                 |
-| DOC-1 | Not Started | Authoring-oriented guide (headings, bullets, tags, links)         | M    | REQUIREMENTS §5.9                         |
-| DOC-2 | Not Started | User docs: DB location, sync warnings, uninstall/reindex recovery | S    | REQUIREMENTS §8                           |
+| ID                                        | Status      | Story                                                             | Size | Notes                                     |
+| ----------------------------------------- | ----------- | ----------------------------------------------------------------- | ---- | ----------------------------------------- |
+| [TST-1](docs/features/TST-1.md)           | Not Started | `test:unit`: core + plugin only (no `src/sidecar` tests)          | M    | Aligns with [Available Scripts](#available-scripts) |
+| [TST-2](docs/features/TST-2.md)           | Not Started | `test:integration`: `src/sidecar` (SQLite + sqlite-vec)           | M    | Pairs with TST-1                          |
+| [DOC-1](docs/features/DOC-1.md)           | Not Started | Authoring-oriented guide (headings, bullets, tags, links)         | M    | REQUIREMENTS §5                           |
+| [DOC-2](docs/features/DOC-2.md)           | Not Started | User docs: DB location, sync warnings, uninstall / reindex recovery | S    | REQUIREMENTS §8                           |
 
 ---
 
