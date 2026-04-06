@@ -17,6 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:unit": "vitest run src/core src/plugin",
+    "test:integration": "vitest run src/sidecar",
     "verify:plugin-bundle": "node scripts/verify-plugin-bundle.mjs",
     "check:boundaries": "node scripts/check-source-boundaries.mjs",
     "verify:core-imports": "node scripts/check-core-imports.mjs",

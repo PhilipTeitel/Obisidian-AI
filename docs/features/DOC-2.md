@@ -3,7 +3,7 @@
 **Story**: Document **default index database location**, **per-vault override**, **risks of cloud/network paths**, and that **uninstall** may **leave DB files** unless the user deletes them (REQUIREMENTS §8).
 **Epic**: 10 — Testing, authoring guide, and release hardening
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -17,7 +17,7 @@ Storage expectations are easy to get wrong (sync services locking SQLite, multip
 
 | ADR | Why it binds this story |
 |-----|-------------------------|
-| [ADR-004](../decisions/ADR-004-lazy-database-initialization.md) | Lazy DB open; explains why first index may feel slower. |
+| [ADR-004](../decisions/ADR-004-per-vault-index-storage.md) | Per-vault DB location, lazy init, path override. |
 | [ADR-006](../decisions/ADR-006-sidecar-architecture.md) | DB lives with sidecar process expectations, not in plugin WASM. |
 
 ---
@@ -54,16 +54,16 @@ Storage expectations are easy to get wrong (sync services locking SQLite, multip
 
 ### Phase A
 
-- [ ] **A1** — `docs/guides/user-storage-and-uninstall.md` addresses Y1–Y3.
+- [x] **A1** — `docs/guides/user-storage-and-uninstall.md` addresses Y1–Y3.
   - Evidence: file content review
 
 ### Phase Z
 
-- [ ] **Z1** — `npm run build` passes
-- [ ] **Z2** — `npm run lint` passes
-- [ ] **Z3** — **N/A**
-- [ ] **Z4** — **N/A**
-- [ ] **Z5** — **N/A**
+- [x] **Z1** — `npm run build` passes
+- [x] **Z2** — `npm run lint` passes
+- [x] **Z3** — **N/A**
+- [x] **Z4** — **N/A**
+- [x] **Z5** — **N/A**
 
 ---
 

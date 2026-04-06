@@ -3,7 +3,7 @@
 **Story**: Add a short **authoring-oriented** guide (REQUIREMENTS §5 user-facing documentation) explaining how **headings**, **bullet structure**, **tags**, and **wikilinks** affect **hierarchical indexing and retrieval**, with pointers to the chunker/node model.
 **Epic**: 10 — Testing, authoring guide, and release hardening
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -52,16 +52,16 @@ Users get better search and chat grounding when notes match the model described 
 
 ### Phase A
 
-- [ ] **A1** — `docs/guides/authoring-for-ai-indexing.md` exists and covers headings, bullets, tags, links per Y1.
+- [x] **A1** — `docs/guides/authoring-for-ai-indexing.md` exists and covers headings, bullets, tags, links per Y1.
   - Evidence: file content review
 
 ### Phase Z
 
-- [ ] **Z1** — `npm run build` passes
-- [ ] **Z2** — `npm run lint` passes
-- [ ] **Z3** — **N/A** (markdown)
-- [ ] **Z4** — **N/A**
-- [ ] **Z5** — **N/A**
+- [x] **Z1** — `npm run build` passes
+- [x] **Z2** — `npm run lint` passes
+- [x] **Z3** — **N/A** (markdown)
+- [x] **Z4** — **N/A**
+- [x] **Z5** — **N/A**
 
 ---
 

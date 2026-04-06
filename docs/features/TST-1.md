@@ -3,7 +3,7 @@
 **Story**: Define and script **`npm run test:unit`** to run Vitest for **`src/core/**/*.test.ts`** and **`src/plugin/**/*.test.ts`** only, so CI and local runs can execute **fast, portable** tests without loading **`better-sqlite3` / sqlite-vec** (those stay under TST-2).
 **Epic**: 10 — Testing, authoring guide, and release hardening
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -65,21 +65,21 @@ Pointers: [REQUIREMENTS §9](../requirements/REQUIREMENTS.md) quality bar; [ADR-
 
 ### Phase A
 
-- [ ] **A1** — `npm run test:unit` completes successfully and runs only `src/core` and `src/plugin` tests.
+- [x] **A1** — `npm run test:unit` completes successfully and runs only `src/core` and `src/plugin` tests.
   - Evidence: `package.json` script + `npm run test:unit`
 
 ### Phase Y
 
-- [ ] **Y1** — **(binding)** No `src/sidecar/**/*.test.ts` is invoked by `test:unit`.
+- [x] **Y1** — **(binding)** No `src/sidecar/**/*.test.ts` is invoked by `test:unit`.
   - Evidence: `vitest run src/core src/plugin` (or equivalent) with no `src/sidecar` path
 
 ### Phase Z
 
-- [ ] **Z1** — `npm run build` passes
-- [ ] **Z2** — `npm run lint` passes
-- [ ] **Z3** — No `any` in new config
-- [ ] **Z4** — **N/A** (no client `@shared` alias in this repo)
-- [ ] **Z5** — **N/A**
+- [x] **Z1** — `npm run build` passes
+- [x] **Z2** — `npm run lint` passes
+- [x] **Z3** — No `any` in new config
+- [x] **Z4** — **N/A** (no client `@shared` alias in this repo)
+- [x] **Z5** — **N/A**
 
 ---
 

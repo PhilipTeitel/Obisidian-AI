@@ -138,6 +138,8 @@ Since one of the main objectives of this plugin was to explore the concepts of A
 ## Requirements
 
 - [docs/requirements/REQUIREMENTS.md](docs/requirements/REQUIREMENTS.md) — Canonical product and technical requirements (iteration 2)
+- [docs/guides/authoring-for-ai-indexing.md](docs/guides/authoring-for-ai-indexing.md) — How headings, lists, tags, and links affect indexing (REQUIREMENTS §5)
+- [docs/guides/user-storage-and-uninstall.md](docs/guides/user-storage-and-uninstall.md) — Index DB location, sync risks, uninstall (REQUIREMENTS §8)
 - [.cursor/plans/obsidian_ai_iteration_2_95fe6b8a.plan.md](.cursor/plans/obsidian_ai_iteration_2_95fe6b8a.plan.md) — Iteration 2 architectural plan and implementation phases
 
 **Architecture decisions (traceability for backlog alignment)**
@@ -871,7 +873,9 @@ The dev script watches `src/` and rebuilds on change. For hot-reload in Obsidian
 | `npm run build:plugin`         | Build plugin `main.js` via esbuild                                       |
 | `npm run build:sidecar`        | Build sidecar bundle via esbuild (`dist/sidecar/server.js`)              |
 | `npm run typecheck`            | Type-check `src/core`, `src/plugin`, and `src/sidecar` (no emit)         |
-| `npm run test`                 | Run Vitest once in Node (`src/**/*.test.ts`)                             |
+| `npm run test`                 | Full suite: `src/core` + `src/plugin` + `src/sidecar` (same as unit + integration) |
+| `npm run test:unit`            | Unit tests: `src/core` and `src/plugin` only (no native sidecar stack)   |
+| `npm run test:integration`     | Integration tests: `src/sidecar` (SQLite, sqlite-vec, HTTP, runtime)    |
 | `npm run lint`                 | ESLint 9 flat config over repo sources and tooling configs               |
 | `npm run lint:fix`             | ESLint with `--fix`                                                      |
 | `npm run format`               | Prettier write                                                           |
@@ -883,13 +887,11 @@ The dev script watches `src/` and rebuilds on change. For hot-reload in Obsidian
 | `npm run dev:plugin`           | Watch mode for plugin only                                               |
 | `npm run dev:sidecar`          | Watch mode for sidecar only                                              |
 
-The following are **planned** in later stories: `test:unit`, `test:integration`, `query-store`.
+Planned later: `query-store` (dev utility to inspect SQLite store contents).
 
-| Command                    | Description                                          |
-| -------------------------- | ---------------------------------------------------- |
-| `npm run test:unit`        | Run unit tests only (core domain) _(later)_          |
-| `npm run test:integration` | Run integration tests (sidecar + SQLite) _(later)_   |
-| `npm run query-store`      | Dev utility: inspect SQLite store contents _(later)_ |
+| Command               | Description                                          |
+| --------------------- | ---------------------------------------------------- |
+| `npm run query-store` | Dev utility: inspect SQLite store contents _(later)_ |
 
 ---
 
@@ -1115,14 +1117,14 @@ Panes and command palette (REQUIREMENTS §3, §6, §10); agent writes ([§16](#1
 
 ### Epic 10: Testing, authoring guide, and release hardening
 
-MVP quality bar (REQUIREMENTS §5 user docs, §8–§9).
+MVP quality bar (REQUIREMENTS §5 user docs, §8–§9). Guides: [Authoring for indexing](docs/guides/authoring-for-ai-indexing.md), [Storage and uninstall](docs/guides/user-storage-and-uninstall.md).
 
-| ID                                        | Status      | Story                                                             | Size | Notes                                     |
-| ----------------------------------------- | ----------- | ----------------------------------------------------------------- | ---- | ----------------------------------------- |
-| [TST-1](docs/features/TST-1.md)           | Not Started | `test:unit`: core + plugin only (no `src/sidecar` tests)          | M    | Aligns with [Available Scripts](#available-scripts) |
-| [TST-2](docs/features/TST-2.md)           | Not Started | `test:integration`: `src/sidecar` (SQLite + sqlite-vec)           | M    | Pairs with TST-1                          |
-| [DOC-1](docs/features/DOC-1.md)           | Not Started | Authoring-oriented guide (headings, bullets, tags, links)         | M    | REQUIREMENTS §5                           |
-| [DOC-2](docs/features/DOC-2.md)           | Not Started | User docs: DB location, sync warnings, uninstall / reindex recovery | S    | REQUIREMENTS §8                           |
+| ID                                        | Status    | Story                                                             | Size | Notes                                     |
+| ----------------------------------------- | --------- | ----------------------------------------------------------------- | ---- | ----------------------------------------- |
+| [TST-1](docs/features/TST-1.md)           | Complete  | `test:unit`: core + plugin only (no `src/sidecar` tests)          | M    | [Available Scripts](#available-scripts)   |
+| [TST-2](docs/features/TST-2.md)           | Complete  | `test:integration`: `src/sidecar` (SQLite + sqlite-vec)           | M    | Pairs with TST-1                          |
+| [DOC-1](docs/features/DOC-1.md)           | Complete  | Authoring-oriented guide (headings, bullets, tags, links)         | M    | [docs/guides/authoring-for-ai-indexing.md](docs/guides/authoring-for-ai-indexing.md) |
+| [DOC-2](docs/features/DOC-2.md)           | Complete  | User docs: DB location, sync warnings, uninstall / reindex recovery | S    | [docs/guides/user-storage-and-uninstall.md](docs/guides/user-storage-and-uninstall.md) |
 
 ---
 

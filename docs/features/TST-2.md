@@ -3,7 +3,7 @@
 **Story**: Define **`npm run test:integration`** to run Vitest for **`src/sidecar/**/*.test.ts`**, covering native **`better-sqlite3`**, migrations, adapters, HTTP/stdio servers, and **`SidecarRuntime`** where those tests already live.
 **Epic**: 10 — Testing, authoring guide, and release hardening
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -55,21 +55,21 @@ Pointers: [ADR-006](../decisions/ADR-006-sidecar-architecture.md); REQUIREMENTS 
 
 ### Phase A
 
-- [ ] **A1** — `npm run test:integration` passes and executes every `src/sidecar/**/*.test.ts`.
+- [x] **A1** — `npm run test:integration` passes and executes every `src/sidecar/**/*.test.ts`.
   - Evidence: `npm run test:integration`
 
 ### Phase Y
 
-- [ ] **Y1** — **(binding)** Integration script targets only `src/sidecar` test paths.
+- [x] **Y1** — **(binding)** Integration script targets only `src/sidecar` test paths.
   - Evidence: `package.json` + `vitest run src/sidecar`
 
 ### Phase Z
 
-- [ ] **Z1** — `npm run build` passes
-- [ ] **Z2** — `npm run lint` passes
-- [ ] **Z3** — No `any`
-- [ ] **Z4** — **N/A**
-- [ ] **Z5** — **N/A**
+- [x] **Z1** — `npm run build` passes
+- [x] **Z2** — `npm run lint` passes
+- [x] **Z3** — No `any`
+- [x] **Z4** — **N/A**
+- [x] **Z5** — **N/A**
 
 ---
 
