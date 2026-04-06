@@ -1091,14 +1091,14 @@ Message router, protocol parity across transports ([ADR-006](docs/decisions/ADR-
 
 Thin client: lifecycle, transport, settings, per-request secrets (REQUIREMENTS §2–3, §8).
 
-| ID    | Status      | Story                                                                | Size | Notes                                         |
-| ----- | ----------- | -------------------------------------------------------------------- | ---- | --------------------------------------------- |
-| PLG-1 | Not Started | `SidecarLifecycle`: spawn, async health, shutdown on unload          | M    | Sidecar binary path / packaged `dist/sidecar` |
-| PLG-2 | Not Started | `StdioTransportAdapter` (NDJSON)                                     | M    | Default transport                             |
-| PLG-3 | Not Started | `HttpTransportAdapter` (REST + WS, session token)                    | L    | Opt-in setting                                |
-| PLG-4 | Not Started | Settings tab: providers, folders, DB path, transport, budgets, queue | M    | Mirror [Plugin Settings](#plugin-settings)    |
-| PLG-5 | Not Started | Obsidian `SecretStorage` read; pass secrets per message only         | S    | Never persist keys in sidecar                 |
-| PLG-6 | Not Started | Vault listing/reading for index commands; hash computation           | M    | `IVaultAccessPort` implementation in plugin   |
+| ID                                      | Status      | Story                                                                | Size | Notes                                         |
+| --------------------------------------- | ----------- | -------------------------------------------------------------------- | ---- | --------------------------------------------- |
+| [PLG-1](docs/features/PLG-1.md)         | Complete    | `SidecarLifecycle`: spawn, async health, shutdown on unload          | M    | Sidecar binary path / packaged `dist/sidecar` |
+| [PLG-2](docs/features/PLG-2.md)         | Complete    | `StdioTransportAdapter` (NDJSON)                                     | M    | Default transport                             |
+| [PLG-3](docs/features/PLG-3.md)         | Complete    | `HttpTransportAdapter` (REST + WS, session token)                    | L    | Opt-in setting                                |
+| [PLG-4](docs/features/PLG-4.md)         | Complete    | Settings tab: providers, folders, DB path, transport, budgets, queue | M    | Mirror [Plugin Settings](#plugin-settings)    |
+| [PLG-5](docs/features/PLG-5.md)         | Complete    | Obsidian `SecretStorage` read; pass secrets per message only         | S    | Never persist keys in sidecar                 |
+| [PLG-6](docs/features/PLG-6.md)         | Complete    | Vault listing/reading for index commands; hash computation           | M    | `IVaultAccessPort` implementation in plugin   |
 
 ### Epic 9: Plugin UI, commands, and agent file operations
 
