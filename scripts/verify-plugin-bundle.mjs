@@ -16,7 +16,7 @@ if (typeof mainFile !== 'string' || !mainFile.trim()) {
   process.exit(1);
 }
 
-const bundlePath = path.join(root, mainFile);
+const bundlePath = path.join(root, 'dist', 'plugin', mainFile);
 if (!fs.existsSync(bundlePath)) {
   console.error(`verify-plugin-bundle: missing plugin bundle at ${bundlePath}`);
   process.exit(1);

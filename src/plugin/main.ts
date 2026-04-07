@@ -1,4 +1,4 @@
-import { Plugin } from 'obsidian';
+import { Notice, Plugin } from 'obsidian';
 import { getCoreLabel } from '../core/index.js';
 import { registerCommands } from './commands/registerCommands.js';
 import { SidecarLifecycle } from './client/SidecarLifecycle.js';
@@ -15,6 +15,7 @@ export default class ObsidianAIPlugin extends Plugin {
   lifecycle: SidecarLifecycle | null = null;
 
   async onload(): Promise<void> {
+    console.log('Obsidian AI: plugin loaded');
     void getCoreLabel();
     await this.loadSettings();
     this.addSettingTab(new ObsidianAISettingTab(this.app, this));
@@ -29,8 +30,17 @@ export default class ObsidianAIPlugin extends Plugin {
     });
     try {
       await this.lifecycle.start();
+      console.log('Obsidian AI: sidecar started');
     } catch (e) {
-      console.error('Obsidian AI: sidecar failed to start — run `npm run build` and ensure dist/sidecar/server.js exists.', e);
+      const detail = e instanceof Error ? e.message : String(e);
+      console.error(
+        'Obsidian AI: sidecar failed to start — set Node executable path in plugin settings (or OBSIDIAN_AI_NODE), deploy sidecar, reload plugin.',
+        e,
+      );
+      new Notice(
+        `Obsidian AI: sidecar failed to start. Check the developer console. ${detail}`,
+        12_000,
+      );
     }
   }
 

@@ -6,7 +6,21 @@ import Database from 'better-sqlite3';
 type SqliteDatabase = InstanceType<typeof Database>;
 import { loadSqliteVec } from './load-sqlite-vec.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+/**
+ * SQL files live in ./migrations next to this module (Vitest / TS source) or next to the built
+ * `server.cjs` (esbuild CJS output leaves `import.meta.url` empty, so use `process.argv[1]`).
+ */
+function migrationsDirectory(): string {
+  const metaUrl = import.meta.url;
+  if (typeof metaUrl === 'string' && metaUrl.length > 0) {
+    return path.join(path.dirname(fileURLToPath(metaUrl)), 'migrations');
+  }
+  const entry = process.argv[1];
+  if (!entry) {
+    throw new Error('migrate: cannot resolve migrations directory (no import.meta.url and no argv[1])');
+  }
+  return path.join(path.dirname(path.resolve(entry)), 'migrations');
+}
 
 /** STO-1 baseline: relational tables only. */
 export const RELATIONAL_USER_VERSION = 1;
@@ -17,7 +31,7 @@ export const VECTOR_USER_VERSION = 2;
 const META_KEY_EMBEDDING_DIMENSION = 'embedding_dimension';
 
 function readMigrationSql(filename: string): string {
-  const full = path.join(__dirname, 'migrations', filename);
+  const full = path.join(migrationsDirectory(), filename);
   return fs.readFileSync(full, 'utf8');
 }
 

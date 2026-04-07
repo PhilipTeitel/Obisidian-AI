@@ -22,8 +22,10 @@
     "verify:plugin-bundle": "node scripts/verify-plugin-bundle.mjs",
     "check:boundaries": "node scripts/check-source-boundaries.mjs",
     "verify:core-imports": "node scripts/check-core-imports.mjs",
-    "smoke:sidecar": "node dist/sidecar/server.js",
+    "smoke:sidecar": "node dist/sidecar/server.cjs",
     "dev": "node scripts/dev.mjs",
+    "deploy:plugin": "node scripts/deploy-plugin.mjs",
+    "deploy:sidecar": "node scripts/deploy-sidecar.mjs",
     "dev:plugin": "node esbuild.config.mjs --watch",
     "dev:sidecar": "node esbuild.sidecar.mjs --watch"
   },

@@ -14,6 +14,10 @@ export interface ObsidianAISettings {
   agentOutputFolders: string[];
   maxGeneratedNoteSize: number;
   dbPath: string;
+  /** Absolute path to the `node` binary for the sidecar. Empty = auto-detect (often fails when Obsidian starts from the Dock). */
+  nodeExecutablePath: string;
+  /** Launch the sidecar with `--inspect=0` so a Node debugger can attach. Reload plugin after changing. */
+  sidecarInspector: boolean;
   transport: 'stdio' | 'http';
   logLevel: 'debug' | 'info' | 'warn' | 'error';
   searchResultCount: number;

@@ -13,6 +13,8 @@ export const DEFAULT_SETTINGS: ObsidianAISettings = {
   agentOutputFolders: ['AI-Generated'],
   maxGeneratedNoteSize: 5000,
   dbPath: '',
+  nodeExecutablePath: '',
+  sidecarInspector: false,
   transport: 'stdio',
   logLevel: 'info',
   searchResultCount: 20,

@@ -23,6 +23,33 @@ export class ObsidianAISettingTab extends PluginSettingTab {
     const s = this.aiPlugin.settings;
 
     new Setting(containerEl)
+      .setName('Node executable path')
+      .setDesc(
+        'Absolute path to your Node binary (run `which node` in Terminal). Set this when the sidecar fails to start from Dock/Finder; reload the plugin after changing.',
+      )
+      .addText((t) =>
+        t
+          .setPlaceholder('/opt/homebrew/bin/node')
+          .setValue(s.nodeExecutablePath)
+          .onChange(async (v) => {
+            s.nodeExecutablePath = v.trim();
+            await this.aiPlugin.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName('Enable sidecar inspector')
+      .setDesc(
+        'Launch the sidecar with `--inspect=0` so you can attach a Node debugger. The inspector URL is printed by the sidecar on stderr; reload the plugin after changing.',
+      )
+      .addToggle((t) =>
+        t.setValue(s.sidecarInspector).onChange(async (v) => {
+          s.sidecarInspector = v;
+          await this.aiPlugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
       .setName('Transport')
       .setDesc('stdio (default) or HTTP (127.0.0.1 only; requires sidecar restart).')
       .addDropdown((d) =>
