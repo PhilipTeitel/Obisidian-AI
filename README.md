@@ -2,7 +2,7 @@
 
 ## Preface
 
-This project represents 2 things for me. The first is AI capabilities in Obsidian. This isn't even the first time I've built it. It's become my "Hello World" project where I experiment with various ways of building software. The second is to practice using Cursor's subagent features. It was built using the following subagents:
+This project represents 2 things. The first is AI capabilities in Obsidian. There are multiple iterations each experimenting with implementations, architectures, stacks, etc. The second is to practice using Cursor's subagent features. It was built using the following subagents:
 
 - Architect
   - Build the high-level design document. It doesn't write the code, only makes sure the project is properly spec'd to be built correctly and cleanly. A template is used to assure completeness.
@@ -26,11 +26,16 @@ Iteration 2 replaces the fragile WASM-in-renderer approach from iteration 1 with
 Since one of the main objectives of this plugin was to explore the concepts of AI-assisted development, it is important to keep track of lessons learned.
 
 - Context Management - The key to success here is managing context. The models can only focus on so much at a time. You have ~200 KB of a window. That means that you have to keep things concise. You can go to the Max models with 1 MB but some have shown that the drift increases rapidly beyond ~250 KB so that's not as cool as it sounds nor is it price-efficient.
+  - Drift is the biggest problem encountered in this project.  Even core requirements documented in multiple documents could easily be left out or outright violated.  In the first iteration, the implementer used the Obsidian API's `saveData()` method instead of the specified `sqlite-wasm`.  The problem was that it might have been mentioned, the criticality of it got lost in the context.
+    - Binding constraints helped with that.  Those necessitated additional criteria and evidence.  
+    - Architectural design records provided the foundation for the design and specifications.  The requirements referenced them.  The user story specification also referenced them.  They drove the binding constraints as well as the evidence required to demonstrate doneness.  This proved to be the missing link, at least in terms of code completeness.
+    - The subagents, commands and templates were updated to reflect this.
   - By separating the concerns, the context can be managed more effectively. This also produces a better result. Most of the efforts I've seen people say something like "I want to build an application that does..." They then see that the application doesn't necessarily do what they want. The code isn't clean, readable or maintainable. The problem there is no separation of concerns where the lifecycle is concerned. Designing and planning are very different from coding. To make it worse, there's no real human in the loop to manage the development as it proceeds. Most that I see doing the AI-assisted development are essentially doing end-to-end testing. They might get the functionality they're looking for but, again, are disappointed in how it was implemented. I separated the architecting from the coding. This at least manages the context in terms of the lifecycle, but is still insufficient to get the desired result.
   - Keeping actions small enough for the model to handle them without drift is essential.
     - For the architect-related functions, designing and planning are separate activities. This not only has the advantage of being done in a more consistent manner but it also creates a natural checkpoint for the human to verify things are proceeding the way they want, e.g. "Do I agree with the stack choices?", "Are the endpoints following standards?", "Do the data flows make sense?", etc. are the sorts of things the developer needs to specify or verify. This can also surface undecided design decisions.
     - Planning is also its own activity. Designing is done so how will this be implemented in a sensible, efficient manner. The architect can then determine what actions need to be done and in what order. I separated planning the application from planning the stories. Planning a story can actually be a pretty involved process. Keeping it within its own window allows for solid results in addition to another checkpoint for verification.
     - Implementation is its separate activity. It's a different concern. It requires a different context as well. For this, special instructions are needed to prevent hallucinations, surface any ambiguities, etc. I created a separate sub-agent for this. This also allows a setting coding and style standards. Trying to set architectural standards along with coding standards really multiplies the complexities which can push against the window. A proper plan ahead of time is one of the key components here.
+- Testing - When setting out to play with AI-assisted development, I envisioned being more of a solution architect than developer and I was.  What I didn't predict was how much of a QA tester I'd have to become.  Every bug found indicated a missing test.  They're inevitable I had a few moments where I felt like I could have prevented the pain.
 - How actions are batched can make a big difference in costs. I've found that keeping related things together in requests really helps efficiently by getting more cache hits. Of course that context window is always a concern so finding the right balance is critical. I've seen cache hits go from 75% to >95% when batching operations. This is particularly important with design and implementation where the whole codebase needs to be considered. As the coding progresses, having that already in memory can greatly reduce costs as cache reads are much cheaper than inputs and cache writes. *This is particularly relevant when you're paying for it!*
 - There's a sweetspot for how large the batches. You might want to keep them small until you're confident the requirements are solid and the agents are producing what you're intending.
 - The particular model you use is very important.
@@ -111,6 +116,7 @@ Since one of the main objectives of this plugin was to explore the concepts of A
     - [3. Install into an Obsidian vault](#3-install-into-an-obsidian-vault)
     - [4. Enable the plugin](#4-enable-the-plugin)
     - [5. Development mode](#5-development-mode)
+    - [6. Debugging the sidecar](#6-debugging-the-sidecar)
   - [Available Scripts](#available-scripts)
   - [UI Components](#ui-components)
     - [SearchView](#searchview)
