@@ -85,6 +85,45 @@ export class JobStepService implements IJobStepPort {
         step: 'queued',
         status: 'started',
       });
+      return;
+    }
+    const row = this.db
+      .prepare('SELECT current_step, note_path FROM job_steps WHERE job_id = ?')
+      .get(input.jobId) as
+      | { current_step: IndexStep; note_path: string }
+      | undefined;
+    if (!row) return;
+    if (row.current_step === 'failed') {
+      this.transitionStep({
+        jobId: input.jobId,
+        runId: input.runId,
+        to: 'queued',
+        detail: 'retrying failed job',
+      });
+      return;
+    }
+    if (row.current_step !== 'queued' && row.current_step !== 'embedded' && row.current_step !== 'dead_letter') {
+      this.db
+        .prepare(
+          `UPDATE job_steps SET current_step = 'queued', error_message = NULL, updated_at = datetime('now') WHERE job_id = ?`,
+        )
+        .run(input.jobId);
+      this.emit({
+        jobId: input.jobId,
+        runId: input.runId,
+        notePath: row.note_path,
+        step: row.current_step,
+        status: 'completed',
+      });
+      this.emit({
+        jobId: input.jobId,
+        runId: input.runId,
+        notePath: row.note_path,
+        step: 'queued',
+        status: 'started',
+        detail: 'resuming interrupted job',
+      });
+      return;
     }
   }
 

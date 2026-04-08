@@ -97,6 +97,58 @@ describe('JobStepService', () => {
     db.close();
   });
 
+  it('B1b_ensure_failed_job_requeues_for_retry', () => {
+    const { db, job } = svc(2);
+    job.ensureJob({
+      jobId: 'j1',
+      runId: 'r1',
+      notePath: 'n.md',
+      contentHash: 'h',
+    });
+    job.markFailed({ jobId: 'j1', runId: 'r1', message: 'boom' });
+    job.ensureJob({
+      jobId: 'j1',
+      runId: 'r1',
+      notePath: 'n.md',
+      contentHash: 'h',
+    });
+    const row = db
+      .prepare('SELECT current_step, retry_count, error_message FROM job_steps WHERE job_id = ?')
+      .get('j1') as { current_step: string; retry_count: number; error_message: string | null };
+    expect(row.current_step).toBe('queued');
+    expect(row.retry_count).toBe(1);
+    expect(row.error_message).toBeNull();
+    db.close();
+  });
+
+  it('B1c_ensure_interrupted_job_resets_to_queued', () => {
+    const { db, job } = svc();
+    job.ensureJob({
+      jobId: 'j1',
+      runId: 'r1',
+      notePath: 'n.md',
+      contentHash: 'h',
+    });
+    job.transitionStep({ jobId: 'j1', runId: 'r1', to: 'parsing' });
+    job.transitionStep({ jobId: 'j1', runId: 'r1', to: 'parsed' });
+    job.transitionStep({ jobId: 'j1', runId: 'r1', to: 'storing' });
+    job.transitionStep({ jobId: 'j1', runId: 'r1', to: 'stored' });
+    job.transitionStep({ jobId: 'j1', runId: 'r1', to: 'summarizing' });
+    job.ensureJob({
+      jobId: 'j1',
+      runId: 'r1',
+      notePath: 'n.md',
+      contentHash: 'h',
+    });
+    const row = db
+      .prepare('SELECT current_step, retry_count, error_message FROM job_steps WHERE job_id = ?')
+      .get('j1') as { current_step: string; retry_count: number; error_message: string | null };
+    expect(row.current_step).toBe('queued');
+    expect(row.retry_count).toBe(0);
+    expect(row.error_message).toBeNull();
+    db.close();
+  });
+
   it('B2_retry_and_dead_letter', () => {
     const { db, job } = svc(2);
     job.ensureJob({

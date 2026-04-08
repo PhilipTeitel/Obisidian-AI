@@ -10,12 +10,13 @@ function trimBaseUrl(url: string): string {
 }
 
 /**
- * Ollama `/api/embeddings` accepts a single string `input` in common deployments.
- * We call once per text to preserve order (batching would require server-specific support).
+ * Ollama's current embeddings API is `/api/embed`, which accepts either a single string
+ * or an array in `input` and returns `embeddings`. Keep compatibility with older single-vector
+ * response shapes in case the local server is behind the current docs.
  */
 function ollamaEmbeddingsUrl(baseUrl: string): string {
   const base = trimBaseUrl(baseUrl);
-  return `${base}/api/embeddings`;
+  return `${base}/api/embed`;
 }
 
 export class OllamaEmbeddingAdapter implements IEmbeddingPort {
@@ -29,33 +30,33 @@ export class OllamaEmbeddingAdapter implements IEmbeddingPort {
 
   async embed(texts: string[], _apiKey?: string): Promise<Float32Array[]> {
     void _apiKey;
+    if (texts.length === 0) return [];
     const url = ollamaEmbeddingsUrl(this.baseUrl);
-    const results: Float32Array[] = [];
-    for (const text of texts) {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: this.model, input: text }),
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: this.model, input: texts }),
+    });
+    const rawBody = await res.text();
+    if (!res.ok) {
+      console.warn('OllamaEmbeddingAdapter: embeddings request failed', {
+        status: res.status,
+        url,
       });
-      const rawBody = await res.text();
-      if (!res.ok) {
-        console.warn('OllamaEmbeddingAdapter: embeddings request failed', {
-          status: res.status,
-          url,
-        });
-        throw new Error(`Ollama embeddings HTTP ${res.status}: ${rawBody.slice(0, 200)}`);
-      }
-      let json: { embedding?: number[] };
-      try {
-        json = JSON.parse(rawBody) as { embedding?: number[] };
-      } catch {
-        throw new Error(`Ollama embeddings: invalid JSON (HTTP ${res.status}): ${rawBody.slice(0, 200)}`);
-      }
-      if (!json.embedding || !Array.isArray(json.embedding)) {
-        throw new Error('Ollama embeddings: response missing embedding array');
-      }
-      results.push(Float32Array.from(json.embedding));
+      throw new Error(`Ollama embeddings HTTP ${res.status}: ${rawBody.slice(0, 200)}`);
     }
-    return results;
+    let json: { embeddings?: number[][]; embedding?: number[] };
+    try {
+      json = JSON.parse(rawBody) as { embeddings?: number[][]; embedding?: number[] };
+    } catch {
+      throw new Error(`Ollama embeddings: invalid JSON (HTTP ${res.status}): ${rawBody.slice(0, 200)}`);
+    }
+    if (Array.isArray(json.embeddings)) {
+      return json.embeddings.map((embedding) => Float32Array.from(embedding));
+    }
+    if (Array.isArray(json.embedding)) {
+      return [Float32Array.from(json.embedding)];
+    }
+    throw new Error('Ollama embeddings: response missing embeddings array');
   }
 }

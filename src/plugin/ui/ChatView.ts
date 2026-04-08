@@ -1,7 +1,8 @@
-import { ItemView, Notice, WorkspaceLeaf } from 'obsidian';
+import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { ChatMessage, Source } from '../../core/domain/types.js';
 import { getOpenAIApiKey } from '../settings/secretSettings.js';
 import type ObsidianAIPlugin from '../main.js';
+import { showAiNotice } from './showAiNotice.js';
 import { VIEW_TYPE_CHAT } from './viewIds.js';
 
 export class ChatView extends ItemView {
@@ -106,12 +107,12 @@ export class ChatView extends ItemView {
   private async sendUserMessage(): Promise<void> {
     const transport = this.plugin.lifecycle?.getTransport();
     if (!transport) {
-      new Notice('Sidecar is not available.');
+      showAiNotice('Sidecar is not available.');
       return;
     }
     const text = this.inputEl.value.trim();
     if (!text) {
-      new Notice('Enter a message.');
+      showAiNotice('Enter a message.');
       return;
     }
     this.inputEl.value = '';
@@ -147,7 +148,7 @@ export class ChatView extends ItemView {
     } catch (e) {
       if (signal.aborted) return;
       const msg = e instanceof Error ? e.message : String(e);
-      new Notice(`Chat failed: ${msg}`);
+      showAiNotice(`Chat failed: ${msg}`);
     } finally {
       this.abort = null;
     }

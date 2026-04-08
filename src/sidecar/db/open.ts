@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import Database from 'better-sqlite3';
 import { ensureVectorSchema, runRelationalMigrations } from './migrate.js';
 
@@ -12,6 +14,12 @@ export interface OpenDatabaseOptions {
  * Open SQLite at path, apply relational migrations, optionally vector schema.
  */
 export function openDatabase(filePath: string, options: OpenDatabaseOptions = {}): SqliteDatabase {
+  if (filePath !== ':memory:') {
+    const parentDir = path.dirname(filePath);
+    if (parentDir && parentDir !== '.' && !fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+  }
   const db = new Database(filePath);
   runRelationalMigrations(db);
   if (options.embeddingDimension !== undefined) {

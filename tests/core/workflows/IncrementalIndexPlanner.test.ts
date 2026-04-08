@@ -182,6 +182,31 @@ describe('IncrementalIndexPlanner', () => {
     });
   });
 
+  it('A2b_force_reindex_unchanged', async () => {
+    const store = new PlannerFakeStore();
+    store.seedMeta({
+      noteId: 'same.md',
+      vaultPath: 'same.md',
+      contentHash: 'samehash',
+      indexedAt: 't',
+      nodeCount: 1,
+    });
+    const queue = new PlannerFakeQueue();
+    const jobSteps = new PlannerFakeJobSteps();
+    const r = await planAndApplyIncrementalIndex(
+      { store, queue, jobSteps },
+      {
+        runId: 'r',
+        files: [{ path: 'same.md', content: 'body', hash: 'samehash' }],
+        deletedPaths: [],
+        forceReindex: true,
+      },
+    );
+    expect(r.enqueued).toBe(1);
+    expect(r.skipped).toBe(0);
+    expect(queue.batches).toHaveLength(1);
+  });
+
   it('A3_enqueue_new_note', async () => {
     const store = new PlannerFakeStore();
     const queue = new PlannerFakeQueue();

@@ -13,9 +13,9 @@ describe('OllamaEmbeddingAdapter', () => {
   });
 
   it('B1_ollama_url_and_body', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ embedding: [0.5, -0.5] }), { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ embeddings: [[0.5, -0.5]] }), { status: 200 }),
+    );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const adapter = new OllamaEmbeddingAdapter({
@@ -26,17 +26,17 @@ describe('OllamaEmbeddingAdapter', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://127.0.0.1:11434/api/embeddings');
+    expect(url).toBe('http://127.0.0.1:11434/api/embed');
     expect(init.method).toBe('POST');
-    const body = JSON.parse(init.body as string) as { model: string; input: string };
+    const body = JSON.parse(init.body as string) as { model: string; input: string[] };
     expect(body.model).toBe('nomic-embed-text');
-    expect(body.input).toBe('hello');
+    expect(body.input).toEqual(['hello']);
   });
 
   it('B1_normalizes_trailing_slash_on_base', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ embedding: [1] }), { status: 200 }));
+      .mockResolvedValue(new Response(JSON.stringify({ embeddings: [[1]] }), { status: 200 }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const adapter = new OllamaEmbeddingAdapter({
@@ -45,14 +45,15 @@ describe('OllamaEmbeddingAdapter', () => {
     });
     await adapter.embed(['a']);
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://127.0.0.1:11434/api/embeddings');
+    expect(url).toBe('http://127.0.0.1:11434/api/embed');
   });
 
   it('B2_ollama_order', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ embedding: [1, 0] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ embedding: [0, 2] }), { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ embeddings: [[1, 0], [0, 2]] }), { status: 200 }),
+      );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const adapter = new OllamaEmbeddingAdapter({
@@ -60,8 +61,22 @@ describe('OllamaEmbeddingAdapter', () => {
       model: 'm',
     });
     const vecs = await adapter.embed(['first', 'second']);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(vecs[0]).toEqual(new Float32Array([1, 0]));
     expect(vecs[1]).toEqual(new Float32Array([0, 2]));
+  });
+
+  it('B3_legacy_single_embedding_shape', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ embedding: [3, 4] }), { status: 200 }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const adapter = new OllamaEmbeddingAdapter({
+      baseUrl: 'http://localhost:11434',
+      model: 'm',
+    });
+    const vecs = await adapter.embed(['only']);
+    expect(vecs).toEqual([new Float32Array([3, 4])]);
   });
 });

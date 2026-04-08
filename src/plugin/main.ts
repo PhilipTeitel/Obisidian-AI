@@ -1,4 +1,4 @@
-import { Notice, Plugin } from 'obsidian';
+import { Plugin } from 'obsidian';
 import { getCoreLabel } from '../core/index.js';
 import { registerCommands } from './commands/registerCommands.js';
 import { SidecarLifecycle } from './client/SidecarLifecycle.js';
@@ -8,6 +8,7 @@ import type { ObsidianAISettings } from './settings/types.js';
 import { ChatView } from './ui/ChatView.js';
 import { ProgressSlideout } from './ui/ProgressSlideout.js';
 import { SearchView } from './ui/SearchView.js';
+import { showAiNotice } from './ui/showAiNotice.js';
 import { VIEW_TYPE_CHAT, VIEW_TYPE_PROGRESS, VIEW_TYPE_SEARCH } from './ui/viewIds.js';
 
 export default class ObsidianAIPlugin extends Plugin {
@@ -37,10 +38,7 @@ export default class ObsidianAIPlugin extends Plugin {
         'Obsidian AI: sidecar failed to start — set Node executable path in plugin settings (or OBSIDIAN_AI_NODE), deploy sidecar, reload plugin.',
         e,
       );
-      new Notice(
-        `Obsidian AI: sidecar failed to start. Check the developer console. ${detail}`,
-        12_000,
-      );
+      showAiNotice(`Obsidian AI: sidecar failed to start. ${detail}`, 12_000);
     }
   }
 

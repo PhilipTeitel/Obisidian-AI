@@ -207,14 +207,24 @@ export class SidecarRuntime {
         const runId = randomUUID();
         const r = await planAndApplyIncrementalIndex(
           { store: this.store!, queue: this.queue!, jobSteps: this.jobSteps! },
-          { runId, files: req.payload.files, deletedPaths: [] },
+          { runId, files: req.payload.files, deletedPaths: [], forceReindex: true },
         );
         this.log.info(
           { op: 'index/full', runId, enqueued: r.enqueued, ms: Date.now() - t0 },
           'sidecar.index.full',
         );
         this.startIndexDrain(req.payload.apiKey);
-        return { type: 'index/full', body: { runId, noteCount: r.enqueued } };
+        return {
+          type: 'index/full',
+          body: {
+            runId,
+            scannedCount: req.payload.files.length,
+            noteCount: r.enqueued,
+            enqueuedCount: r.enqueued,
+            skippedCount: r.skipped,
+            deletedCount: r.deleted,
+          },
+        };
       }
       case 'index/incremental': {
         this.ensureDb();
@@ -232,7 +242,17 @@ export class SidecarRuntime {
           'sidecar.index.incremental',
         );
         this.startIndexDrain(req.payload.apiKey);
-        return { type: 'index/incremental', body: { runId, noteCount: r.enqueued } };
+        return {
+          type: 'index/incremental',
+          body: {
+            runId,
+            scannedCount: req.payload.files.length,
+            noteCount: r.enqueued,
+            enqueuedCount: r.enqueued,
+            skippedCount: r.skipped,
+            deletedCount: r.deleted,
+          },
+        };
       }
       case 'index/status': {
         const body = this.getIndexStatus();

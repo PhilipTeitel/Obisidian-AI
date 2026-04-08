@@ -90,6 +90,10 @@ export function ensureVectorSchema(db: SqliteDatabase, options: VectorMigrationO
     throw new Error('ensureVectorSchema: run relational migrations first');
   }
 
+  // sqlite-vec registers the vec0 virtual table module per connection, not per database file.
+  // Existing vectorized databases still need the extension loaded on every open.
+  loadSqliteVec(db);
+
   if (current >= VECTOR_USER_VERSION) {
     const stored = getSchemaMeta(db, META_KEY_EMBEDDING_DIMENSION);
     if (stored === undefined) {
@@ -102,8 +106,6 @@ export function ensureVectorSchema(db: SqliteDatabase, options: VectorMigrationO
     }
     return;
   }
-
-  loadSqliteVec(db);
   ensureSchemaMetaTable(db);
 
   const d = dimension;

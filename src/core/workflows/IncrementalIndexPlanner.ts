@@ -14,6 +14,8 @@ export interface IncrementalIndexInput {
   runId: string;
   files: IndexFilePayload[];
   deletedPaths: string[];
+  /** Re-enqueue all provided files even when the stored content hash matches. */
+  forceReindex?: boolean;
   /** Optional display titles; default is the last path segment of each file `path`. */
   noteTitlesByPath?: Record<string, string>;
 }
@@ -37,6 +39,7 @@ export async function planAndApplyIncrementalIndex(
   let enqueued = 0;
   let deleted = 0;
   let skipped = 0;
+  const forceReindex = input.forceReindex === true;
 
   for (const path of input.deletedPaths) {
     await deps.store.deleteNote(path);
@@ -48,7 +51,7 @@ export async function planAndApplyIncrementalIndex(
   for (const f of input.files) {
     const path = f.path;
     const meta = await deps.store.getNoteMeta(path);
-    if (meta?.contentHash === f.hash) {
+    if (!forceReindex && meta?.contentHash === f.hash) {
       skipped += 1;
       continue;
     }

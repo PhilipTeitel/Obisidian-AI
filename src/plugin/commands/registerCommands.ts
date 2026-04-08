@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { showAiNotice } from '../ui/showAiNotice.js';
 import type ObsidianAIPlugin from '../main.js';
 import { getOpenAIApiKey } from '../settings/secretSettings.js';
 import { SearchView } from '../ui/SearchView.js';
@@ -6,10 +6,34 @@ import { VIEW_TYPE_CHAT, VIEW_TYPE_PROGRESS, VIEW_TYPE_SEARCH } from '../ui/view
 import { hashVaultText } from '../vault/hashVaultText.js';
 import { ObsidianVaultAccess } from '../vault/ObsidianVaultAccess.js';
 
+function formatIndexAck(
+  mode: 'full' | 'incremental',
+  body: {
+    runId: string;
+    scannedCount: number;
+    enqueuedCount: number;
+    skippedCount: number;
+    deletedCount: number;
+  },
+): string {
+  const parts = [
+    `scanned ${body.scannedCount}`,
+    `queued ${body.enqueuedCount}`,
+    `skipped ${body.skippedCount}`,
+  ];
+  if (mode === 'incremental') parts.push(`deleted ${body.deletedCount}`);
+  return `${mode === 'full' ? 'Full' : 'Incremental'} index run ${body.runId}: ${parts.join(', ')}.`;
+}
+
 async function buildIndexPayload(plugin: ObsidianAIPlugin) {
   const access = new ObsidianVaultAccess(plugin.app.vault, () => plugin.settings);
   const filesMeta = await access.listFiles([]);
   const apiKey = getOpenAIApiKey(plugin.app);
+  console.log('Obsidian AI: buildIndexPayload file discovery', {
+    fileCount: filesMeta.length,
+    indexedFolders: plugin.settings.indexedFolders,
+    excludedFolders: plugin.settings.excludedFolders,
+  });
   const files = await Promise.all(
     filesMeta.map(async (vf) => {
       const content = await access.readFile(vf.path);
@@ -34,24 +58,24 @@ async function revealView(plugin: ObsidianAIPlugin, viewType: string): Promise<v
 async function runFullReindex(plugin: ObsidianAIPlugin): Promise<void> {
   const transport = plugin.lifecycle?.getTransport();
   if (!transport) {
-    new Notice('Sidecar is not available.');
+    showAiNotice('Sidecar is not available.');
     return;
   }
   try {
     const payload = await buildIndexPayload(plugin);
     const res = await transport.send({ type: 'index/full', payload });
     if (res.type === 'index/full') {
-      new Notice(`Queued full index run ${res.body.runId} (${res.body.noteCount} notes).`);
+      showAiNotice(formatIndexAck('full', res.body));
     }
   } catch (e) {
-    new Notice(`Reindex failed: ${e instanceof Error ? e.message : String(e)}`);
+    showAiNotice(`Reindex failed: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
 async function runIncrementalReindex(plugin: ObsidianAIPlugin): Promise<void> {
   const transport = plugin.lifecycle?.getTransport();
   if (!transport) {
-    new Notice('Sidecar is not available.');
+    showAiNotice('Sidecar is not available.');
     return;
   }
   try {
@@ -61,10 +85,10 @@ async function runIncrementalReindex(plugin: ObsidianAIPlugin): Promise<void> {
       payload: { files, deletedPaths: [], apiKey },
     });
     if (res.type === 'index/incremental') {
-      new Notice(`Queued incremental index run ${res.body.runId} (${res.body.noteCount} notes).`);
+      showAiNotice(formatIndexAck('incremental', res.body));
     }
   } catch (e) {
-    new Notice(`Incremental index failed: ${e instanceof Error ? e.message : String(e)}`);
+    showAiNotice(`Incremental index failed: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 

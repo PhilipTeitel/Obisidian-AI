@@ -416,6 +416,35 @@ describe('IndexWorkflow', () => {
     expect(queue.acked).toHaveLength(0);
   });
 
+  it('E2_empty_embedding_vector_nack_with_clear_error', async () => {
+    const store = new FakeStore();
+    const jobSteps = new FakeJobSteps();
+    const queue = new FakeQueue();
+    const embed: IEmbeddingPort = {
+      async embed(texts: string[]) {
+        return texts.map(() => new Float32Array(0));
+      },
+    };
+    await processOneJob(
+      baseDeps(store, jobSteps, queue, embed),
+      {},
+      {
+        id: 'q',
+        payload: {
+          runId: 'r7',
+          noteId: 'n1',
+          vaultPath: 'p.md',
+          noteTitle: 'T',
+          markdown: 'Fail.\n',
+          contentHash: 'h',
+        },
+      },
+    );
+    expect(queue.nacked).toHaveLength(1);
+    expect(queue.nacked[0].reason).toMatch(/content embeddings: node .* expected length 4, got 0/);
+    expect(jobSteps.markFailedCalls).toHaveLength(1);
+  });
+
   it('F1_resume_reenqueue', async () => {
     const store = new FakeStore();
     const jobSteps = new FakeJobSteps();

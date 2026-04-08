@@ -48,7 +48,11 @@ describe('SidecarRuntime', () => {
     });
     expect(res.type).toBe('index/full');
     if (res.type !== 'index/full') throw new Error('expected index/full');
+    expect(res.body.scannedCount).toBe(1);
     expect(res.body.noteCount).toBe(1);
+    expect(res.body.enqueuedCount).toBe(1);
+    expect(res.body.skippedCount).toBe(0);
+    expect(res.body.deletedCount).toBe(0);
     expect(res.body.runId).toMatch(/^[0-9a-f-]{36}$/i);
   });
 });

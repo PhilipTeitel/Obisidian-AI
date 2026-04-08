@@ -1,6 +1,7 @@
-import { ItemView, Notice, WorkspaceLeaf } from 'obsidian';
+import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { IndexStatusResponse } from '../../core/domain/types.js';
 import type ObsidianAIPlugin from '../main.js';
+import { showAiNotice } from './showAiNotice.js';
 import { VIEW_TYPE_PROGRESS } from './viewIds.js';
 
 const POLL_MS = 2000;
@@ -60,7 +61,7 @@ export class ProgressSlideout extends ItemView {
       this.renderStatus(res.body);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      new Notice(`index/status failed: ${msg}`);
+      showAiNotice(`index/status failed: ${msg}`);
     }
   }
 

@@ -41,6 +41,27 @@ function isNonLeaf(nodes: DocumentNode[], nodeId: string): boolean {
   return nodes.some((n) => n.parentId === nodeId);
 }
 
+function assertEmbeddingBatch(
+  vectors: Float32Array[],
+  ids: string[],
+  expectedDimension: number,
+  label: 'content' | 'summary',
+): void {
+  if (vectors.length !== ids.length) {
+    throw new Error(
+      `${label} embeddings: provider returned ${vectors.length} vectors for ${ids.length} inputs`,
+    );
+  }
+  for (let i = 0; i < vectors.length; i++) {
+    const vector = vectors[i];
+    if (vector.length !== expectedDimension) {
+      throw new Error(
+        `${label} embeddings: node ${ids[i]} expected length ${expectedDimension}, got ${vector.length}`,
+      );
+    }
+  }
+}
+
 export async function processOneJob(
   deps: IndexWorkflowDeps,
   ctx: { apiKey?: string },
@@ -110,6 +131,7 @@ export async function processOneJob(
     }
     if (contentTexts.length > 0) {
       const vecs = await deps.embed.embed(contentTexts, ctx.apiKey);
+      assertEmbeddingBatch(vecs, contentIds, deps.embeddingDimension, 'content');
       for (let i = 0; i < contentIds.length; i++) {
         const nid = contentIds[i];
         const node = idToNode.get(nid);
@@ -136,6 +158,7 @@ export async function processOneJob(
     }
     if (summaryTexts.length > 0) {
       const vecs = await deps.embed.embed(summaryTexts, ctx.apiKey);
+      assertEmbeddingBatch(vecs, summaryIds, deps.embeddingDimension, 'summary');
       for (let i = 0; i < summaryIds.length; i++) {
         const nid = summaryIds[i];
         const row = await deps.store.getSummary(nid);

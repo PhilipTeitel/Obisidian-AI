@@ -1,0 +1,10 @@
+{
+  "configurations": [
+    {
+      "type": "node",
+      "name": "ws://127.0.0.1",
+      "request": "attach",
+      "port": 61911
+    }
+  ]
+}

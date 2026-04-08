@@ -185,7 +185,11 @@ export interface IndexIncrementalRequest {
 
 export interface IndexRunAck {
   runId: string;
+  scannedCount: number;
   noteCount: number;
+  enqueuedCount: number;
+  skippedCount: number;
+  deletedCount: number;
 }
 
 export interface JobStep {

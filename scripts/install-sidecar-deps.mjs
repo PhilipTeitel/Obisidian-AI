@@ -5,6 +5,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 
 /**
@@ -21,8 +22,13 @@ export function installSidecarRuntimeDeps(repoRoot, sidecarDest) {
   const deps = pkg.dependencies ?? {};
   const better = deps['better-sqlite3'];
   const vec = deps['sqlite-vec'];
-  if (typeof better !== 'string' || typeof vec !== 'string') {
-    console.error('install-sidecar-deps: root package.json missing better-sqlite3 / sqlite-vec in dependencies');
+  const betterPkgPath = path.join(repoRoot, 'node_modules', 'better-sqlite3', 'package.json');
+  const betterPkg = JSON.parse(fs.readFileSync(betterPkgPath, 'utf8'));
+  const bindings = betterPkg.dependencies?.bindings;
+  if (typeof better !== 'string' || typeof vec !== 'string' || typeof bindings !== 'string') {
+    console.error(
+      'install-sidecar-deps: missing better-sqlite3 / sqlite-vec / bindings dependency metadata',
+    );
     process.exit(1);
   }
   const sidecarPkg = {
@@ -31,6 +37,7 @@ export function installSidecarRuntimeDeps(repoRoot, sidecarDest) {
     type: 'commonjs',
     dependencies: {
       'better-sqlite3': better,
+      bindings,
       'sqlite-vec': vec,
     },
   };
@@ -47,5 +54,17 @@ export function installSidecarRuntimeDeps(repoRoot, sidecarDest) {
   }
   if (r.status !== 0 && r.status !== null) {
     process.exit(r.status);
+  }
+
+  // Fail during deploy instead of at sidecar startup if native runtime deps are incomplete.
+  const sidecarRequire = createRequire(path.join(sidecarDest, 'package.json'));
+  for (const mod of ['better-sqlite3', 'bindings', 'sqlite-vec']) {
+    try {
+      sidecarRequire.resolve(mod);
+    } catch (error) {
+      console.error(`install-sidecar-deps: failed to resolve ${mod} in ${sidecarDest}`);
+      console.error(error);
+      process.exit(1);
+    }
   }
 }

@@ -1,7 +1,8 @@
-import { ItemView, Notice, WorkspaceLeaf } from 'obsidian';
+import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { SearchResult } from '../../core/domain/types.js';
 import { getOpenAIApiKey } from '../settings/secretSettings.js';
 import type ObsidianAIPlugin from '../main.js';
+import { showAiNotice } from './showAiNotice.js';
 import { VIEW_TYPE_SEARCH } from './viewIds.js';
 
 const SNIPPET_STYLE_ID = 'obsidian-ai-search-snippet-style';
@@ -72,12 +73,12 @@ export class SearchView extends ItemView {
   private async runSearch(): Promise<void> {
     const transport = this.plugin.lifecycle?.getTransport();
     if (!transport) {
-      new Notice('Sidecar is not available.');
+      showAiNotice('Sidecar is not available.');
       return;
     }
     const q = this.queryInput.value.trim();
     if (!q) {
-      new Notice('Enter a search query.');
+      showAiNotice('Enter a search query.');
       return;
     }
     const s = this.plugin.settings;
@@ -90,13 +91,13 @@ export class SearchView extends ItemView {
         payload: { query: q, k: s.searchResultCount, apiKey },
       });
       if (res.type !== 'search') {
-        new Notice('Unexpected search response.');
+        showAiNotice('Unexpected search response.');
         return;
       }
       this.renderResults(res.body.results);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      new Notice(`Search failed: ${msg}`);
+      showAiNotice(`Search failed: ${msg}`);
       this.resultsEl.empty();
       this.resultsEl.createEl('p', { text: msg, cls: 'mod-warning' });
     }
