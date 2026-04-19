@@ -41,7 +41,9 @@ function isMarkdownPath(filePath: string): boolean {
   return normalizeVaultPath(filePath).toLowerCase().endsWith('.md');
 }
 
-function isMarkdownAbstractFile(file: TAbstractFile): file is TAbstractFile & { path: string; extension: string } {
+function isMarkdownAbstractFile(
+  file: TAbstractFile,
+): file is TAbstractFile & { path: string; extension: string } {
   const ext = (file as { extension?: unknown }).extension;
   return typeof file.path === 'string' && typeof ext === 'string' && ext.toLowerCase() === 'md';
 }
@@ -101,7 +103,8 @@ export class ObsidianVaultAccess implements IVaultAccessPort {
     const out: VaultFile[] = [];
     const markdownFiles = this.vault.getMarkdownFiles().map((f) => ({ path: f.path }));
     const files = markdownFiles.length > 0 ? [] : this.listFilesViaGetFiles();
-    const loaded = markdownFiles.length > 0 || files.length > 0 ? [] : this.listFilesViaAllLoadedFiles();
+    const loaded =
+      markdownFiles.length > 0 || files.length > 0 ? [] : this.listFilesViaAllLoadedFiles();
     let md = markdownFiles.length > 0 ? markdownFiles : files.length > 0 ? files : loaded;
     if (md.length === 0) {
       md = await this.listFilesViaAdapter();

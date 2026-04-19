@@ -13,9 +13,11 @@ describe('OllamaEmbeddingAdapter', () => {
   });
 
   it('B1_ollama_url_and_body', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ embeddings: [[0.5, -0.5]] }), { status: 200 }),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ embeddings: [[0.5, -0.5]] }), { status: 200 }),
+      );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const adapter = new OllamaEmbeddingAdapter({
@@ -49,11 +51,17 @@ describe('OllamaEmbeddingAdapter', () => {
   });
 
   it('B2_ollama_order', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ embeddings: [[1, 0], [0, 2]] }), { status: 200 }),
-      );
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          embeddings: [
+            [1, 0],
+            [0, 2],
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const adapter = new OllamaEmbeddingAdapter({

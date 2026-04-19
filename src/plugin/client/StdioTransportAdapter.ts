@@ -19,10 +19,7 @@ export class StdioTransportAdapter implements ISidecarTransport {
   private rl: readline.Interface;
   private closed = false;
 
-  constructor(
-    stdin: Writable,
-    stdout: NodeJS.ReadableStream,
-  ) {
+  constructor(stdin: Writable, stdout: NodeJS.ReadableStream) {
     this.rl = readline.createInterface({ input: stdout, crlfDelay: Infinity });
     this.rl.on('line', (line) => this.onLine(line));
     this.stdin = stdin;

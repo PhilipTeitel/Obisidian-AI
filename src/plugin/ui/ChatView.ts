@@ -46,8 +46,12 @@ export class ChatView extends ItemView {
       attr: { rows: 3, placeholder: 'Message…' },
     });
     const actions = inputRow.createDiv();
-    actions.createEl('button', { text: 'Send' }).addEventListener('click', () => void this.sendUserMessage());
-    actions.createEl('button', { text: 'Cancel' }).addEventListener('click', () => this.cancelStream());
+    actions
+      .createEl('button', { text: 'Send' })
+      .addEventListener('click', () => void this.sendUserMessage());
+    actions
+      .createEl('button', { text: 'Cancel' })
+      .addEventListener('click', () => this.cancelStream());
     this.renderMessages();
   }
 

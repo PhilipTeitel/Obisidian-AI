@@ -39,10 +39,10 @@ The plugin uses Obsidian’s console; the sidecar is a separate Node process and
 
 ## Alternatives considered
 
-| Alternative | Why not chosen |
-|-------------|----------------|
-| `winston` | README prefers Pino for Node sidecar; Pino is lighter for JSON-first use. |
-| `console.log` only | No levels/child fields; hard to redact consistently. |
+| Alternative        | Why not chosen                                                            |
+| ------------------ | ------------------------------------------------------------------------- |
+| `winston`          | README prefers Pino for Node sidecar; Pino is lighter for JSON-first use. |
+| `console.log` only | No levels/child fields; hard to redact consistently.                      |
 
 ---
 

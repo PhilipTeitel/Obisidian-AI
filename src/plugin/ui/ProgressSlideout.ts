@@ -34,7 +34,9 @@ export class ProgressSlideout extends ItemView {
     root.empty();
     root.createEl('h4', { text: 'Index progress' });
     const refreshRow = root.createDiv();
-    refreshRow.createEl('button', { text: 'Refresh now' }).addEventListener('click', () => void this.refresh());
+    refreshRow
+      .createEl('button', { text: 'Refresh now' })
+      .addEventListener('click', () => void this.refresh());
     this.bodyEl = root.createDiv({ cls: 'obsidian-ai-progress-body' });
     void this.refresh();
     this.timer = window.setInterval(() => void this.refresh(), POLL_MS);

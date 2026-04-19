@@ -34,11 +34,7 @@ export interface IDocumentStore {
     meta: EmbedMeta,
   ): Promise<void>;
   searchSummaryVectors(query: Float32Array, k: number): Promise<VectorMatch[]>;
-  searchContentVectors(
-    query: Float32Array,
-    k: number,
-    filter?: NodeFilter,
-  ): Promise<VectorMatch[]>;
+  searchContentVectors(query: Float32Array, k: number, filter?: NodeFilter): Promise<VectorMatch[]>;
   getAncestors(nodeId: string): Promise<DocumentNode[]>;
   getSiblings(nodeId: string): Promise<DocumentNode[]>;
   getNoteMeta(noteId: string): Promise<NoteMeta | null>;

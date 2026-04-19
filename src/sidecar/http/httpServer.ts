@@ -37,7 +37,11 @@ function unauthorized(res: ServerResponse): void {
  * SRV-2: REST + WebSocket on 127.0.0.1 only.
  * @returns Node HTTP server (use `listen` event + `address()` in tests; port `0` = ephemeral).
  */
-export function startHttpServer(runtime: SidecarRuntime, log: Logger, options: HttpSidecarOptions): Server {
+export function startHttpServer(
+  runtime: SidecarRuntime,
+  log: Logger,
+  options: HttpSidecarOptions,
+): Server {
   const { port, token, onWsClient } = options;
 
   const server = createServer((req, res) => {
@@ -124,7 +128,10 @@ async function handleHttp(
 
     if (method === 'POST' && path === '/index/incremental') {
       const raw = await readBody(req);
-      const payload = JSON.parse(raw) as Extract<SidecarRequest, { type: 'index/incremental' }>['payload'];
+      const payload = JSON.parse(raw) as Extract<
+        SidecarRequest,
+        { type: 'index/incremental' }
+      >['payload'];
       const r = await runtime.handleSend({ type: 'index/incremental', payload });
       sendJson(res, 200, r.body);
       return;

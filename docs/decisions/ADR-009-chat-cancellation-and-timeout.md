@@ -44,11 +44,11 @@ Without an explicit contract, implementers may bake timeouts only into one adapt
 
 ## Alternatives considered
 
-| Alternative | Why not chosen |
-|-------------|----------------|
+| Alternative                                                    | Why not chosen                                                                                |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Timeout only inside each vendor adapter with no port parameter | Duplicates logic; hard to test from core; ignores user-configured `chatTimeout` consistently. |
-| Separate `ICancellableChatPort` | Splits the ecosystem; all MVP providers need both stream and cancel. |
-| No transport-level signal; only UI-side ignore | Wastes sidecar CPU/network; poor UX on slow models. |
+| Separate `ICancellableChatPort`                                | Splits the ecosystem; all MVP providers need both stream and cancel.                          |
+| No transport-level signal; only UI-side ignore                 | Wastes sidecar CPU/network; poor UX on slow models.                                           |
 
 ---
 

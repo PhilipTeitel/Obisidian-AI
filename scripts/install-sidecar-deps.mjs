@@ -41,7 +41,10 @@ export function installSidecarRuntimeDeps(repoRoot, sidecarDest) {
       'sqlite-vec': vec,
     },
   };
-  fs.writeFileSync(path.join(sidecarDest, 'package.json'), JSON.stringify(sidecarPkg, null, 2) + '\n');
+  fs.writeFileSync(
+    path.join(sidecarDest, 'package.json'),
+    JSON.stringify(sidecarPkg, null, 2) + '\n',
+  );
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const r = spawnSync(npm, ['install', '--omit=dev', '--no-audit', '--no-fund'], {
     cwd: sidecarDest,

@@ -26,9 +26,7 @@ export function validateSearchAssemblyOptions(opts: SearchAssemblyOptions): void
   }
   const sum = matchedContent + siblingContext + parentSummary;
   if (Math.abs(sum - 1) > SUM_TOLERANCE) {
-    throw new Error(
-      `Context budget fractions must sum to 1.0 (±${SUM_TOLERANCE}), got ${sum}`,
-    );
+    throw new Error(`Context budget fractions must sum to 1.0 (±${SUM_TOLERANCE}), got ${sum}`);
   }
 }
 
@@ -69,8 +67,7 @@ export function assembleSearchSnippet(input: AssembleSnippetInput): string {
   const parentBlock = truncateToMaxTokens(input.parentSummaryText, maxParent);
 
   const title = noteTitleFromPath(input.vaultPath);
-  const trail =
-    input.headingTrail.length > 0 ? input.headingTrail.join(' > ') : '(root)';
+  const trail = input.headingTrail.length > 0 ? input.headingTrail.join(' > ') : '(root)';
 
   return [
     `## Note: "${title}" (${input.vaultPath})`,

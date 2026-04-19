@@ -49,7 +49,9 @@ export class OllamaEmbeddingAdapter implements IEmbeddingPort {
     try {
       json = JSON.parse(rawBody) as { embeddings?: number[][]; embedding?: number[] };
     } catch {
-      throw new Error(`Ollama embeddings: invalid JSON (HTTP ${res.status}): ${rawBody.slice(0, 200)}`);
+      throw new Error(
+        `Ollama embeddings: invalid JSON (HTTP ${res.status}): ${rawBody.slice(0, 200)}`,
+      );
     }
     if (Array.isArray(json.embeddings)) {
       return json.embeddings.map((embedding) => Float32Array.from(embedding));

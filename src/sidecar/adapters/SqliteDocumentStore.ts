@@ -97,9 +97,7 @@ export class SqliteDocumentStore implements IDocumentStore {
       this.db
         .prepare(`DELETE FROM tags WHERE node_id IN (SELECT id FROM nodes WHERE note_id = ?)`)
         .run(noteId);
-      const ins = this.db.prepare(
-        `INSERT INTO tags (node_id, tag, source) VALUES (?, ?, ?)`,
-      );
+      const ins = this.db.prepare(`INSERT INTO tags (node_id, tag, source) VALUES (?, ?, ?)`);
       for (const t of tags) {
         ins.run(t.nodeId, t.tag, t.source);
       }
@@ -160,9 +158,7 @@ export class SqliteDocumentStore implements IDocumentStore {
   async getSummary(nodeId: string): Promise<StoredSummary | null> {
     const row = this.db
       .prepare('SELECT summary, generated_at, model FROM summaries WHERE node_id = ?')
-      .get(nodeId) as
-      | { summary: string; generated_at: string; model: string | null }
-      | undefined;
+      .get(nodeId) as { summary: string; generated_at: string; model: string | null } | undefined;
     if (!row) return null;
     return {
       summary: row.summary,

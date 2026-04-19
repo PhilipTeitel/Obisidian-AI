@@ -75,7 +75,9 @@ export class OpenAIEmbeddingAdapter implements IEmbeddingPort {
     try {
       json = JSON.parse(rawBody) as { data: Array<{ embedding: number[]; index: number }> };
     } catch {
-      throw new Error(`OpenAI embeddings: invalid JSON (HTTP ${res.status}): ${rawBody.slice(0, 200)}`);
+      throw new Error(
+        `OpenAI embeddings: invalid JSON (HTTP ${res.status}): ${rawBody.slice(0, 200)}`,
+      );
     }
     if (!Array.isArray(json.data)) {
       throw new Error('OpenAI embeddings: response missing data array');

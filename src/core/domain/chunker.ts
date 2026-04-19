@@ -22,10 +22,7 @@ import type {
 } from './types.js';
 import { parseFrontmatterForTags } from './frontmatterTags.js';
 import { extractInlineTagsFromText } from './inlineTags.js';
-import {
-  canonicalParagraphBody,
-  splitIntoSentences,
-} from './sentenceSplitter.js';
+import { canonicalParagraphBody, splitIntoSentences } from './sentenceSplitter.js';
 import { DEFAULT_MAX_EMBEDDING_TOKENS, estimateTokens } from './tokenEstimator.js';
 import { extractCrossRefsFromContent, vaultDirOf } from './wikilinkParser.js';
 
@@ -54,8 +51,7 @@ export function partitionFrontmatter(markdown: string): {
   if (!t.startsWith('---')) return { frontmatter: null, body: markdown };
   const afterFirst = t.slice(3);
   const firstNl = afterFirst.indexOf('\n');
-  const rest =
-    firstNl === -1 ? afterFirst : afterFirst.slice(firstNl + 1);
+  const rest = firstNl === -1 ? afterFirst : afterFirst.slice(firstNl + 1);
   const endMarker = '\n---';
   const endIdx = rest.indexOf(endMarker);
   if (endIdx === -1) return { frontmatter: null, body: markdown };
@@ -91,8 +87,7 @@ export function phrasingToMarkdown(nodes: readonly PhrasingContent[]): string {
         out += '*' + phrasingToMarkdown(n.children) + '*';
         break;
       case 'link':
-        out +=
-          '[' + phrasingToMarkdown(n.children) + '](' + n.url + ')';
+        out += '[' + phrasingToMarkdown(n.children) + '](' + n.url + ')';
         break;
       case 'image':
         out += '![' + (n.alt ?? '') + '](' + n.url + ')';
@@ -101,13 +96,8 @@ export function phrasingToMarkdown(nodes: readonly PhrasingContent[]): string {
         out += '~~' + phrasingToMarkdown(n.children) + '~~';
         break;
       default:
-        if (
-          'children' in n &&
-          Array.isArray((n as { children?: unknown }).children)
-        ) {
-          out += phrasingToMarkdown(
-            (n as { children: PhrasingContent[] }).children,
-          );
+        if ('children' in n && Array.isArray((n as { children?: unknown }).children)) {
+          out += phrasingToMarkdown((n as { children: PhrasingContent[] }).children);
         }
         break;
     }
@@ -190,11 +180,7 @@ class ChunkerCtx {
   }
 }
 
-function maybeSplitParagraph(
-  ctx: ChunkerCtx,
-  p: DocumentNode,
-  maxTokens: number,
-): void {
+function maybeSplitParagraph(ctx: ChunkerCtx, p: DocumentNode, maxTokens: number): void {
   if (p.type !== 'paragraph') return;
   const canon = canonicalParagraphBody(p.content);
   if (estimateTokens(canon) <= maxTokens) return;
@@ -252,11 +238,7 @@ function processNestedList(list: List, parentBulletId: string, ctx: ChunkerCtx):
   }
 }
 
-function processListItem(
-  item: ListItem,
-  parentGroupId: string,
-  ctx: ChunkerCtx,
-): void {
+function processListItem(item: ListItem, parentGroupId: string, ctx: ChunkerCtx): void {
   const group = ctx.byId.get(parentGroupId)!;
   const { text, nestedLists } = listItemParts(item);
   const bullet = ctx.pushDocNode({
@@ -295,8 +277,7 @@ function processBlock(node: BlockContent, ctx: ChunkerCtx, noteId: string): void
       while (ctx.stack.length && ctx.stack[ctx.stack.length - 1]!.depth >= d) {
         ctx.stack.pop();
       }
-      const parentId =
-        ctx.stack.length > 0 ? ctx.stack[ctx.stack.length - 1]!.id : noteId;
+      const parentId = ctx.stack.length > 0 ? ctx.stack[ctx.stack.length - 1]!.id : noteId;
       const headingTrail = ctx.stack.map((s) => s.title);
       const parentNode = ctx.byId.get(parentId)!;
       const title = phrasingToMarkdown(h.children);
@@ -399,9 +380,7 @@ export function chunkNote(input: ChunkNoteInput): ChunkNoteResult {
   for (const n of ctx.nodes) {
     if (n.type === 'bullet_group' || n.type === 'sentence_part') continue;
     if (!n.content) continue;
-    crossRefs.push(
-      ...extractCrossRefsFromContent(n.content, n.id, vaultDir),
-    );
+    crossRefs.push(...extractCrossRefsFromContent(n.content, n.id, vaultDir));
     inlineTags.push(...extractInlineTagsFromText(n.content, n.id));
   }
 

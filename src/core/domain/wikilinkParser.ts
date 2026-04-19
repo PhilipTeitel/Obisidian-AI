@@ -30,10 +30,7 @@ function shouldSkipMarkdownTarget(target: string): boolean {
   return false;
 }
 
-export function resolveMarkdownLinkTarget(
-  target: string,
-  vaultDir: string,
-): string | null {
+export function resolveMarkdownLinkTarget(target: string, vaultDir: string): string | null {
   if (shouldSkipMarkdownTarget(target)) return null;
   let path = target.trim().replace(/\\/gu, '/');
   if (path.startsWith('./')) path = path.slice(2);

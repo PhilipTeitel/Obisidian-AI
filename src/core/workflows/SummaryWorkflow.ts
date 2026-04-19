@@ -90,7 +90,10 @@ function postorder(nodes: DocumentNode[], rootId: string): DocumentNode[] {
 /**
  * Zip pre-order lists: structural/content mismatch marks the new node and all its ancestors dirty.
  */
-export function computeDirtyNodeIds(oldNodes: DocumentNode[], newNodes: DocumentNode[]): Set<string> {
+export function computeDirtyNodeIds(
+  oldNodes: DocumentNode[],
+  newNodes: DocumentNode[],
+): Set<string> {
   const dirty = new Set<string>();
   const newById = new Map(newNodes.map((n) => [n.id, n]));
 
@@ -186,9 +189,7 @@ async function summarizeNonLeaf(
   for (const ch of children) {
     const text = await childTextForPrompt(deps.store, nodes, ch);
     const trail = ch.headingTrail.length ? ch.headingTrail.join(' > ') : '(root)';
-    sections.push(
-      `### ${ch.type} (${trail})\n${text}`,
-    );
+    sections.push(`### ${ch.type} (${trail})\n${text}`);
   }
   const system = `You are a concise note indexer. Produce a short summary (2–4 sentences) of the child sections for hierarchical search. Model: ${input.chatModelLabel}.`;
   const user = sections.join('\n\n');
@@ -215,7 +216,10 @@ async function summarizeNonLeaf(
 /**
  * Generate bottom-up summaries for one note; uses `chunkNote` unless `input.precomputed` is set.
  */
-export async function summarizeNote(deps: SummaryWorkflowDeps, input: SummaryWorkflowInput): Promise<void> {
+export async function summarizeNote(
+  deps: SummaryWorkflowDeps,
+  input: SummaryWorkflowInput,
+): Promise<void> {
   const oldNodes = await deps.store.getNodesByNote(input.noteId);
   const result =
     input.precomputed ??

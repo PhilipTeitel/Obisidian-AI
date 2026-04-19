@@ -25,7 +25,10 @@ type SqliteDb = ReturnType<typeof openDatabase>;
 
 const QUEUE_NAME = 'index';
 
-function parseProvider(raw: string | undefined, fallback: 'openai' | 'ollama'): 'openai' | 'ollama' {
+function parseProvider(
+  raw: string | undefined,
+  fallback: 'openai' | 'ollama',
+): 'openai' | 'ollama' {
   const v = raw?.trim().toLowerCase();
   return v === 'ollama' ? 'ollama' : fallback;
 }
@@ -182,10 +185,14 @@ export class SidecarRuntime {
       )
       .get(qn) as Record<string, number | null>;
     const failedJobs = (
-      db.prepare(`SELECT COUNT(*) as c FROM job_steps WHERE current_step = 'failed'`).get() as { c: number }
+      db.prepare(`SELECT COUNT(*) as c FROM job_steps WHERE current_step = 'failed'`).get() as {
+        c: number;
+      }
     ).c;
     const deadJobs = (
-      db.prepare(`SELECT COUNT(*) as c FROM job_steps WHERE current_step = 'dead_letter'`).get() as { c: number }
+      db
+        .prepare(`SELECT COUNT(*) as c FROM job_steps WHERE current_step = 'dead_letter'`)
+        .get() as { c: number }
     ).c;
     return {
       pending: row.pending ?? 0,
@@ -261,15 +268,16 @@ export class SidecarRuntime {
       case 'search': {
         this.ensureDb();
         const body = await runSearch(this.getSearchDeps(), req.payload, DEFAULT_SEARCH_ASSEMBLY);
-        this.log.info({ op: 'search', ms: Date.now() - t0, n: body.results.length }, 'sidecar.search');
+        this.log.info(
+          { op: 'search', ms: Date.now() - t0, n: body.results.length },
+          'sidecar.search',
+        );
         return { type: 'search', body };
       }
       case 'chat/clear':
         return { type: 'chat/clear', body: { ok: true } };
       default:
-        throw new Error(
-          `unsupported sidecar operation: ${(req as { type: string }).type}`,
-        );
+        throw new Error(`unsupported sidecar operation: ${(req as { type: string }).type}`);
     }
   }
 

@@ -49,10 +49,7 @@ const TAG_RE = /#([a-zA-Z0-9_/-]+)/gu;
 /**
  * Obsidian-style `#tag` tokens outside code fences / inline code (CHK-5).
  */
-export function extractInlineTagsFromText(
-  text: string,
-  nodeId: string,
-): ParsedTag[] {
+export function extractInlineTagsFromText(text: string, nodeId: string): ParsedTag[] {
   const ex = buildCodeExclusions(text);
   const seen = new Set<string>();
   const out: ParsedTag[] = [];

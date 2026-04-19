@@ -39,7 +39,9 @@ export class HttpTransportAdapter implements ISidecarTransport {
     const b = this.base();
     switch (request.type) {
       case 'health': {
-        const r = await fetch(`${b}/health`, { headers: { Authorization: `Bearer ${this.token}` } });
+        const r = await fetch(`${b}/health`, {
+          headers: { Authorization: `Bearer ${this.token}` },
+        });
         const body = (await r.json()) as HealthResponse;
         if (!r.ok) throw new Error(`health failed: ${r.status}`);
         return { type: 'health', body };
@@ -65,7 +67,9 @@ export class HttpTransportAdapter implements ISidecarTransport {
         return { type: 'index/incremental', body };
       }
       case 'index/status': {
-        const r = await fetch(`${b}/index/status`, { headers: { Authorization: `Bearer ${this.token}` } });
+        const r = await fetch(`${b}/index/status`, {
+          headers: { Authorization: `Bearer ${this.token}` },
+        });
         const body = await r.json();
         if (!r.ok) throw new Error(`index/status failed: ${r.status}`);
         return { type: 'index/status', body };

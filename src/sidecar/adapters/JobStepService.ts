@@ -89,9 +89,7 @@ export class JobStepService implements IJobStepPort {
     }
     const row = this.db
       .prepare('SELECT current_step, note_path FROM job_steps WHERE job_id = ?')
-      .get(input.jobId) as
-      | { current_step: IndexStep; note_path: string }
-      | undefined;
+      .get(input.jobId) as { current_step: IndexStep; note_path: string } | undefined;
     if (!row) return;
     if (row.current_step === 'failed') {
       this.transitionStep({
@@ -102,7 +100,11 @@ export class JobStepService implements IJobStepPort {
       });
       return;
     }
-    if (row.current_step !== 'queued' && row.current_step !== 'embedded' && row.current_step !== 'dead_letter') {
+    if (
+      row.current_step !== 'queued' &&
+      row.current_step !== 'embedded' &&
+      row.current_step !== 'dead_letter'
+    ) {
       this.db
         .prepare(
           `UPDATE job_steps SET current_step = 'queued', error_message = NULL, updated_at = datetime('now') WHERE job_id = ?`,

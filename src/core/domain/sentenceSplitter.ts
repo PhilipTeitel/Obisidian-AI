@@ -8,16 +8,13 @@ export function canonicalParagraphBody(text: string): string {
   return text.replace(/\n+$/u, '');
 }
 
-const ABBREV_PATTERN =
-  /(?:e\.g\.|i\.e\.|Dr\.|Mr\.|Mrs\.|Ms\.|vs\.|etc\.)/giu;
+const ABBREV_PATTERN = /(?:e\.g\.|i\.e\.|Dr\.|Mr\.|Mrs\.|Ms\.|vs\.|etc\.)/giu;
 
 /** Placeholder for `.` inside protected abbreviations (not valid in Markdown text). */
 const DOT_PLACEHOLDER = '\uE999';
 
 function maskAbbreviationDots(text: string): string {
-  return text.replace(ABBREV_PATTERN, (m) =>
-    m.replace(/\./gu, DOT_PLACEHOLDER),
-  );
+  return text.replace(ABBREV_PATTERN, (m) => m.replace(/\./gu, DOT_PLACEHOLDER));
 }
 
 function unmaskAbbreviationDots(text: string): string {

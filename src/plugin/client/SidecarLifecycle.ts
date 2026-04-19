@@ -17,7 +17,11 @@ export interface SidecarHost {
 }
 
 export function vaultDefaultDbPath(vault: Vault): string {
-  const raw = vault.getName().replace(/[^a-z0-9_-]+/gi, '_').toLowerCase() || 'vault';
+  const raw =
+    vault
+      .getName()
+      .replace(/[^a-z0-9_-]+/gi, '_')
+      .toLowerCase() || 'vault';
   return path.join(os.homedir(), '.obsidian-ai', `${raw}.db`);
 }
 
@@ -141,8 +145,14 @@ function highestNvmInstalledVersionName(nvmRoot: string): string | undefined {
   });
   if (names.length === 0) return undefined;
   names.sort((a, b) => {
-    const pa = a.replace(/^v/, '').split('.').map((x) => parseInt(x, 10));
-    const pb = b.replace(/^v/, '').split('.').map((x) => parseInt(x, 10));
+    const pa = a
+      .replace(/^v/, '')
+      .split('.')
+      .map((x) => parseInt(x, 10));
+    const pb = b
+      .replace(/^v/, '')
+      .split('.')
+      .map((x) => parseInt(x, 10));
     for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
       const da = pa[i] ?? 0;
       const db = pb[i] ?? 0;
@@ -368,8 +378,16 @@ export class SidecarLifecycle {
       await Promise.race([once(child, 'spawn'), once(child, 'error')]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error('Obsidian AI: sidecar spawn failed', { pid: child.pid, node, args, script, error: e });
-      throw new Error(`Sidecar spawn failed (${msg}). Set Node executable path in Obsidian AI settings.`);
+      console.error('Obsidian AI: sidecar spawn failed', {
+        pid: child.pid,
+        node,
+        args,
+        script,
+        error: e,
+      });
+      throw new Error(
+        `Sidecar spawn failed (${msg}). Set Node executable path in Obsidian AI settings.`,
+      );
     }
 
     if (this.host.settings.transport === 'http') {
@@ -386,7 +404,9 @@ export class SidecarLifecycle {
     return adapter;
   }
 
-  private readHttpHandshake(child: ChildProcessWithoutNullStreams): Promise<{ baseUrl: string; token: string }> {
+  private readHttpHandshake(
+    child: ChildProcessWithoutNullStreams,
+  ): Promise<{ baseUrl: string; token: string }> {
     return new Promise((resolve, reject) => {
       let token = '';
       let baseUrl = '';

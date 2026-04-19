@@ -60,16 +60,9 @@ export async function* runChatStream(
   );
 
   const context =
-    searchRes.results.length > 0
-      ? searchRes.results.map((r) => r.snippet).join('\n\n---\n\n')
-      : '';
+    searchRes.results.length > 0 ? searchRes.results.map((r) => r.snippet).join('\n\n---\n\n') : '';
 
-  const stream = deps.chat.complete(
-    messages,
-    context,
-    options.apiKey,
-    options.completion,
-  );
+  const stream = deps.chat.complete(messages, context, options.apiKey, options.completion);
   for await (const delta of withChatCompletionControls(stream, options.completion)) {
     yield delta;
   }

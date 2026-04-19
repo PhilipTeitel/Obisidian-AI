@@ -117,9 +117,11 @@ export class SearchView extends ItemView {
         ev.preventDefault();
         void this.app.workspace.openLinkText(r.notePath, '', false);
       });
-      card.createEl('div', { text: `Score: ${r.score.toFixed(4)}`, cls: 'obsidian-ai-search-meta' });
-      const trail =
-        r.headingTrail.length > 0 ? r.headingTrail.join(' › ') : '(no heading trail)';
+      card.createEl('div', {
+        text: `Score: ${r.score.toFixed(4)}`,
+        cls: 'obsidian-ai-search-meta',
+      });
+      const trail = r.headingTrail.length > 0 ? r.headingTrail.join(' › ') : '(no heading trail)';
       card.createEl('div', { text: trail, cls: 'obsidian-ai-search-meta' });
       card.createEl('div', {
         text: r.snippet,

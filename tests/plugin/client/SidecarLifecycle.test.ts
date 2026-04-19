@@ -37,7 +37,9 @@ describe('SidecarLifecycle', () => {
 
   it('resolveSidecarNodeExecutable_uses_env_when_set', () => {
     process.env.OBSIDIAN_AI_NODE = process.execPath;
-    expect(resolveSidecarNodeExecutable({ nodeExecutablePath: '' })).toBe(path.resolve(process.execPath));
+    expect(resolveSidecarNodeExecutable({ nodeExecutablePath: '' })).toBe(
+      path.resolve(process.execPath),
+    );
   });
 
   it('resolveSidecarNodeExecutable_finds_node_without_electron', () => {

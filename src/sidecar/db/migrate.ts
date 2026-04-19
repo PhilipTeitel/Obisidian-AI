@@ -17,7 +17,9 @@ function migrationsDirectory(): string {
   }
   const entry = process.argv[1];
   if (!entry) {
-    throw new Error('migrate: cannot resolve migrations directory (no import.meta.url and no argv[1])');
+    throw new Error(
+      'migrate: cannot resolve migrations directory (no import.meta.url and no argv[1])',
+    );
   }
   return path.join(path.dirname(path.resolve(entry)), 'migrations');
 }

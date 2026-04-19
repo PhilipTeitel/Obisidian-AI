@@ -39,7 +39,10 @@ export async function dispatchStdioLine(
     return;
   }
   if (!isRecord(parsed) || typeof parsed.id !== 'string' || typeof parsed.type !== 'string') {
-    writeLine({ id: isRecord(parsed) && typeof parsed.id === 'string' ? parsed.id : 'unknown', error: { message: 'missing id or type' } });
+    writeLine({
+      id: isRecord(parsed) && typeof parsed.id === 'string' ? parsed.id : 'unknown',
+      error: { message: 'missing id or type' },
+    });
     return;
   }
   const id = parsed.id;

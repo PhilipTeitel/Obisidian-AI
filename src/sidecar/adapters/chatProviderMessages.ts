@@ -1,17 +1,13 @@
 import type { ChatMessage } from '../../core/domain/types.js';
 
 /** Must match PRV-2 / README: injected before the last user turn when context is non-empty. */
-export const VAULT_CONTEXT_PREFIX =
-  'Vault context (use only this material for answering):\n';
+export const VAULT_CONTEXT_PREFIX = 'Vault context (use only this material for answering):\n';
 
 /**
  * Map `(messages, context)` from `IChatPort.complete` to provider message arrays.
  * @see docs/features/PRV-2.md
  */
-export function buildMessagesWithContext(
-  messages: ChatMessage[],
-  context: string,
-): ChatMessage[] {
+export function buildMessagesWithContext(messages: ChatMessage[], context: string): ChatMessage[] {
   const ctx = context.trim();
   if (ctx === '') {
     return [...messages];

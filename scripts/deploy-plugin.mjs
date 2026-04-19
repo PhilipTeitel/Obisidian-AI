@@ -26,8 +26,7 @@ function parseArgs(argv) {
       process.exit(1);
     } else positional.push(a);
   }
-  const vaultRaw =
-    positional[0] ?? process.env.OBSIDIAN_VAULT ?? process.env.VAULT_PATH ?? null;
+  const vaultRaw = positional[0] ?? process.env.OBSIDIAN_VAULT ?? process.env.VAULT_PATH ?? null;
   if (!vaultRaw) {
     console.error(`deploy-plugin: missing vault path.
 

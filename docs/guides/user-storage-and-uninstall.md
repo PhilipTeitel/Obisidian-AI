@@ -27,4 +27,4 @@ This document describes where the **semantic index** lives on disk, how it relat
 
 ---
 
-*Part of Epic 10 (DOC-2).*
+_Part of Epic 10 (DOC-2)._

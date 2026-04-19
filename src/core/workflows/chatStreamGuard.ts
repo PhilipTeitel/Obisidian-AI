@@ -26,8 +26,7 @@ export async function* withChatCompletionControls(
       if (sig?.aborted) {
         break;
       }
-      const remaining =
-        deadline !== null ? Math.max(0, deadline - Date.now()) : null;
+      const remaining = deadline !== null ? Math.max(0, deadline - Date.now()) : null;
       if (remaining !== null && remaining === 0) {
         break;
       }

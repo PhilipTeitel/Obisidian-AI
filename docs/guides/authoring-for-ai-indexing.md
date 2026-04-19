@@ -4,7 +4,7 @@ This guide explains how everyday Obsidian writing habits affect **hierarchical i
 
 ## Headings
 
-- **Outline hierarchy:** `#` / `##` / `###` (and deeper) define **topics and subtopics** in the index tree. Clear headings give the chunker **heading trails** so search snippets and chat context can show *where* in the note a passage lived.
+- **Outline hierarchy:** `#` / `##` / `###` (and deeper) define **topics and subtopics** in the index tree. Clear headings give the chunker **heading trails** so search snippets and chat context can show _where_ in the note a passage lived.
 - **Skipping headings:** Long runs of body text without headings still index as paragraphs under the note root, but you lose navigable structure for coarse retrieval.
 
 ## Paragraphs and bullets
@@ -32,4 +32,4 @@ This guide explains how everyday Obsidian writing habits affect **hierarchical i
 
 ---
 
-*Part of Epic 10 (DOC-1).*
+_Part of Epic 10 (DOC-1)._
