@@ -3,7 +3,7 @@
 **Story**: Replace the free-prose summary prompt in `SummaryWorkflow` with a breadth-preserving **structured rubric** for `note`, `topic`, and `subtopic` nodes (topics, entities, dates, actions, tags); **skip** summary generation and embedding entirely for `bullet_group` nodes; stamp every stored summary with the current `SUMMARY_RUBRIC_VERSION` so older-version rows regenerate automatically on the next summary pass.
 **Epic**: 4 — Index, summary, and embedding workflows
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -144,8 +144,9 @@ Not applicable.
 | 1 | `src/core/domain/summaryPrompts.ts` | Exports `SUMMARY_RUBRIC_VERSION`, `SUMMARY_RUBRIC_V1` prompt string, and `selectSummaryPrompt(nodeType)`. Pure string template; no provider / sqlite / obsidian imports (Y1). |
 | 2 | `tests/core/domain/summaryPrompts.test.ts` | Unit tests assert the rubric prompt contains all five field labels (`topics`, `entities`, `dates`, `actions`, `tags`), documents caps inline, and that `selectSummaryPrompt` returns the rubric for `note`/`topic`/`subtopic` and `null` for `bullet_group` / leaves. |
 | 3 | `tests/core/workflows/SummaryWorkflow.rubric.test.ts` | Workflow-level tests for prompt selection, `bullet_group` skip, truncation-with-warn-log behavior, and version-based invalidation (A1–A4, B1–B4, C1, D2, D3). |
-| 4 | `tests/core/ports/IDocumentStore.contract.ts` | Generic contract suite any `IDocumentStore` adapter must pass, including `promptVersion` round-trip on `upsertSummary` / `getSummary`. Exported so adapter integration tests can mount it. |
-| 5 | `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts` | Integration test against a real `better-sqlite3` DB (hermetic fixture at `var/test/wkf-4-summaries.db`) with STO-4's migration applied; mounts the contract suite and asserts column-level persistence. |
+| 4 | `tests/core/ports/IDocumentStore.contract.ts` | Exported `assertPromptVersionRoundTrip(store)` (core-only imports; no sidecar). Adapter tests mount this helper. |
+| 5 | `tests/sidecar/adapters/IDocumentStore.promptVersion.contract.test.ts` | Vitest `promptVersion_round_trip` against `SqliteDocumentStore` + in-memory migrated DB (FND-3: contract test lives under `tests/sidecar/`). |
+| 6 | `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts` | Integration tests on a real `better-sqlite3` file DB (temp dir) with migrations + vector schema; D1, A4, Y2, Y4–Y6, Y8. |
 
 ### Files to MODIFY
 
@@ -156,7 +157,8 @@ Not applicable.
 | 3 | `src/core/domain/types.ts` | Add `promptVersion: string` to `StoredSummary`. |
 | 4 | `src/sidecar/adapters/SqliteDocumentStore.ts` | Bind the `promptVersion` parameter in the `INSERT … ON CONFLICT … DO UPDATE` for `summaries`; project `prompt_version` in the `getSummary` read. |
 | 5 | `tests/core/workflows/SummaryWorkflow.test.ts` | Update any existing fixtures that assumed a prose prompt shape. |
-| 6 | `README.md` | In the Epic 4 backlog row for WKF-4, update the link to point at this refreshed story. |
+| 6 | `tests/contract/document-store.contract.ts` | `upsertSummary` / `getSummary` assertions include `promptVersion` (STO-4 / WKF-4 schema). |
+| 7 | `README.md` | Epic 4 WKF-4 backlog row + API table `upsertSummary` signature include `promptVersion`. |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -174,95 +176,95 @@ Not applicable.
 
 ### Phase A: Prompt selection and `bullet_group` skip
 
-- [ ] **A1** — `SummaryWorkflow` invokes `IChatPort.complete` with `SUMMARY_RUBRIC_V1` when summarizing a `note` node; the captured prompt contains the five rubric field labels (`topics`, `entities`, `dates`, `actions`, `tags`) and does **not** contain the legacy "2–4 sentences" phrasing.
+- [x] **A1** — `SummaryWorkflow` invokes `IChatPort.complete` with `SUMMARY_RUBRIC_V1` when summarizing a `note` node; the captured prompt contains the five rubric field labels (`topics`, `entities`, `dates`, `actions`, `tags`) and does **not** contain the legacy "2–4 sentences" phrasing.
   - Verification: capture the prompt argument on a fake `IChatPort`; assert every rubric label is present and the prose phrasing is absent.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::A1_note_uses_rubric(vitest)`
 
-- [ ] **A2** — For a note containing at least one `topic` and one `subtopic` descendant, `SummaryWorkflow` invokes `IChatPort.complete` with `SUMMARY_RUBRIC_V1` scoped to each section's subtree; captured prompts for `topic` and `subtopic` both expose the same five rubric labels.
+- [x] **A2** — For a note containing at least one `topic` and one `subtopic` descendant, `SummaryWorkflow` invokes `IChatPort.complete` with `SUMMARY_RUBRIC_V1` scoped to each section's subtree; captured prompts for `topic` and `subtopic` both expose the same five rubric labels.
   - Verification: spy on `IChatPort.complete`; assert rubric labels present for both node types.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::A2_topic_and_subtopic_use_rubric(vitest)`
 
-- [ ] **A3** — For a note containing one or more `bullet_group` nodes, the workflow makes **zero** `IChatPort.complete` calls and **zero** `IDocumentStore.upsertSummary` calls for those nodes; `getSummary(bulletGroupId)` returns `null` afterwards.
+- [x] **A3** — For a note containing one or more `bullet_group` nodes, the workflow makes **zero** `IChatPort.complete` calls and **zero** `IDocumentStore.upsertSummary` calls for those nodes; `getSummary(bulletGroupId)` returns `null` afterwards.
   - Verification: counted spies on both ports return zero calls for `bullet_group` node ids; store round-trip returns `null`.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::A3_bullet_group_skipped(vitest)`
 
-- [ ] **A4** — Bullet content remains reachable via the content-vector path: given a note whose only mention of a fact lives inside a bullet under a `bullet_group`, a query for that fact returns the bullet's node id via `IDocumentStore.searchContentVectors` under its enclosing `subtopic`/`note` ancestor.
+- [x] **A4** — Bullet content remains reachable via the content-vector path: given a note whose only mention of a fact lives inside a bullet under a `bullet_group`, a query for that fact returns the bullet's node id via `IDocumentStore.searchContentVectors` under its enclosing `subtopic`/`note` ancestor.
   - Verification: integration-level search through `SqliteDocumentStore.searchContentVectors`; result set contains the bullet's node id with a non-null parent linkage.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::A4_bullet_still_retrievable(vitest)`
 
 ### Phase B: Rubric structure and well-formedness
 
-- [ ] **B1** — The exported `SUMMARY_RUBRIC_V1` string declares each of the five rubric field labels exactly once and documents per-field item caps for each; no sixth field label is present.
+- [x] **B1** — The exported `SUMMARY_RUBRIC_V1` string declares each of the five rubric field labels exactly once and documents per-field item caps for each; no sixth field label is present.
   - Verification: string matching on exports from `src/core/domain/summaryPrompts.ts`.
   - Evidence: `tests/core/domain/summaryPrompts.test.ts::B1_rubric_headers_and_caps(vitest)`
 
-- [ ] **B2** — When the chat port returns rubric output that exceeds the documented per-field item caps, the stored summary text still conforms to the caps (the workflow or prompt enforcement drops extras at a documented boundary); the persisted `summary_text` therefore has no more than the capped item count per field.
+- [x] **B2** — When the chat port returns rubric output that exceeds the documented per-field item caps, the stored summary text still conforms to the caps (the workflow or prompt enforcement drops extras at a documented boundary); the persisted `summary_text` therefore has no more than the capped item count per field.
   - Verification: drive a fake `IChatPort` with oversized rubric output; assert persisted text honors caps.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::B2_per_field_caps(vitest)`
 
-- [ ] **B3** — When the chat port returns rubric output where some fields are empty (e.g. a note with no actions), the stored summary is still structurally well-formed (each rubric field label is present with an empty or absent value) and no exception is thrown.
+- [x] **B3** — When the chat port returns rubric output where some fields are empty (e.g. a note with no actions), the stored summary is still structurally well-formed (each rubric field label is present with an empty or absent value) and no exception is thrown.
   - Verification: drive the fake with rubric output missing one or more field bodies; assert persistence succeeds and stored text preserves the overall rubric shape.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::B3_empty_fields_well_formed(vitest)`
 
-- [ ] **B4** — The workflow does not fabricate rubric items on empty-field cases: when `IChatPort.complete` returns empty field bodies, the workflow does **not** replace them with synthesized values before persisting. The `summary_text` persisted equals the (possibly truncated) output the port returned.
+- [x] **B4** — The workflow does not fabricate rubric items on empty-field cases: when `IChatPort.complete` returns empty field bodies, the workflow does **not** replace them with synthesized values before persisting. The `summary_text` persisted equals the (possibly truncated) output the port returned.
   - Verification: capture the port's returned string and the persisted string; assert textual equivalence modulo documented truncation.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::B4_no_fabrication(vitest)`
 
 ### Phase C: Truncation and length budget
 
-- [ ] **C1** — When the model returns text exceeding the per-summary length budget from ADR-013 / Y5, `SummaryWorkflow` truncates at a safe boundary before calling `upsertSummary` and emits exactly one `warn`-level log event that includes the node id, node type, and pre-truncation size. The persisted `summary_text` length is at or under the documented budget.
+- [x] **C1** — When the model returns text exceeding the per-summary length budget from ADR-013 / Y5, `SummaryWorkflow` truncates at a safe boundary before calling `upsertSummary` and emits exactly one `warn`-level log event that includes the node id, node type, and pre-truncation size. The persisted `summary_text` length is at or under the documented budget.
   - Verification: spy on the logger; drive an oversized chat response; assert persisted-length bound and a single `warn` call with the expected fields.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::C1_truncation_logged_at_warn(vitest)`
 
 ### Phase D: Prompt version and invalidation
 
-- [ ] **D1** — Every rubric-era `upsertSummary` call carries `promptVersion === 'SUMMARY_RUBRIC_V1'`; a subsequent `getSummary` call returns a `StoredSummary` whose `promptVersion` is exactly the stored value. Verified against the real `SqliteDocumentStore` (not a mock).
+- [x] **D1** — Every rubric-era `upsertSummary` call carries `promptVersion === 'SUMMARY_RUBRIC_V1'`; a subsequent `getSummary` call returns a `StoredSummary` whose `promptVersion` is exactly the stored value. Verified against the real `SqliteDocumentStore` (not a mock).
   - Verification: run rubric summary; read back via integration test; assert `storedSummary.promptVersion === 'SUMMARY_RUBRIC_V1'`.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::D1_round_trip(vitest)`
 
-- [ ] **D2** — Given a `summaries` row whose `prompt_version = 'legacy'` (or any value older than `SUMMARY_RUBRIC_VERSION`), running `SummaryWorkflow` over that node triggers regeneration (a `IChatPort.complete` call and a new `upsertSummary` with the current version) even when the content hash is unchanged.
+- [x] **D2** — Given a `summaries` row whose `prompt_version = 'legacy'` (or any value older than `SUMMARY_RUBRIC_VERSION`), running `SummaryWorkflow` over that node triggers regeneration (a `IChatPort.complete` call and a new `upsertSummary` with the current version) even when the content hash is unchanged.
   - Verification: seed the store with a `'legacy'` summary via the real adapter; run the workflow with identical content hash; assert a chat call fired and the stored `promptVersion` updated.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::D2_legacy_version_regenerates(vitest)`
 
-- [ ] **D3** — Given a `summaries` row whose `prompt_version` matches `SUMMARY_RUBRIC_VERSION` **and** whose node's content hash is unchanged, running `SummaryWorkflow` produces **zero** `IChatPort.complete` calls and **zero** `upsertSummary` calls for that node.
+- [x] **D3** — Given a `summaries` row whose `prompt_version` matches `SUMMARY_RUBRIC_VERSION` **and** whose node's content hash is unchanged, running `SummaryWorkflow` produces **zero** `IChatPort.complete` calls and **zero** `upsertSummary` calls for that node.
   - Verification: counted spies on both ports return zero for the node in question.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::D3_hash_and_version_match_skips(vitest)`
 
 ### Phase Y: Binding and stack compliance
 
-- [ ] **Y1** — **(binding)** `src/core/domain/summaryPrompts.ts` has zero imports from `src/sidecar/*`, `obsidian`, `better-sqlite3`, or any provider SDK.
+- [x] **Y1** — **(binding)** `src/core/domain/summaryPrompts.ts` has zero imports from `src/sidecar/*`, `obsidian`, `better-sqlite3`, or any provider SDK.
   - Verification: static grep + boundary check.
-  - Evidence: `scripts/verify-core-boundaries.mjs(npm run check:boundaries)` and `rg "from '(\.\./)+sidecar|obsidian|better-sqlite3|openai|ollama" src/core/domain/summaryPrompts.ts` returns no matches.
+  - Evidence: `npm run check:boundaries` (`scripts/check-source-boundaries.mjs`) and `rg "from '(\.\./)+sidecar|obsidian|better-sqlite3|openai|ollama" src/core/domain/summaryPrompts.ts` returns no matches.
 
-- [ ] **Y2** — **(binding)** For every node of type `bullet_group` in a representative fixture, `SummaryWorkflow` produces no chat call, no `summaries` row, and no summary embedding; `getSummary(bulletGroupId)` returns `null` and the coarse summary ANN table contains zero vectors owned by `bullet_group` nodes. Verified end-to-end through the real `SqliteDocumentStore` adapter.
+- [x] **Y2** — **(binding)** For every node of type `bullet_group` in a representative fixture, `SummaryWorkflow` produces no chat call, no `summaries` row, and no summary embedding; `getSummary(bulletGroupId)` returns `null` and the coarse summary ANN table contains zero vectors owned by `bullet_group` nodes. Verified end-to-end through the real `SqliteDocumentStore` adapter.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y2_bullet_group_no_row_no_vector(vitest)`
 
-- [ ] **Y3** — **(binding)** Rubric fields and caps are authored exactly once in `SUMMARY_RUBRIC_V1`; changing the label set is guarded by a co-located test that pins the five labels and fails if a sixth is added without a `SUMMARY_RUBRIC_VERSION` bump.
+- [x] **Y3** — **(binding)** Rubric fields and caps are authored exactly once in `SUMMARY_RUBRIC_V1`; changing the label set is guarded by a co-located test that pins the five labels and fails if a sixth is added without a `SUMMARY_RUBRIC_VERSION` bump.
   - Evidence: `tests/core/domain/summaryPrompts.test.ts::Y3_label_set_pinned(vitest)`
 
-- [ ] **Y4** — **(binding)** The workflow stores rubric output verbatim in `summaries.summary_text` without per-field parsing: a string written through the port equals the string read back (modulo documented truncation). Verified through the real SQLite adapter.
+- [x] **Y4** — **(binding)** The workflow stores rubric output verbatim in `summaries.summary_text` without per-field parsing: a string written through the port equals the string read back (modulo documented truncation). Verified through the real SQLite adapter.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y4_summary_text_verbatim(vitest)`
 
-- [ ] **Y5** — **(binding)** When chat output exceeds the documented budget, `summary_text` persisted in SQLite is at or under the budget and a `warn` log is emitted exactly once per truncation. Verified through the real SQLite adapter; budget measured against the actual stored string length.
+- [x] **Y5** — **(binding)** When chat output exceeds the documented budget, `summary_text` persisted in SQLite is at or under the budget and a `warn` log is emitted exactly once per truncation. Verified through the real SQLite adapter; budget measured against the actual stored string length.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y5_truncation_respects_budget_in_sqlite(vitest)`
 
-- [ ] **Y6** — **(binding)** A row with `prompt_version = 'legacy'` triggers regeneration on the next summary pass; a row with `prompt_version = 'SUMMARY_RUBRIC_V1'` and unchanged content hash is skipped. Verified against a real `better-sqlite3` DB that has STO-4's `002_fts.sql` applied.
+- [x] **Y6** — **(binding)** A row with `prompt_version = 'legacy'` triggers regeneration on the next summary pass; a row with `prompt_version = 'SUMMARY_RUBRIC_V1'` and unchanged content hash is skipped. Verified against a real `better-sqlite3` DB that has STO-4's `002_fts.sql` applied.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y6_version_staleness(vitest)`
 
-- [ ] **Y7** — **(binding)** The content-hash skip path still fires when `prompt_version` matches and the node's hash is unchanged: counted `IChatPort.complete` spy returns zero for that node across the run.
+- [x] **Y7** — **(binding)** The content-hash skip path still fires when `prompt_version` matches and the node's hash is unchanged: counted `IChatPort.complete` spy returns zero for that node across the run.
   - Evidence: `tests/core/workflows/SummaryWorkflow.rubric.test.ts::D3_hash_and_version_match_skips(vitest)` (shared with D3 — same behavior, binding restatement).
 
-- [ ] **Y8** — **(binding)** Persistence of `promptVersion` goes through `IDocumentStore`; no core code issues raw SQL against SQLite. Integration test against the real `better-sqlite3` DB proves the adapter writes to `summaries.prompt_version`; the contract test proves the port contract holds for any adapter.
-  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y8_adapter_persists_prompt_version(vitest)` and `tests/core/ports/IDocumentStore.contract.ts::promptVersion_round_trip(vitest)`.
+- [x] **Y8** — **(binding)** Persistence of `promptVersion` goes through `IDocumentStore`; no core code issues raw SQL against SQLite. Integration test against the real `better-sqlite3` DB proves the adapter writes to `summaries.prompt_version`; the contract test proves the port contract holds for any adapter.
+  - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y8_adapter_persists_prompt_version(vitest)` and `tests/sidecar/adapters/IDocumentStore.promptVersion.contract.test.ts::promptVersion_round_trip(vitest)` (helper: `tests/core/ports/IDocumentStore.contract.ts`).
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A for this story (no client changes; this gate is automatically satisfied by the lack of client surface)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines: `debug` for every summary call (node id, node type, promptVersion, hash-skip or version-skip decision), `warn` exactly once when truncation fires (Y5).
-- [ ] **Z6** — `/review-story WKF-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output).
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — N/A for this story (no client changes; this gate is automatically satisfied by the lack of client surface)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines: `debug` for every summary call (node id, node type, promptVersion, hash-skip or version-skip decision), `warn` exactly once when truncation fires (Y5).
+- [x] **Z6** — `/review-story WKF-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output).
 
 ---
 
@@ -281,7 +283,7 @@ Not applicable.
 | 9 | unit | `tests/core/workflows/SummaryWorkflow.rubric.test.ts::C1_truncation_logged_at_warn` | C1 | S3 | Over-budget output truncated and single `warn` logged with node id + size. |
 | 10 | unit | `tests/core/workflows/SummaryWorkflow.rubric.test.ts::D2_legacy_version_regenerates` | D2 | S8 | `'legacy'` row forces regen even when content hash matches. |
 | 11 | unit | `tests/core/workflows/SummaryWorkflow.rubric.test.ts::D3_hash_and_version_match_skips` | D3, Y7 | S10 | Zero chat calls when hash unchanged and version current. |
-| 12 | contract | `tests/core/ports/IDocumentStore.contract.ts::promptVersion_round_trip` | Y8 | S7 | Any `IDocumentStore` adapter must round-trip `promptVersion` on `upsertSummary` / `getSummary`. |
+| 12 | contract | `tests/sidecar/adapters/IDocumentStore.promptVersion.contract.test.ts::promptVersion_round_trip` | Y8 | S7 | Port round-trip via `assertPromptVersionRoundTrip` in `tests/core/ports/IDocumentStore.contract.ts`. |
 | 13 | integration | `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::D1_round_trip` | D1 | S7 | Real `better-sqlite3` DB with STO-4's `002_fts.sql`; `promptVersion` round-trips at column level. |
 | 14 | integration | `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y2_bullet_group_no_row_no_vector` | Y2 | S5 | Real DB: after a run, `summaries` and summary-ANN rows own zero `bullet_group` nodes. |
 | 15 | integration | `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::A4_bullet_still_retrievable` | A4 | S6 | Real DB: content-vector search returns the bullet node id under its enclosing ancestor. |
@@ -289,7 +291,7 @@ Not applicable.
 | 17 | integration | `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y5_truncation_respects_budget_in_sqlite` | Y5 | S3 | Persisted string length in SQLite is at or under budget after truncation fires. |
 | 18 | integration | `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y6_version_staleness` | Y6 | S8, S10 | Real DB: legacy-version row regenerates, current-version unchanged-hash row skips. |
 | 19 | integration | `tests/sidecar/adapters/SqliteDocumentStore.summaries.promptVersion.test.ts::Y8_adapter_persists_prompt_version` | Y8 | S7 | Real DB: row exists in `summaries` with the written `prompt_version` value. |
-| 20 | static | `scripts/verify-core-boundaries.mjs(npm run check:boundaries)` | Y1 | — | Core/domain purity — no sidecar/provider/sqlite imports in `summaryPrompts.ts`. |
+| 20 | static | `npm run check:boundaries` | Y1 | — | Core/domain purity — no Obsidian/SQLite imports in `src/core/` (`scripts/check-source-boundaries.mjs`). |
 
 Every AC ID (A1–A4, B1–B4, C1, D1–D3, Y1–Y8, Z1–Z6) appears in the table above except standard `Z1–Z6` quality gates, which are covered by the project-wide build / lint / review pipeline rather than planned per-test rows. Every WKF-4-tagged Sn (S1, S2, S3, S4, S5, S6, S7, S8, S10) appears in **Covers Sn** on at least one row. S9 is explicitly out of scope and covered in STO-4's test plan.
 

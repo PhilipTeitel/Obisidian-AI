@@ -24,7 +24,12 @@ export interface IDocumentStore {
   /** Single node by id (retrieval / assembly). */
   getNodeById(nodeId: string): Promise<DocumentNode | null>;
   deleteNote(noteId: string): Promise<void>;
-  upsertSummary(nodeId: string, summary: string, model: string): Promise<void>;
+  upsertSummary(
+    nodeId: string,
+    summary: string,
+    model: string,
+    promptVersion: string,
+  ): Promise<void>;
   getSummary(nodeId: string): Promise<StoredSummary | null>;
   getEmbeddingMeta(nodeId: string, vectorType: VectorType): Promise<EmbedMeta | null>;
   upsertEmbedding(

@@ -122,11 +122,17 @@ class FakeStore implements IDocumentStore {
 
   async deleteNote(): Promise<void> {}
 
-  async upsertSummary(nodeId: string, summary: string, model: string): Promise<void> {
+  async upsertSummary(
+    nodeId: string,
+    summary: string,
+    model: string,
+    promptVersion: string,
+  ): Promise<void> {
     this.summaries.set(nodeId, {
       summary,
       generatedAt: '2099-01-01T00:00:00.000Z',
       model,
+      promptVersion,
     });
   }
 

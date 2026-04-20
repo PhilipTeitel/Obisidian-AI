@@ -38,7 +38,12 @@ class PlannerFakeStore implements IDocumentStore {
     this.noteMeta.delete(noteId);
   }
 
-  async upsertSummary(): Promise<void> {
+  async upsertSummary(
+    _nodeId: string,
+    _summary: string,
+    _model: string,
+    _promptVersion: string,
+  ): Promise<void> {
     throw new Error('unused');
   }
 

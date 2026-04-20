@@ -65,7 +65,12 @@ export class SearchTestStore implements IDocumentStore {
     return this.nodes.get(id) ?? null;
   }
   async deleteNote(): Promise<void> {}
-  async upsertSummary(): Promise<void> {}
+  async upsertSummary(
+    _nodeId: string,
+    _summary: string,
+    _model: string,
+    _promptVersion: string,
+  ): Promise<void> {}
   async getSummary(): Promise<null> {
     return null;
   }

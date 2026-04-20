@@ -143,28 +143,39 @@ export class SqliteDocumentStore implements IDocumentStore {
     this.db.prepare('DELETE FROM nodes WHERE note_id = ?').run(noteId);
   }
 
-  async upsertSummary(nodeId: string, summary: string, model: string): Promise<void> {
+  async upsertSummary(
+    nodeId: string,
+    summary: string,
+    model: string,
+    promptVersion: string,
+  ): Promise<void> {
     this.db
       .prepare(
-        `INSERT INTO summaries (node_id, summary, model, generated_at)
-         VALUES (?, ?, ?, datetime('now'))
+        `INSERT INTO summaries (node_id, summary, model, prompt_version, generated_at)
+         VALUES (?, ?, ?, ?, datetime('now'))
          ON CONFLICT(node_id) DO UPDATE SET
            summary = excluded.summary,
            model = excluded.model,
+           prompt_version = excluded.prompt_version,
            generated_at = datetime('now')`,
       )
-      .run(nodeId, summary, model);
+      .run(nodeId, summary, model, promptVersion);
   }
 
   async getSummary(nodeId: string): Promise<StoredSummary | null> {
     const row = this.db
-      .prepare('SELECT summary, generated_at, model FROM summaries WHERE node_id = ?')
-      .get(nodeId) as { summary: string; generated_at: string; model: string | null } | undefined;
+      .prepare(
+        'SELECT summary, generated_at, model, prompt_version FROM summaries WHERE node_id = ?',
+      )
+      .get(nodeId) as
+      | { summary: string; generated_at: string; model: string | null; prompt_version: string }
+      | undefined;
     if (!row) return null;
     return {
       summary: row.summary,
       generatedAt: row.generated_at,
       model: row.model ?? null,
+      promptVersion: row.prompt_version,
     };
   }
 

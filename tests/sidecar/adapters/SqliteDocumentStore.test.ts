@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { DocumentNode } from '@src/core/domain/types.js';
+import { SUMMARY_RUBRIC_VERSION } from '@src/core/domain/summaryPrompts.js';
 import { openMigratedMemoryDb } from '@src/sidecar/db/open.js';
 import { SqliteDocumentStore } from '@src/sidecar/adapters/SqliteDocumentStore.js';
 
@@ -73,7 +74,7 @@ describe('SqliteDocumentStore', () => {
     db.prepare(
       `INSERT INTO cross_refs (source_node_id, target_path) VALUES ('n2','other.md')`,
     ).run();
-    await s.upsertSummary('n2', 'sum', 'm');
+    await s.upsertSummary('n2', 'sum', 'm', 'legacy');
     await s.upsertNoteMeta({
       noteId: 'note1',
       vaultPath: 'a.md',
@@ -143,11 +144,12 @@ describe('SqliteDocumentStore', () => {
   it('A1_getSummary_roundtrip', async () => {
     const { store: s } = makeStore();
     await s.upsertNodes([baseNode({ id: 'sn1', noteId: 'note1' })]);
-    await s.upsertSummary('sn1', 'hello summary', 'gpt-test');
+    await s.upsertSummary('sn1', 'hello summary', 'gpt-test', SUMMARY_RUBRIC_VERSION);
     const got = await s.getSummary('sn1');
     expect(got).not.toBeNull();
     expect(got!.summary).toBe('hello summary');
     expect(got!.model).toBe('gpt-test');
+    expect(got!.promptVersion).toBe(SUMMARY_RUBRIC_VERSION);
     expect(got!.generatedAt).toMatch(/\d{4}/);
     const missing = await s.getSummary('no-such');
     expect(missing).toBeNull();
@@ -175,7 +177,7 @@ describe('SqliteDocumentStore', () => {
   it('A3_summary_note_meta', async () => {
     const { store: s } = makeStore();
     await s.upsertNodes([baseNode({ id: 'n1', noteId: 'note1' })]);
-    await s.upsertSummary('n1', 'text', 'model-x');
+    await s.upsertSummary('n1', 'text', 'model-x', 'legacy');
     await s.upsertNoteMeta({
       noteId: 'note1',
       vaultPath: 'p.md',

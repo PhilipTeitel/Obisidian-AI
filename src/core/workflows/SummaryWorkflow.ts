@@ -1,10 +1,17 @@
 /**
- * Bottom-up LLM summaries (WKF-1, ADR-002 / ADR-008).
+ * Bottom-up LLM summaries (WKF-1, ADR-002 / ADR-008 / WKF-4).
  *
- * Prompt shape: system message states role; user message lists each child with heading trail,
- * node type, and text — either the child's stored summary (non-leaf) or raw content (leaf).
+ * Prompt shape: system message states role; context string lists the structured rubric plus each child
+ * with heading trail, node type, and text — either the child's stored summary (non-leaf) or raw content (leaf).
  */
 import { chunkNote } from '../domain/chunker.js';
+import {
+  SUMMARY_RUBRIC_MAX_CHARS,
+  SUMMARY_RUBRIC_VERSION,
+  clipRubricToCaps,
+  selectSummaryPrompt,
+  truncateSummaryToBudget,
+} from '../domain/summaryPrompts.js';
 import type { ChunkNoteResult, DocumentNode } from '../domain/types.js';
 import type { IChatPort } from '../ports/IChatPort.js';
 import type { IDocumentStore } from '../ports/IDocumentStore.js';
@@ -159,10 +166,33 @@ async function shouldSkipNonLeaf(
   node: DocumentNode,
   dirty: Set<string>,
 ): Promise<boolean> {
-  if (dirty.has(node.id)) return false;
+  if (dirty.has(node.id)) {
+    console.debug('SummaryWorkflow: will summarize (dirty)', {
+      nodeId: node.id,
+      nodeType: node.type,
+      promptVersion: SUMMARY_RUBRIC_VERSION,
+    });
+    return false;
+  }
   const row = await store.getSummary(node.id);
   if (!row) return false;
-  return generatedAtNotBeforeNodeUpdatedAt(row.generatedAt, node.updatedAt);
+  if (row.promptVersion !== SUMMARY_RUBRIC_VERSION) {
+    console.debug('SummaryWorkflow: will summarize (prompt version stale)', {
+      nodeId: node.id,
+      nodeType: node.type,
+      storedPromptVersion: row.promptVersion,
+      promptVersion: SUMMARY_RUBRIC_VERSION,
+    });
+    return false;
+  }
+  if (!generatedAtNotBeforeNodeUpdatedAt(row.generatedAt, node.updatedAt)) return false;
+  console.debug('SummaryWorkflow: skip fresh summary', {
+    nodeId: node.id,
+    nodeType: node.type,
+    promptVersion: row.promptVersion,
+    reason: 'hash-and-version-skip',
+  });
+  return true;
 }
 
 async function childTextForPrompt(
@@ -183,6 +213,11 @@ async function summarizeNonLeaf(
   nodes: DocumentNode[],
   node: DocumentNode,
 ): Promise<void> {
+  const rubric = selectSummaryPrompt(node.type);
+  if (rubric === null) {
+    return;
+  }
+
   const byParent = buildChildrenMap(nodes);
   const children = byParent.get(node.id) ?? [];
   const sections: string[] = [];
@@ -191,13 +226,18 @@ async function summarizeNonLeaf(
     const trail = ch.headingTrail.length ? ch.headingTrail.join(' > ') : '(root)';
     sections.push(`### ${ch.type} (${trail})\n${text}`);
   }
-  const system = `You are a concise note indexer. Produce a short summary (2–4 sentences) of the child sections for hierarchical search. Model: ${input.chatModelLabel}.`;
-  const user = sections.join('\n\n');
+  const system = `You are a concise note indexer for hierarchical search. Follow the rubric in the context exactly. Model: ${input.chatModelLabel}.`;
+  const context = `${rubric}\n\n-----\n\n${sections.join('\n\n')}`;
+  console.debug('SummaryWorkflow: summarizing', {
+    nodeId: node.id,
+    nodeType: node.type,
+    promptVersion: SUMMARY_RUBRIC_VERSION,
+  });
   let out = '';
   try {
     for await (const delta of deps.chat.complete(
       [{ role: 'system', content: system }],
-      user,
+      context,
       input.apiKey,
     )) {
       out += delta;
@@ -206,11 +246,21 @@ async function summarizeNonLeaf(
     console.warn('SummaryWorkflow: chat.complete failed', { nodeId: node.id, error: e });
     throw e;
   }
-  const summary = out.trim();
+  let summary = clipRubricToCaps(out.trim());
+  const trunc = truncateSummaryToBudget(summary, SUMMARY_RUBRIC_MAX_CHARS);
+  summary = trunc.text;
+  if (trunc.truncated) {
+    console.warn('SummaryWorkflow: summary truncated to budget', {
+      nodeId: node.id,
+      nodeType: node.type,
+      preTruncationSize: trunc.preTruncationSize,
+      budgetChars: SUMMARY_RUBRIC_MAX_CHARS,
+    });
+  }
   if (!summary) {
     throw new Error(`SummaryWorkflow: empty summary for node ${node.id}`);
   }
-  await deps.store.upsertSummary(node.id, summary, input.chatModelLabel);
+  await deps.store.upsertSummary(node.id, summary, input.chatModelLabel, SUMMARY_RUBRIC_VERSION);
 }
 
 /**
@@ -237,8 +287,14 @@ export async function summarizeNote(
 
   for (const node of order) {
     if (!isNonLeaf(newNodes, node.id)) continue;
+    if (selectSummaryPrompt(node.type) === null) {
+      console.debug('SummaryWorkflow: skip non-summarized node type', {
+        nodeId: node.id,
+        nodeType: node.type,
+      });
+      continue;
+    }
     if (await shouldSkipNonLeaf(deps.store, node, dirty)) {
-      console.debug('SummaryWorkflow: skip fresh summary', { nodeId: node.id });
       continue;
     }
     await summarizeNonLeaf(deps, input, newNodes, node);

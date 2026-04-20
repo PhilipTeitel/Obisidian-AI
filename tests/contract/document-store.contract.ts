@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DocumentNode } from '@src/core/domain/types.js';
+import { SUMMARY_RUBRIC_VERSION } from '@src/core/domain/summaryPrompts.js';
 import type { IDocumentStore } from '@src/core/ports/IDocumentStore.js';
 import { SqliteDocumentStore } from '@src/sidecar/adapters/SqliteDocumentStore.js';
 import { openMigratedMemoryDb } from '@src/sidecar/db/open.js';
@@ -28,10 +29,11 @@ export async function runDocumentStoreContractRoundTrip(store: IDocumentStore): 
   expect(nodes).toHaveLength(1);
   expect(nodes[0]!.content).toBe('contract body');
 
-  await store.upsertSummary('n_contract', 'summary text', 'model-x');
+  await store.upsertSummary('n_contract', 'summary text', 'model-x', SUMMARY_RUBRIC_VERSION);
   const sum = await store.getSummary('n_contract');
   expect(sum?.summary).toBe('summary text');
   expect(sum?.model).toBe('model-x');
+  expect(sum?.promptVersion).toBe(SUMMARY_RUBRIC_VERSION);
 
   await store.upsertNoteMeta({
     noteId: 'note_contract',

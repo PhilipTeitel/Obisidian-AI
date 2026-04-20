@@ -60,11 +60,17 @@ class MemoryStore implements IDocumentStore {
     this.noteNodes.delete(noteId);
   }
 
-  async upsertSummary(nodeId: string, text: string, model: string): Promise<void> {
+  async upsertSummary(
+    nodeId: string,
+    text: string,
+    model: string,
+    promptVersion: string,
+  ): Promise<void> {
     this.summaries.set(nodeId, {
       summary: text,
       generatedAt: '2099-01-01T00:00:00.000Z',
       model,
+      promptVersion,
     });
   }
 

@@ -39,11 +39,13 @@ export interface EmbedMeta {
   contentHash: string;
 }
 
-/** Row shape for `summaries` (read path for WKF-1 / WKF-3). */
+/** Row shape for `summaries` (read path for WKF-1 / WKF-3 / WKF-4). */
 export interface StoredSummary {
   summary: string;
   generatedAt: string;
   model: string | null;
+  /** Rubric / prose era stamp (`legacy` until regenerated; WKF-4). */
+  promptVersion: string;
 }
 
 export interface VectorMatch {
