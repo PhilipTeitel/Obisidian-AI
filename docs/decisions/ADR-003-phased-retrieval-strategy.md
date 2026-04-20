@@ -18,6 +18,14 @@ With a hierarchical model, **naive** flat top-K vector search either returns tin
 
 4. **Comparable embeddings:** Query, summary, and content vectors used in these phases must be **in the same embedding space** (same embedding model configuration).
 
+## Amendments (iter-2)
+
+- **Coarse-K cap superseded.** The `kSummary = min(k, 8)` mapping originally documented in [RET-1 §5](../features/RET-1.md) is **superseded by [ADR-012](ADR-012-hybrid-retrieval-and-coarse-k.md)**. Phase 1 now honors a user-configurable `coarseK` (default 32); there is no hard cap at 8.
+- **Content-only fallback.** When Phase 1 returns fewer usable summary hits than a configurable floor, the workflow runs an additional **unrestricted `vec_content` ANN** (no subtree filter) and merges its matches into the candidate set. This replaces the original "return empty when Phase 1 is empty" policy from [RET-1 Y4](../features/RET-1.md). See [ADR-012 §2](ADR-012-hybrid-retrieval-and-coarse-k.md).
+- **Hybrid pre-merge stage.** Phase 1 candidates are now produced by **reciprocal rank fusion** of summary vector ANN + BM25 keyword hits over an FTS5 index on `nodes.content`. When hybrid is disabled by setting, Phase 1 runs vector-only. See [ADR-012 §3–§5](ADR-012-hybrid-retrieval-and-coarse-k.md).
+- **Structured summaries.** The summary vectors feeding Phase 1 are produced from a breadth-preserving structured rubric, not free prose. See [ADR-013](ADR-013-structured-note-summaries.md).
+- **Optional filters.** `SearchRequest` accepts optional `pathGlobs` and `dateRange` filters that are pushed into SQLite before ANN scoring across all phases and the fallback. See [ADR-014](ADR-014-temporal-and-path-filters.md).
+
 ## Consequences
 
 - **Positive:** Chat receives coherent, structure-preserving context; fewer “random sentence” failures.
@@ -33,3 +41,6 @@ With a hierarchical model, **naive** flat top-K vector search either returns tin
 
 - [../requirements/REQUIREMENTS.md](../requirements/REQUIREMENTS.md) §5
 - [ADR-002-hierarchical-document-model.md](./ADR-002-hierarchical-document-model.md)
+- [ADR-012-hybrid-retrieval-and-coarse-k.md](./ADR-012-hybrid-retrieval-and-coarse-k.md) — configurable `coarseK`, content-only fallback, hybrid RRF
+- [ADR-013-structured-note-summaries.md](./ADR-013-structured-note-summaries.md) — structured summary rubric feeding Phase 1
+- [ADR-014-temporal-and-path-filters.md](./ADR-014-temporal-and-path-filters.md) — optional `pathGlobs` and `dateRange` filters

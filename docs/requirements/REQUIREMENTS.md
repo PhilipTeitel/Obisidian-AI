@@ -22,6 +22,7 @@ This document rolls up the intent of prior scoping and prompt documents into a s
 
 - Users can **find notes by meaning** via semantic search.
 - **Chat answers use only the vault as knowledge** for retrieval context (no general web or external knowledge bases in the retrieval path for answering about the user's notes).
+- **Vault-only grounding is enforced, not conditional.** When retrieval returns no usable context, chat must respond with an explicit **insufficient-evidence** message (describing what was searched and suggesting how to narrow the query). The model must not fall back to general knowledge, instruct the user to paste their notes, or otherwise answer from outside the vault. See [ADR-011](../decisions/ADR-011-vault-only-chat-grounding.md).
 
 ---
 
@@ -84,17 +85,25 @@ Flat chunking of notes into tiny isolated snippets is **insufficient**: search a
 - **LLM-generated summaries** for non-leaf nodes are produced **bottom-up** and **re-generated** when content changes, propagating toward the root so parent summaries do not stay stale after child edits.
 - **Summary** and **content** vectors for retrieval must be **comparable** (same embedding model / space).
 - **Cost control:** Skip redundant summary work when a note's content hash is unchanged (incremental indexing).
+- **Structured note/topic summaries (iter-2):** `note` and `topic`/`subtopic` summaries must be **breadth-preserving** (not free 2–4-sentence prose). The summary prompt produces a bounded structured rubric covering the topics discussed, named entities, dates/time references, actions/decisions, and tags in that subtree, so coarse retrieval can hit entity- and date-specific queries without relying on dense prose. See [ADR-013](../decisions/ADR-013-structured-note-summaries.md). **(iter-2)**
+- **Selective summary embeddings (iter-2):** Nodes that add no semantic signal beyond their already-embedded children (e.g. `bullet_group` whose signal is fully represented by its `bullet` leaves) are **not** required to produce a summary vector. This trims the summary-embedding corpus and reduces noise in the coarse phase. See [ADR-002](../decisions/ADR-002-hierarchical-document-model.md) and [ADR-013](../decisions/ADR-013-structured-note-summaries.md). **(iter-2)**
 
 **Retrieval phases**
 
-1. **Coarse:** Query embedding matched primarily against **summary** embeddings to find candidate regions.
+1. **Coarse:** Query embedding matched primarily against **summary** embeddings to find candidate regions. The number of candidates retained at this phase must be **configurable** (`chatCoarseK` / equivalent setting); a hard cap of 8 is **not** acceptable — see [ADR-012](../decisions/ADR-012-hybrid-retrieval-and-coarse-k.md). **(iter-2)**
 2. **Fine:** **Drill down** within candidates using **content** embeddings (including recursive descent as needed).
 3. **Assembly:** Build **structured context** for the chat (and search display) by walking ancestors/siblings with **token budgets** per tier (matched content, sibling context, parent summaries), preserving headings and list structure in the text sent to the LLM.
+
+**Hybrid retrieval (iter-2)**
+
+- Retrieval must support **hybrid recall**: combining vector search over summary/content embeddings with keyword/BM25 search over node content (SQLite FTS5). Results are merged via a documented fusion strategy (e.g. reciprocal rank fusion). Hybrid recall is toggleable by the user. See [ADR-012](../decisions/ADR-012-hybrid-retrieval-and-coarse-k.md). **(iter-2)**
+- **Content-only fallback:** When the coarse phase returns zero or too few candidates relative to a configurable floor, retrieval must fall back to an **unrestricted content-vector ANN** (no subtree filter) so recall does not collapse when summaries failed to match. **(iter-2)**
 
 **Tags and cross-references**
 
 - Tags are tracked at **scopes** consistent with the hierarchy so users can reason about "this topic vs that topic."
 - **Wikilinks** (and similar explicit references) are tracked to allow **related context** to be pulled in when useful.
+- **Temporal and path filters (iter-2):** `SearchRequest` must accept optional **path globs** (e.g. `Daily/**/*.md`) and **date ranges** (ISO start/end). For daily-note vaults, filenames of the form `YYYY-MM-DD.md` are parsed into dates so users (or workflows on their behalf) can restrict retrieval to "the last two weeks of daily notes" without model-side heuristics. Filters are pushed down to SQLite before ANN scoring where possible. See [ADR-014](../decisions/ADR-014-temporal-and-path-filters.md). **(iter-2)**
 
 **User-facing documentation**
 
@@ -105,6 +114,12 @@ Flat chunking of notes into tiny isolated snippets is **insufficient**: search a
 ## 6. Functional requirements — chat and agent
 
 - **Chat** uses retrieval from the hierarchical index to supply **vault-only** context for answering (plus conversation history within a session as configured).
+- **Grounding policy (non-optional):** Every chat request must carry a **built-in grounding system message** directing the model to answer only from provided vault context and to emit an **insufficient-evidence response** when context is empty or inadequate. The policy is applied regardless of whether retrieval returned snippets. See [ADR-011](../decisions/ADR-011-vault-only-chat-grounding.md). **(iter-2)**
+- **User-supplied chat prompts:** In addition to the built-in grounding policy, the user may configure:
+  - A **chat system prompt** (persona, tone, style preferences that do not contradict the grounding policy), and
+  - A **vault organization prompt** (how the user's notes are organized — for example, "daily notes live in `Daily/` with `YYYY-MM-DD.md` filenames; journal entries use `#mood`; job search uses `#jobsearch`").
+    Both user prompts are merged into provider message lists on **every** chat request in a defined order (see [ADR-011](../decisions/ADR-011-vault-only-chat-grounding.md)). **(iter-2)**
+- **Retrieval configuration is honored by chat:** Chat retrieval must apply the same user-configured retrieval settings (result count, token budgets, tag filters, and any future hybrid/filter toggles) that the search pane uses. Chat must not ignore user retrieval tuning.
 - **Conversation history:** Subsequent turns in the same conversation include prior user and assistant messages when supported by the product.
 - **New conversation:** User can clear history and start fresh.
 - **Agent (file operations):** Chat may **create or update** notes when the user asks; **allowed output folders** are **configurable** and distinct from indexed-folder rules where product policy requires separation.
@@ -118,6 +133,14 @@ Flat chunking of notes into tiny isolated snippets is **insufficient**: search a
 - **MVP chat providers:** At least **OpenAI** and **Ollama**; the architecture must allow **additional providers later** without rewriting core orchestration.
 - **Embeddings** and **chat** endpoints, models, and keys (where applicable) are **configurable**.
 - **Models** need not run locally; if local inference is offered, it should be **configurable** with cross-platform realism in mind.
+- **Chat grounding settings (iter-2):** The settings surface must expose:
+  - `chatSystemPrompt` — user-supplied persona/style system prompt, appended to the built-in grounding policy per [ADR-011](../decisions/ADR-011-vault-only-chat-grounding.md).
+  - `vaultOrganizationPrompt` — user-supplied description of how notes are organized (daily note conventions, tag conventions, folder conventions) so the assistant can translate natural-language queries into effective retrieval intent.
+- **Chat retrieval settings (iter-2):** In addition to the existing search settings, expose:
+  - `chatCoarseK` — number of candidate summary hits retained in the coarse phase (see [ADR-012](../decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)).
+  - `enableHybridSearch` — toggle for keyword (FTS5) + vector recall fusion (see [ADR-012](../decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)).
+  - `dailyNotePathGlobs` — optional glob(s) identifying daily-note files for temporal filtering (see [ADR-014](../decisions/ADR-014-temporal-and-path-filters.md)).
+  - `dailyNoteDatePattern` — date format embedded in daily-note filenames (default `YYYY-MM-DD`).
 
 ---
 
@@ -128,6 +151,7 @@ Flat chunking of notes into tiny isolated snippets is **insufficient**: search a
 - **Lazy initialization:** Opening the DB and running migrations must not block a **fast plugin startup**; heavy work runs on **first use** of storage or explicit user action, consistent with the startup budget below.
 - After storage upgrades, users must be able to recover via **full reindex**; legacy import paths are optional, not a hard requirement.
 - **Documentation** must warn users about cloud-synced or network paths for the DB file (locking/corruption risk) and that **uninstall** may leave DB files on disk unless the user deletes them.
+- **Keyword index (iter-2):** The same per-vault SQLite database must house a **full-text search index** (SQLite FTS5 virtual table over node content) alongside the `nodes`, `summaries`, and `vec_*` tables. The FTS5 table is an **additive** migration; a full reindex is an acceptable upgrade path and is documented in the storage guide. See [ADR-012](../decisions/ADR-012-hybrid-retrieval-and-coarse-k.md). **(iter-2)**
 
 ---
 
@@ -153,6 +177,7 @@ Flat chunking of notes into tiny isolated snippets is **insufficient**: search a
 - **Sources** from retrieval are surfaced as **navigable** controls that open the corresponding note.
 - **Input** is at the **bottom** of the pane, **multi-line**, with send/cancel affordances.
 - Styling should follow **Obsidian theme variables** so light and dark themes remain usable.
+- **Insufficient-evidence state (iter-2):** When the grounding policy emits an insufficient-evidence response ([ADR-011](../decisions/ADR-011-vault-only-chat-grounding.md)), the chat pane must render it as a **distinct state** (visibly different from a normal assistant reply, with no fabricated sources and no "paste your notes" phrasing) so the user knows the answer was gated by retrieval, not generated from outside knowledge.
 
 _(Specific CSS class names, pixel values, and component structure are left to implementation.)_
 
@@ -203,3 +228,7 @@ These observations inform scoping and risk; they are not substitute acceptance t
 - **Mobile** roadmap for any AI features (if ever), relative to sidecar constraints.
 - Final **default token budgets** and settings exposure (starting points exist in hierarchical prompt; tune with telemetry or user feedback).
 - **Sidecar binary packaging:** Future iterations may compile the sidecar to a single executable (via `pkg`, `sea`, or similar) to remove the Node.js runtime prerequisite for end users. **(iter-2)**
+- **Built-in grounding prompt copy (iter-2):** Default wording for the built-in grounding system message — terse directive vs. a richer rubric that explicitly enumerates refusals ("do not invent citations", "do not instruct the user to paste notes").
+- **System prompt ordering (iter-2):** Whether the user-supplied `chatSystemPrompt` is appended **after** or **before** the built-in grounding policy when building the provider message list. Current working assumption: built-in policy first (authoritative), then vault-organization prompt, then user system prompt — reconfirm during CHAT-3 / CHAT-4 implementation.
+- **Daily-note date parsing strategy (iter-2):** Single global `dailyNoteDatePattern` setting vs. per-glob pattern. Default assumption: one pattern (`YYYY-MM-DD`) with optional prefix/suffix; revisit if users need multiple daily-note conventions per vault.
+- **Hybrid retrieval weighting (iter-2):** Whether RRF fusion weights for vector vs BM25 are **fixed** (ADR-012 default) or user-tunable. Default assumption: fixed in MVP, revisit with retrieval-quality telemetry.

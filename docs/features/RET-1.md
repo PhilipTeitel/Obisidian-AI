@@ -5,6 +5,8 @@
 **Size**: Large
 **Status**: Complete
 
+> **Partially superseded:** the hard-coded coarse-K cap documented here (`kSummary = Math.min(k, 8)` in `mapSearchK`) is replaced by [RET-4](RET-4.md) per [ADR-012](../decisions/ADR-012-hybrid-retrieval-and-coarse-k.md); vector-only Phase 1 is augmented with FTS5 + RRF fusion in [RET-5](RET-5.md); the `NodeFilter` shape is extended by [RET-6](RET-6.md) for path/date filters. The three-phase pipeline and assembly contract defined in this story remain the foundation those stories build on.
+
 ---
 
 ## 1. Summary

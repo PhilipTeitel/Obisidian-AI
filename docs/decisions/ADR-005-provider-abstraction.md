@@ -20,6 +20,8 @@ Hard-coding a single vendor blocks experimentation (local vs cloud) and complica
 
 4. **Model configuration:** Distinct settings for **embedding model** and **chat model** (and related parameters such as timeouts) remain **user-visible** and validated where feasible.
 
+5. **Grounding-context inputs to chat (iter-2):** Chat completions are **not** a bare `(messages, context)` call. The caller (sidecar route / `ChatWorkflow`) is responsible for assembling the final provider message list from a structured grounding context — built-in policy system message, optional user-supplied `systemPrompt` and `vaultOrganizationPrompt`, the retrieval context block, prior conversation history, and the current user turn — in the order fixed by [ADR-011](./ADR-011-vault-only-chat-grounding.md). `IChatPort.complete` itself stays provider-neutral and receives the fully-assembled `messages` array; adapters must not re-order, drop, or inject system messages.
+
 ## Consequences
 
 - **Positive:** Testability (mocks/fakes), user choice, fewer merge conflicts when adding providers.
@@ -34,3 +36,5 @@ Hard-coding a single vendor blocks experimentation (local vs cloud) and complica
 
 - [../requirements/REQUIREMENTS.md](../requirements/REQUIREMENTS.md) §6–7
 - [ADR-004-per-vault-index-storage.md](./ADR-004-per-vault-index-storage.md) (secrets and settings boundaries)
+- [ADR-009-chat-cancellation-and-timeout.md](./ADR-009-chat-cancellation-and-timeout.md) (`IChatPort.complete` `options` parameter)
+- [ADR-011-vault-only-chat-grounding.md](./ADR-011-vault-only-chat-grounding.md) (grounding-context assembly upstream of `IChatPort`)

@@ -26,9 +26,25 @@ This guide explains how everyday Obsidian writing habits affect **hierarchical i
 2. Keep bullet lists **contiguous** when they belong together; use a blank line when you start a new list or topic.
 3. Prefer explicit links between notes you want treated as related knowledge.
 
+## Daily notes and dated filenames
+
+If you keep daily notes in a folder like `Daily/` with dated filenames (e.g. `Daily/2026-04-16.md`), the indexer parses the date from the filename and stores it as `note_meta.note_date`. That unlocks temporal filtering in chat — for example, asking for "what I worked on last week" can be scoped to the matching date range rather than semantically rediscovered across the entire vault. Defaults:
+
+- Folders treated as daily notes: `['Daily/**/*.md']` (setting: `dailyNotePathGlobs`).
+- Filename date pattern: `YYYY-MM-DD` (setting: `dailyNoteDatePattern`).
+
+Both are configurable in **Settings → AI MVP → Advanced retrieval** when your layout differs.
+
+You can also scope any question explicitly with slash-command-style filters in the chat input, e.g. `path:Projects/** last:14d what are the open questions for Acme?`. See [chat-behavior-tuning.md](chat-behavior-tuning.md) for full examples.
+
 ## Limits
 
 - Very large paragraphs are split on **sentence boundaries** for embedding size; the indexer preserves order so meaning stays recoverable.
+- Summaries are generated for `note`, `topic`, and `subtopic` nodes only. Bullets inside a bullet group are still searched — they just contribute content-level vectors rather than their own summary (see [ADR-013](../decisions/ADR-013-structured-note-summaries.md)). Keep important names, dates, and actions in prose under a heading when you want them to surface in coarse retrieval.
+
+## Telling the assistant how your vault is organized
+
+Structure in your notes helps the indexer; a short **vault organization prompt** in plugin settings helps the chat assistant _target_ that structure. See [chat-behavior-tuning.md](chat-behavior-tuning.md) for examples (daily notes with dated filenames, tag conventions, folder layouts).
 
 ---
 

@@ -5,6 +5,8 @@
 **Size**: Large
 **Status**: Complete
 
+> **Partially superseded:** the prose-prompt shape and the rule that **every** non-leaf receives a summary are replaced by [WKF-4](WKF-4.md) per [ADR-013](../decisions/ADR-013-structured-note-summaries.md). After WKF-4, `note` / `topic` / `subtopic` nodes use the `SUMMARY_RUBRIC_V1` structured prompt and `bullet_group` nodes are **skipped** (no chat call, no row). The post-order traversal, port boundaries, and hash/version-based staleness machinery defined in this story remain the foundation WKF-4 builds on.
+
 ---
 
 ## 1. Summary

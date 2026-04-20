@@ -5,6 +5,8 @@
 **Size**: Small
 **Status**: Complete
 
+> **Extended by:** [RET-6](RET-6.md) adds `pathGlobs` and `dateRange` to the same `NodeFilter` surface; the `tags` filter defined here remains unchanged and composes additively with the new filters (a request may carry tags, globs, and a date range simultaneously). Implementers working on RET-6 should preserve the OR-within-tags / AND-across-filter-kinds semantics established by this story.
+
 ---
 
 ## 1. Summary

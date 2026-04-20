@@ -5,6 +5,8 @@
 **Size**: Medium
 **Status**: Complete
 
+> **Complementary to Phase B:** the context-budget contract delivered here is unchanged by [RET-4](RET-4.md) / [RET-5](RET-5.md) / [RET-6](RET-6.md); those stories change what enters the assembly, not how it is budgeted. [CHAT-4](CHAT-4.md) adds an **additional** system-message token-budget layer for `chatSystemPrompt` + `vaultOrganizationPrompt`, orthogonal to the per-tier fractions in this story.
+
 ---
 
 ## 1. Summary

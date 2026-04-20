@@ -90,6 +90,7 @@ Iteration 2 replaces the fragile WASM-in-renderer approach from iteration 1 with
 - [docs/requirements/REQUIREMENTS.md](docs/requirements/REQUIREMENTS.md) — Canonical product and technical requirements (iteration 2)
 - [docs/guides/authoring-for-ai-indexing.md](docs/guides/authoring-for-ai-indexing.md) — How headings, lists, tags, and links affect indexing (REQUIREMENTS §5)
 - [docs/guides/user-storage-and-uninstall.md](docs/guides/user-storage-and-uninstall.md) — Index DB location, sync risks, uninstall (REQUIREMENTS §8)
+- [docs/guides/chat-behavior-tuning.md](docs/guides/chat-behavior-tuning.md) — Writing effective `chatSystemPrompt` and `vaultOrganizationPrompt` for grounded chat (REQUIREMENTS §6, [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md))
 - [.cursor/plans/obsidian_ai_iteration_2_95fe6b8a.plan.md](.cursor/plans/obsidian_ai_iteration_2_95fe6b8a.plan.md) — Iteration 2 architectural plan and implementation phases
 
 **Architecture decisions (traceability for backlog alignment)**
@@ -104,6 +105,10 @@ Iteration 2 replaces the fragile WASM-in-renderer approach from iteration 1 with
 - [docs/decisions/ADR-008-idempotent-indexing-state-machine.md](docs/decisions/ADR-008-idempotent-indexing-state-machine.md) — Per-note job steps, retries, dead-letter
 - [docs/decisions/ADR-009-chat-cancellation-and-timeout.md](docs/decisions/ADR-009-chat-cancellation-and-timeout.md) — Chat streaming `AbortSignal` + `timeoutMs` across `IChatPort` and transport
 - [docs/decisions/ADR-010-structured-logging-sidecar.md](docs/decisions/ADR-010-structured-logging-sidecar.md) — Pino structured logging on the Node.js sidecar (stderr, levels, redaction)
+- [docs/decisions/ADR-011-vault-only-chat-grounding.md](docs/decisions/ADR-011-vault-only-chat-grounding.md) — Always-on grounding policy + user system / vault-organization prompts + insufficient-evidence response
+- [docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md) — Configurable coarse-K, content-only fallback, and hybrid (FTS5 + vector via RRF) retrieval
+- [docs/decisions/ADR-013-structured-note-summaries.md](docs/decisions/ADR-013-structured-note-summaries.md) — Structured rubric for `note` / `topic` / `subtopic` summaries; skip `bullet_group`
+- [docs/decisions/ADR-014-temporal-and-path-filters.md](docs/decisions/ADR-014-temporal-and-path-filters.md) — Optional `pathGlobs` + `dateRange` filters on retrieval
 
 ---
 
@@ -236,6 +241,37 @@ sequenceDiagram
     Sidecar->>SQLite: Walk ancestors/siblings, apply token budgets
     Sidecar-->>Transport: Structured results
     Transport-->>Plugin: Display in SearchView
+```
+
+### Data Flow: Chat Query
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Plugin as Plugin (Renderer)
+    participant Transport as Transport (stdio/HTTP)
+    participant Sidecar as Sidecar Process
+    participant SQLite as SQLite + sqlite-vec
+    participant Provider as Chat Provider (OpenAI/Ollama)
+
+    User->>Plugin: Send chat message
+    Plugin->>Transport: chat { messages, systemPrompt?, vaultOrganizationPrompt?, apiKey? }
+    Transport->>Sidecar: Route message
+    Note over Sidecar: Retrieval (ADR-003, ADR-012)
+    Sidecar->>SQLite: Phased + hybrid retrieval for last user turn
+    SQLite-->>Sidecar: Search hits (may be empty)
+    alt Usable context found
+        Note over Sidecar: Assemble messages (ADR-011)
+        Sidecar->>Sidecar: [built-in grounding policy] + [vault org prompt] + [user system prompt] + [context] + history
+        Sidecar->>Provider: IChatPort.complete(messages, options)
+        Provider-->>Sidecar: Stream deltas
+        Sidecar-->>Transport: { delta } chunks
+        Sidecar-->>Transport: done { sources, groundingOutcome: 'answered' }
+    else No usable context (ADR-011)
+        Sidecar-->>Transport: { delta: insufficient-evidence text }
+        Sidecar-->>Transport: done { sources: [], groundingOutcome: 'insufficient_evidence' }
+    end
+    Transport-->>Plugin: Render in ChatView (distinct state when insufficient_evidence)
 ```
 
 ### Indexing State Machine
@@ -421,14 +457,16 @@ CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id);
 CREATE INDEX IF NOT EXISTS idx_nodes_type   ON nodes(type);
 CREATE INDEX IF NOT EXISTS idx_nodes_hash   ON nodes(content_hash);
 
--- LLM-generated summaries (one per non-leaf node)
+-- LLM-generated summaries (one per non-leaf node; `bullet_group` skipped per ADR-013)
 CREATE TABLE IF NOT EXISTS summaries (
-    node_id      TEXT PRIMARY KEY,
-    summary      TEXT NOT NULL,
-    generated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    model        TEXT,             -- model used to generate
+    node_id        TEXT PRIMARY KEY,
+    summary        TEXT NOT NULL,
+    generated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    model          TEXT,             -- model used to generate
+    prompt_version TEXT NOT NULL DEFAULT 'legacy', -- STO-4 / WKF-4
     FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS idx_summaries_prompt_version ON summaries(prompt_version);
 
 -- Vector embeddings (content and summary vectors)
 -- Uses sqlite-vec vec0 virtual table for ANN search
@@ -481,8 +519,19 @@ CREATE TABLE IF NOT EXISTS note_meta (
     vault_path    TEXT NOT NULL,
     content_hash  TEXT NOT NULL,
     indexed_at    TEXT NOT NULL DEFAULT (datetime('now')),
-    node_count    INTEGER NOT NULL DEFAULT 0
+    node_count    INTEGER NOT NULL DEFAULT 0,
+    note_date     TEXT              -- ISO YYYY-MM-DD parsed from daily-note filenames (ADR-014 / RET-6); NULL otherwise
 );
+CREATE INDEX IF NOT EXISTS idx_note_meta_note_date ON note_meta(note_date);
+
+-- FTS5 keyword index mirroring nodes.content (ADR-012 / RET-5 / STO-4)
+CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
+    content,
+    content='nodes',
+    content_rowid='rowid',
+    tokenize='unicode61 remove_diacritics 1'
+);
+-- Triggers keep nodes_fts synchronized with nodes (see src/sidecar/db/migrations/002_fts.sql)
 
 -- Queue items (crash recovery for InProcessQueue) [ADR-007]
 CREATE TABLE IF NOT EXISTS queue_items (
@@ -517,15 +566,18 @@ CREATE INDEX IF NOT EXISTS idx_jobs_note ON job_steps(note_path);
 
 ### 9. Three-Phase Retrieval
 
-> **ADR:** [ADR-003 — Phased retrieval strategy](docs/decisions/ADR-003-phased-retrieval-strategy.md) (Accepted)
+> **ADRs:** [ADR-003 — Phased retrieval strategy](docs/decisions/ADR-003-phased-retrieval-strategy.md) (Accepted), amended by [ADR-012 — Hybrid retrieval and configurable coarse-K](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md) and [ADR-014 — Temporal and path filters](docs/decisions/ADR-014-temporal-and-path-filters.md).
 
-| Phase               | What                                        | How                                                                                                                                                                    |
-| ------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Coarse           | Find candidate **regions**                  | Embed query → ANN search on `vec_summary` → top-K summary matches                                                                                                      |
-| 2. Drill-down       | Find specific **content** within candidates | ANN search on `vec_content` for descendants of Phase 1 hits → recursive descent until high-confidence leaf matches                                                     |
-| 3. Context assembly | Build **structured context**                | Walk ancestors for heading trail, collect sibling context, include parent summaries; apply per-tier token budgets (matched content, sibling context, parent summaries) |
+| Phase               | What                                        | How                                                                                                                                                                                                           |
+| ------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Coarse           | Find candidate **regions**                  | Embed query → ANN on `vec_summary` (top-`coarseK`, user-configurable, default 32) **and** — when `enableHybridSearch` is on — BM25 on `nodes_fts`; merge with reciprocal rank fusion (`k = 60`).              |
+| 1b. Fallback        | Catch recall misses                         | If Phase 1 returns fewer than `max(4, floor(coarseK / 4))` usable hits, run an **unrestricted** `vec_content` ANN and merge results (deduped by `nodeId`).                                                    |
+| 2. Drill-down       | Find specific **content** within candidates | ANN on `vec_content` restricted to descendants of Phase 1 hits; `NodeFilter` applies optional `tags`, `pathGlobs`, and `dateRange` filters to both Phase 1 and Phase 2.                                       |
+| 3. Context assembly | Build **structured context**                | Walk ancestors for heading trail, collect sibling context, include parent summaries; apply per-tier token budgets (matched content, sibling context, parent summaries).                                       |
 
 All vectors (query, content, summary) must be in the **same embedding space** (same model and dimensions).
+
+**Summary-vector coverage** (ADR-002, ADR-013): summaries — and therefore `vec_summary` rows — exist only for `note`, `topic`, and `subtopic` nodes. `bullet_group` is a grouping artifact and is **skipped** to reduce noise; its contents are still reachable via Phase 2 content ANN under the enclosing `subtopic`.
 
 ### 10. Structured Context Formatting
 
@@ -736,7 +788,12 @@ obsidian-ai-plugin/
 │   │   ├── ADR-006-sidecar-architecture.md             # Accepted
 │   │   ├── ADR-007-queue-abstraction.md                # Accepted
 │   │   ├── ADR-008-idempotent-indexing-state-machine.md # Accepted
-│   │   └── ADR-009-chat-cancellation-and-timeout.md      # Accepted
+│   │   ├── ADR-009-chat-cancellation-and-timeout.md      # Accepted
+│   │   ├── ADR-010-structured-logging-sidecar.md         # Accepted
+│   │   ├── ADR-011-vault-only-chat-grounding.md          # Accepted
+│   │   ├── ADR-012-hybrid-retrieval-and-coarse-k.md      # Accepted
+│   │   ├── ADR-013-structured-note-summaries.md          # Accepted
+│   │   └── ADR-014-temporal-and-path-filters.md          # Accepted
 │   └── requirements/
 │       └── REQUIREMENTS.md
 ├── styles.css                               # Obsidian theme-aware styles
@@ -924,6 +981,8 @@ The RAG-powered chat pane, registered as an Obsidian `ItemView`.
 - **Input:** Multi-line text area at the bottom of the pane with send and cancel affordances.
 - **Conversation:** Subsequent turns include prior messages. "New conversation" button clears history.
 - **Timeout:** Configurable chat timeout (default 30s) for slow local models.
+- **Grounding (ADR-011):** Every request carries the built-in grounding policy plus the user's `chatSystemPrompt` and `vaultOrganizationPrompt` (both from settings) in the order defined by [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md). The assistant answers only from vault context.
+- **Insufficient-evidence state:** When retrieval returns nothing usable, the assistant bubble renders in a **distinct state** — no source pills, product-owned copy explaining nothing matched — instead of asking the user to paste notes. Behavior is gated by `groundingOutcome === 'insufficient_evidence'` on the terminal stream event.
 - **Theming:** All styles use Obsidian CSS theme variables for light/dark mode compatibility.
 
 ### ProgressSlideout
@@ -974,8 +1033,8 @@ These messages are sent between the plugin and sidecar over the transport layer.
 | `index/full`        | Plugin → Sidecar | `{ files: [{path, content, hash}], apiKey? }`                                                                                                                     | `{ runId, noteCount }` + progress stream                                                                        |
 | `index/incremental` | Plugin → Sidecar | `{ files: [{path, content, hash}], deletedPaths: string[], apiKey? }`                                                                                             | `{ runId, noteCount }` + progress stream                                                                        |
 | `index/status`      | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ pending, processing, completed, failed, deadLetter, jobs: JobStep[] }`                                       |
-| `search`            | Plugin → Sidecar | `{ query, k?, apiKey?, tags? }` (optional tag filter, OR / case-insensitive)                                                                                      | `{ results: SearchResult[] }`                                                                                   |
-| `chat`              | Plugin → Sidecar | `{ messages, apiKey?, context?, timeoutMs? }` + transport `streamChat(payload, { signal? })` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md)) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[] }`; cancel/timeout via `signal` / `timeoutMs` |
+| `search`            | Plugin → Sidecar | `{ query, k?, apiKey?, tags?, coarseK?, pathGlobs?, dateRange? }` (tag OR / case-insensitive; `pathGlobs` + `dateRange` per [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md); `coarseK` per [ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)) | `{ results: SearchResult[] }`                                                                                   |
+| `chat`              | Plugin → Sidecar | `{ messages, apiKey?, context?, timeoutMs?, systemPrompt?, vaultOrganizationPrompt?, groundingPolicyVersion?, coarseK?, pathGlobs?, dateRange? }` + transport `streamChat(payload, { signal? })` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md), [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md), [ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md), [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[], groundingOutcome: 'answered' \| 'insufficient_evidence', groundingPolicyVersion }`; cancel/timeout via `signal` / `timeoutMs` |
 | `chat/clear`        | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ ok: true }`                                                                                                  |
 | `health`            | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ status: 'ok', uptime, dbReady }`                                                                             |
 | `progress`          | Sidecar → Plugin | `{ event: IndexProgressEvent }`                                                                                                                                   | — (push notification)                                                                                           |
@@ -995,6 +1054,8 @@ When using **HTTP transport**, these map to REST routes (`POST /index/full`, `GE
 | `chatModel`            | `string`                                           | `'gpt-4o-mini'`               | Chat model name                              |
 | `chatBaseUrl`          | `string`                                           | `'https://api.openai.com/v1'` | Chat provider base URL                       |
 | `chatTimeout`          | `number`                                           | `30000`                       | Chat completion timeout in milliseconds      |
+| `chatSystemPrompt`     | `string`                                           | `''`                          | User-supplied persona/style system prompt, appended after the built-in grounding policy ([ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md)) |
+| `vaultOrganizationPrompt` | `string`                                        | `''`                          | User-supplied description of vault conventions (daily notes, tags, folders) used to help the assistant target retrieval ([ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md)) |
 | `indexedFolders`       | `string[]`                                         | `[]` (all folders)            | Folders to include in indexing (empty = all) |
 | `excludedFolders`      | `string[]`                                         | `[]`                          | Folders to exclude from indexing             |
 | `agentOutputFolders`   | `string[]`                                         | `['AI-Generated']`            | Allowed folders for agent-created notes      |
@@ -1003,6 +1064,10 @@ When using **HTTP transport**, these map to REST routes (`POST /index/full`, `GE
 | `transport`            | `'stdio' \| 'http'`                               | `'stdio'`                     | Sidecar transport method                     |
 | `logLevel`             | `'debug' \| 'info' \| 'warn' \| 'error'`          | `'info'`                      | Logging verbosity                            |
 | `searchResultCount`    | `number`                                           | `20`                          | Number of search results to return           |
+| `chatCoarseK`          | `number`                                           | `32`                          | Coarse-phase candidate count used by chat + search retrieval ([ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)) |
+| `enableHybridSearch`   | `boolean`                                          | `true`                        | Combine vector ANN with FTS5 BM25 keyword hits via reciprocal rank fusion ([ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)) |
+| `dailyNotePathGlobs`   | `string[]`                                         | `['Daily/**/*.md']`           | Glob patterns whose matching files are treated as daily notes for `dateRange` filtering ([ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) |
+| `dailyNoteDatePattern` | `string`                                           | `'YYYY-MM-DD'`                | Filename pattern used to extract `note_meta.note_date` from daily notes ([ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) |
 | `matchedContentBudget` | `number`                                           | `0.60`                        | Token budget fraction for matched content    |
 | `siblingContextBudget` | `number`                                           | `0.25`                        | Token budget fraction for sibling context    |
 | `parentSummaryBudget`  | `number`                                           | `0.15`                        | Token budget fraction for parent summaries   |
@@ -1047,6 +1112,7 @@ Parsing pipeline for [§4 hierarchical model](#4-hierarchical-document-model), [
 | [STO-1](docs/features/STO-1.md) | Complete | SQLite migrations: `nodes`, `summaries`, `tags`, `cross_refs`, `note_meta`, `queue_items`, `job_steps` | M    | [§8 SQLite Schema](#8-sqlite-schema)                                                                        |
 | [STO-2](docs/features/STO-2.md) | Complete | `vec0` virtual tables + `embedding_meta`; dimension aligned with settings                              | M    | `better-sqlite3` + `sqlite-vec` in sidecar only                                                             |
 | [STO-3](docs/features/STO-3.md) | Complete | `SqliteDocumentStore` implementing `IDocumentStore`                                                    | L    | CRUD, ANN search, ancestors/siblings, note meta                                                             |
+| [STO-4](docs/features/STO-4.md) | Planned  | `002_fts.sql`: FTS5 virtual table + `note_meta.note_date` + `summaries.prompt_version`                 | M    | Enables RET-5 / RET-6 / WKF-4 ([ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md), [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) |
 | [QUE-1](docs/features/QUE-1.md) | Complete | `InProcessQueue` + `IQueuePort` with crash-safe `queue_items`                                          | M    | Configurable concurrency; ack/nack/dead-letter                                                              |
 | [QUE-2](docs/features/QUE-2.md) | Complete | `job_steps` integration: idempotent steps, resume, retry cap                                           | L    | Emit step transitions for progress ([ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)) |
 
@@ -1056,9 +1122,10 @@ Orchestration in core workflows; incremental behavior ([§13](#13-incremental-su
 
 | ID                              | Status   | Story                                                                            | Size | Notes                                                                  |
 | ------------------------------- | -------- | -------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------- |
-| [WKF-1](docs/features/WKF-1.md) | Complete | `SummaryWorkflow` bottom-up LLM summaries                                        | L    | Uses `IChatPort`; skip redundant work when hashes unchanged            |
+| [WKF-1](docs/features/WKF-1.md) | Complete | `SummaryWorkflow` bottom-up LLM summaries                                        | L    | Uses `IChatPort`; skip redundant work when hashes unchanged; partially superseded by WKF-4 |
 | [WKF-2](docs/features/WKF-2.md) | Complete | `IndexWorkflow` state machine: queue dequeue → parse → store → summarize → embed | L    | Wire `IQueuePort`, `IDocumentStore`, `IEmbeddingPort`, `IProgressPort` |
 | [WKF-3](docs/features/WKF-3.md) | Complete | Incremental indexing: changed-note detection, partial embed/summary reuse        | M    | Deleted notes: direct cleanup without full state machine               |
+| [WKF-4](docs/features/WKF-4.md) | Planned  | Structured note/topic/subtopic summaries; skip `bullet_group`                    | M    | `SUMMARY_RUBRIC_V1` prompt + `prompt_version` invalidation ([ADR-013](docs/decisions/ADR-013-structured-note-summaries.md)) |
 
 ### Epic 5: Retrieval, search workflow, and chat workflow
 
@@ -1066,11 +1133,16 @@ Three-phase search ([ADR-003](docs/decisions/ADR-003-phased-retrieval-strategy.m
 
 | ID                                | Status   | Story                                                                     | Size | Notes                                                                                                              |
 | --------------------------------- | -------- | ------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------ |
-| [RET-1](docs/features/RET-1.md)   | Complete | `SearchWorkflow`: coarse summary ANN → drill-down content → assembly      | L    | Same embedding space for query and vectors; expose `k` / result shape for plugin                                   |
+| [RET-1](docs/features/RET-1.md)   | Complete | `SearchWorkflow`: coarse summary ANN → drill-down content → assembly      | L    | Same embedding space for query and vectors; expose `k` / result shape for plugin; coarse-K cap superseded by RET-4 |
 | [RET-2](docs/features/RET-2.md)   | Complete | Token budgets and structured snippet formatting                           | M    | Config fractions: matched / sibling / parent ([Plugin Settings](#plugin-settings))                                 |
-| [RET-3](docs/features/RET-3.md)   | Complete | Tag-aware filtering in search (where index exposes tags)                  | S    | REQUIREMENTS §5 tags; optional MVP tightening                                                                      |
+| [RET-3](docs/features/RET-3.md)   | Complete | Tag-aware filtering in search (where index exposes tags)                  | S    | REQUIREMENTS §5 tags; `NodeFilter` surface extended by RET-6                                                       |
+| [RET-4](docs/features/RET-4.md)   | Planned  | Configurable coarse-K + content-only fallback                             | M    | Removes `Math.min(k, 8)` cap; fallback unrestricted `vec_content` ANN ([ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)) |
+| [RET-5](docs/features/RET-5.md)   | Planned  | Hybrid retrieval (vector + FTS5 via RRF)                                  | M    | `enableHybridSearch` toggle; BM25 on `nodes_fts` merged with ANN at rank level ([ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)) |
+| [RET-6](docs/features/RET-6.md)   | Planned  | Temporal and path filters (`pathGlobs` + `dateRange`)                     | M    | Daily-note date parsed into `note_meta.note_date`; slash-command UI in chat input ([ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) |
 | [CHAT-1](docs/features/CHAT-1.md) | Complete | `ChatWorkflow`: retrieve → assemble context → stream completion → sources | L    | Vault-only retrieval path; conversation history in payload                                                         |
 | [CHAT-2](docs/features/CHAT-2.md) | Complete | Chat cancel/timeout behavior end-to-end                                   | S    | [ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md); configurable timeout; cancel through transport |
+| [CHAT-3](docs/features/CHAT-3.md) | Planned  | Always-on grounding policy + insufficient-evidence response               | M    | [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md); built-in policy every request; distinct UI state   |
+| [CHAT-4](docs/features/CHAT-4.md) | Planned  | User chat system prompt + vault-organization prompt                       | M    | [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md); two new settings; ordered merge into messages      |
 
 ### Epic 6: Provider adapters
 

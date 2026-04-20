@@ -25,6 +25,16 @@ This document describes where the **semantic index** lives on disk, how it relat
 
 - If the index seems inconsistent after a crash or failed run, use the command **Reindex vault (full)** from the command palette to rebuild from current note contents. Incremental indexing normally resumes from recorded job steps, but a full reindex is the straightforward user-controlled reset.
 
+## Storage upgrades that touch the index
+
+When a plugin update introduces new retrieval features, the sidecar may apply **additive SQLite migrations** on next startup. You don't need to do anything — the migrations are idempotent and preserve existing data — but the first run after an upgrade may be slower than usual, and the index may operate with reduced quality until a reindex runs:
+
+- **FTS5 keyword index (`nodes_fts`)** — see [ADR-012](../decisions/ADR-012-hybrid-retrieval-and-coarse-k.md) and [STO-4](../features/STO-4.md). The migration creates the virtual table and (if necessary) triggers a one-time rebuild from `nodes.content`. After this runs, hybrid search (vector + BM25) becomes available via the **Enable hybrid search** setting. Rebuild time scales with vault size; you will see a `migrations` log entry in the sidecar log on startup.
+- **`note_meta.note_date`** — see [ADR-014](../decisions/ADR-014-temporal-and-path-filters.md). The column is added with all rows set to `NULL`; dates are populated on the next indexing pass for notes whose paths match `dailyNotePathGlobs`. Until you reindex, temporal filters (`last:14d`, `since:2026-04-01`, etc.) will exclude notes whose `note_date` has not yet been parsed. **Run "Reindex vault (full)"** once after this upgrade to populate the column across your Daily notes.
+- **`summaries.prompt_version`** — see [ADR-013](../decisions/ADR-013-structured-note-summaries.md) and [WKF-4](../features/WKF-4.md). Existing summaries are backfilled to `prompt_version = 'legacy'` and treated as stale; they will be **regenerated** during the next summary pass using the new structured rubric (`SUMMARY_RUBRIC_V1`). The first full reindex after this upgrade will make **more LLM summary calls than a typical incremental run** — factor that into cost/rate-limit planning if you use a paid provider.
+
+In general, after any plugin upgrade that mentions retrieval quality or summary changes in release notes, running **Reindex vault (full)** from the command palette is the simplest way to guarantee the new behavior is applied uniformly across your vault.
+
 ---
 
 _Part of Epic 10 (DOC-2)._
