@@ -34,6 +34,10 @@ export class SearchTestStore implements IDocumentStore {
   /** Every `searchContentVectors` filter (including undefined for unrestricted). */
   contentFilters: (NodeFilter | undefined)[] = [];
   lastSummaryK = 0;
+  lastSummaryFilter: NodeFilter | undefined;
+  keywordHits: VectorMatch[] = [];
+  lastKeywordFilter: NodeFilter | undefined;
+  keywordFilters: (NodeFilter | undefined)[] = [];
 
   constructor() {
     this.nodes.set(
@@ -82,10 +86,22 @@ export class SearchTestStore implements IDocumentStore {
   }
   async upsertEmbedding(): Promise<void> {}
 
-  async searchSummaryVectors(_q: Float32Array, k: number): Promise<VectorMatch[]> {
+  async searchSummaryVectors(
+    _q: Float32Array,
+    k: number,
+    filter?: NodeFilter,
+  ): Promise<VectorMatch[]> {
     this.callLog.push('searchSummaryVectors');
     this.lastSummaryK = k;
+    this.lastSummaryFilter = filter;
     return this.summaryHits.slice(0, k);
+  }
+
+  async searchContentKeyword(_q: string, k: number, filter?: NodeFilter): Promise<VectorMatch[]> {
+    this.callLog.push('searchContentKeyword');
+    this.lastKeywordFilter = filter;
+    this.keywordFilters.push(filter);
+    return this.keywordHits.slice(0, k);
   }
 
   async searchContentVectors(

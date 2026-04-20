@@ -9,11 +9,44 @@ import type {
   VectorMatch,
   VectorType,
 } from '../../core/domain/types.js';
+import { sanitizeFtsQuery } from '../../core/domain/fts-sanitize.js';
 import type { IDocumentStore } from '../../core/ports/IDocumentStore.js';
 import Database from 'better-sqlite3';
 import { getEmbeddingDimension } from '../db/migrate.js';
 
 type SqliteDatabase = InstanceType<typeof Database>;
+
+function pathGlobOrClause(metaAlias: string, globs: string[]): { sql: string; params: string[] } {
+  const parts: string[] = [];
+  const params: string[] = [];
+  for (const raw of globs) {
+    const g = raw.replace(/\\/g, '/').replace(/\*\*/g, '*');
+    parts.push(`(${metaAlias}.vault_path GLOB ?)`);
+    params.push(g);
+  }
+  return { sql: parts.length ? `(${parts.join(' OR ')})` : '(1=1)', params };
+}
+
+function dateRangeClause(
+  metaAlias: string,
+  dr: { start?: string; end?: string } | undefined,
+): { sql: string; params: string[] } | null {
+  if (!dr) return null;
+  const hasStart = dr.start !== undefined && dr.start !== '';
+  const hasEnd = dr.end !== undefined && dr.end !== '';
+  if (!hasStart && !hasEnd) return null;
+  const params: string[] = [];
+  let sql = `${metaAlias}.note_date IS NOT NULL`;
+  if (hasStart) {
+    sql += ` AND ${metaAlias}.note_date >= ?`;
+    params.push(dr.start!);
+  }
+  if (hasEnd) {
+    sql += ` AND ${metaAlias}.note_date <= ?`;
+    params.push(dr.end!);
+  }
+  return { sql: `(${sql})`, params };
+}
 
 function rowToDocumentNode(row: Record<string, unknown>): DocumentNode {
   const trailRaw = row.heading_trail as string | null;
@@ -49,6 +82,41 @@ export class SqliteDocumentStore implements IDocumentStore {
 
   constructor(private readonly db: SqliteDatabase) {
     this.dimension = getEmbeddingDimension(db);
+  }
+
+  /** SQL `AND …` fragments for shared retrieval filters (excludes `subtreeRootNodeIds`). */
+  static appendFilterWhere(
+    nodeAlias: string,
+    metaAlias: string,
+    filter: NodeFilter | undefined,
+  ): { sql: string; params: unknown[] } {
+    let sql = '';
+    const params: unknown[] = [];
+    if (!filter) return { sql, params };
+    if (filter.noteIds?.length) {
+      sql += ` AND ${nodeAlias}.note_id IN (${filter.noteIds.map(() => '?').join(',')})`;
+      params.push(...filter.noteIds);
+    }
+    if (filter.nodeTypes?.length) {
+      sql += ` AND ${nodeAlias}.type IN (${filter.nodeTypes.map(() => '?').join(',')})`;
+      params.push(...filter.nodeTypes);
+    }
+    if (filter.tagsAny?.length) {
+      const lowered = filter.tagsAny.map((t) => t.toLowerCase());
+      sql += ` AND EXISTS (SELECT 1 FROM tags t WHERE t.node_id = ${nodeAlias}.id AND lower(t.tag) IN (${lowered.map(() => '?').join(',')}))`;
+      params.push(...lowered);
+    }
+    if (filter.pathGlobs?.length) {
+      const g = pathGlobOrClause(metaAlias, filter.pathGlobs);
+      sql += ` AND ${g.sql}`;
+      params.push(...g.params);
+    }
+    const dr = dateRangeClause(metaAlias, filter.dateRange);
+    if (dr) {
+      sql += ` AND ${dr.sql}`;
+      params.push(...dr.params);
+    }
+    return { sql, params };
   }
 
   private assertVectorLength(v: Float32Array, label: string): void {
@@ -228,17 +296,54 @@ export class SqliteDocumentStore implements IDocumentStore {
     txn();
   }
 
-  async searchSummaryVectors(query: Float32Array, k: number): Promise<VectorMatch[]> {
+  async searchSummaryVectors(
+    query: Float32Array,
+    k: number,
+    filter?: NodeFilter,
+  ): Promise<VectorMatch[]> {
     this.assertVectorLength(query, 'searchSummaryVectors');
+    const { sql: filterSql, params: filterParams } = SqliteDocumentStore.appendFilterWhere(
+      'n',
+      'nm',
+      filter,
+    );
     const rows = this.db
       .prepare(
-        `SELECT node_id, distance FROM vec_summary
-         WHERE embedding MATCH ?
+        `SELECT v.node_id, v.distance FROM vec_summary v
+         INNER JOIN nodes n ON n.id = v.node_id
+         INNER JOIN note_meta nm ON nm.note_id = n.note_id
+         WHERE v.embedding MATCH ?
            AND k = ?
-         ORDER BY distance ASC`,
+           ${filterSql}
+         ORDER BY v.distance ASC`,
       )
-      .all(query, k) as { node_id: string; distance: number }[];
+      .all(query, k, ...filterParams) as { node_id: string; distance: number }[];
     return rows.map((r) => ({ nodeId: r.node_id, score: r.distance }));
+  }
+
+  async searchContentKeyword(query: string, k: number, filter?: NodeFilter): Promise<VectorMatch[]> {
+    const sanitized = sanitizeFtsQuery(query);
+    if (!sanitized) {
+      return [];
+    }
+    const { sql: filterSql, params: filterParams } = SqliteDocumentStore.appendFilterWhere(
+      'n',
+      'nm',
+      filter,
+    );
+    const rows = this.db
+      .prepare(
+        `SELECT n.id AS node_id, bm25(nodes_fts) AS score
+         FROM nodes_fts
+         INNER JOIN nodes n ON n.rowid = nodes_fts.rowid
+         INNER JOIN note_meta nm ON nm.note_id = n.note_id
+         WHERE nodes_fts MATCH ?
+           ${filterSql}
+         ORDER BY score ASC
+         LIMIT ?`,
+      )
+      .all(sanitized, ...filterParams, k) as { node_id: string; score: number }[];
+    return rows.map((r) => ({ nodeId: r.node_id, score: r.score }));
   }
 
   async searchContentVectors(
@@ -249,6 +354,12 @@ export class SqliteDocumentStore implements IDocumentStore {
     this.assertVectorLength(query, 'searchContentVectors');
     const roots = filter?.subtreeRootNodeIds?.filter(Boolean) ?? [];
     const hasSubtree = roots.length > 0;
+
+    const { sql: filterSql, params: filterParams } = SqliteDocumentStore.appendFilterWhere(
+      'n',
+      'nm',
+      filter,
+    );
 
     let sql: string;
     const params: unknown[] = [];
@@ -262,6 +373,7 @@ export class SqliteDocumentStore implements IDocumentStore {
         )
         SELECT v.node_id, v.distance FROM vec_content v
         INNER JOIN nodes n ON n.id = v.node_id
+        INNER JOIN note_meta nm ON nm.note_id = n.note_id
         WHERE n.id IN (SELECT id FROM subtree)
           AND v.embedding MATCH ?
           AND k = ?`;
@@ -269,28 +381,14 @@ export class SqliteDocumentStore implements IDocumentStore {
     } else {
       sql = `SELECT v.node_id, v.distance FROM vec_content v
         INNER JOIN nodes n ON n.id = v.node_id
+        INNER JOIN note_meta nm ON nm.note_id = n.note_id
         WHERE v.embedding MATCH ?
           AND k = ?`;
       params.push(query, k);
     }
 
-    if (filter?.noteIds?.length) {
-      sql += ` AND n.note_id IN (${filter.noteIds.map(() => '?').join(',')})`;
-      params.push(...filter.noteIds);
-    }
-    if (filter?.nodeTypes?.length) {
-      sql += ` AND n.type IN (${filter.nodeTypes.map(() => '?').join(',')})`;
-      params.push(...filter.nodeTypes);
-    }
-    if (filter?.tagsAny?.length) {
-      const lowered = filter.tagsAny.map((t) => t.toLowerCase());
-      const ph = lowered.map(() => '?').join(', ');
-      sql += ` AND EXISTS (
-        SELECT 1 FROM tags t
-        WHERE t.node_id = n.id AND lower(t.tag) IN (${ph})
-      )`;
-      params.push(...lowered);
-    }
+    sql += filterSql;
+    params.push(...filterParams);
     sql += ` ORDER BY v.distance ASC`;
     const rows = this.db.prepare(sql).all(...params) as {
       node_id: string;

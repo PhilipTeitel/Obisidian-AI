@@ -141,6 +141,7 @@ export class ChatView extends ItemView {
           timeoutMs,
           k: ps.searchResultCount,
           coarseK: ps.chatCoarseK,
+          enableHybridSearch: ps.enableHybridSearch,
           search: buildSearchAssemblyFromSettings(ps),
         },
         { signal },

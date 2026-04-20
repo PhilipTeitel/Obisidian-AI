@@ -45,6 +45,13 @@ export async function assertUnrestrictedContentSearchContract(store: IDocumentSt
   };
   await store.upsertEmbedding('ctr_a', 'summary', q, meta);
   await store.upsertEmbedding('ctr_b', 'content', q, meta);
+  await store.upsertNoteMeta({
+    noteId: 'note_ctr_a',
+    vaultPath: 'ctr/vault.md',
+    contentHash: 'h_meta_ctr',
+    indexedAt: '2026-01-01T00:00:00.000Z',
+    nodeCount: 2,
+  });
 
   const scoped = await store.searchContentVectors(q, 8, { subtreeRootNodeIds: ['ctr_a'] });
   const unrestricted = await store.searchContentVectors(q, 8);
@@ -52,6 +59,49 @@ export async function assertUnrestrictedContentSearchContract(store: IDocumentSt
   expect(unrestricted.length).toBeGreaterThan(0);
   const ids = new Set(unrestricted.map((m) => m.nodeId));
   expect(ids.size).toBe(unrestricted.length);
+}
+
+/** RET-5: BM25 ordering + `nodeTypes` push-down for `searchContentKeyword`. */
+export async function runSearchContentKeywordContract(store: IDocumentStore): Promise<void> {
+  await store.upsertNodes([
+    sampleNode({ id: 'k1', noteId: 'nk1', type: 'topic', content: 'Acme Corp appears once' }),
+    sampleNode({
+      id: 'k2',
+      noteId: 'nk2',
+      type: 'topic',
+      content: 'Acme Corp Acme Corp Acme Corp repeated',
+    }),
+    sampleNode({
+      id: 'kb',
+      noteId: 'nk1',
+      parentId: 'k1',
+      type: 'bullet',
+      depth: 1,
+      content: 'Acme Corp bullet noise',
+    }),
+  ]);
+  for (const row of [
+    { noteId: 'nk1', path: 'one.md' },
+    { noteId: 'nk2', path: 'two.md' },
+  ] as const) {
+    await store.upsertNoteMeta({
+      noteId: row.noteId,
+      vaultPath: row.path,
+      contentHash: 'hm',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 2,
+    });
+  }
+  const hits = await store.searchContentKeyword('Acme Corp', 10, {
+    nodeTypes: ['note', 'topic', 'subtopic'],
+  });
+  const ids = hits.map((h) => h.nodeId);
+  expect(ids).not.toContain('kb');
+  expect(ids).toContain('k2');
+  expect(ids.indexOf('k2')).toBeLessThan(ids.indexOf('k1'));
+  for (let i = 1; i < hits.length; i++) {
+    expect(hits[i - 1]!.score).toBeLessThanOrEqual(hits[i]!.score);
+  }
 }
 
 /** Port-level round-trip used by adapter integration tests (STO-4 Y8). */
@@ -95,6 +145,16 @@ describe('IDocumentStore contract', () => {
     const store = new SqliteDocumentStore(db);
     try {
       await assertUnrestrictedContentSearchContract(store);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('searchContentKeyword_contract', async () => {
+    const db = openMigratedMemoryDb({ embeddingDimension: EMBED_DIM });
+    const store = new SqliteDocumentStore(db);
+    try {
+      await runSearchContentKeywordContract(store);
     } finally {
       db.close();
     }

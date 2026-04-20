@@ -102,6 +102,27 @@ describe('SidecarRuntime chat retrieval (RET-4)', () => {
     expect(optionsPassed?.search).toEqual(custom);
   });
 
+  it('RET5_enableHybridSearch_threads_from_chat_payload', async () => {
+    process.env.OBSIDIAN_AI_DB_PATH = ':memory:';
+    let optionsPassed: ChatWorkflowOptions | undefined;
+    vi.spyOn(ChatWorkflow, 'runChatStream').mockImplementation((_d, _m, opts) => {
+      optionsPassed = opts;
+      return (async function* () {
+        yield '';
+        return { sources: [] };
+      })();
+    });
+    const runtime = new SidecarRuntime({ log, progress });
+    await drainChatStream(
+      runtime.handleChatStream({
+        messages: [{ role: 'user', content: 'hi' }],
+        enableHybridSearch: false,
+        search: asmAlt(),
+      }),
+    );
+    expect(optionsPassed?.enableHybridSearch).toBe(false);
+  });
+
   it('D2_runtime_setting_change_S10', async () => {
     process.env.OBSIDIAN_AI_DB_PATH = ':memory:';
     const coarseKs: number[] = [];

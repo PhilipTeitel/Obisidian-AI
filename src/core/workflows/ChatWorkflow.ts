@@ -17,6 +17,8 @@ export interface ChatWorkflowOptions {
   apiKey?: string;
   k?: number;
   tags?: string[];
+  pathGlobs?: string[];
+  dateRange?: { start?: string; end?: string };
   coarseK?: number;
   enableHybridSearch?: boolean;
   /** ADR-009: passed through to chat streaming guard + `IChatPort.complete`. */
@@ -61,6 +63,8 @@ export async function* runChatStream(
       apiKey: options.apiKey,
       k: options.k ?? DEFAULT_SEARCH_K,
       tags: options.tags,
+      pathGlobs: options.pathGlobs,
+      dateRange: options.dateRange,
       coarseK: options.coarseK,
       enableHybridSearch: options.enableHybridSearch,
     },

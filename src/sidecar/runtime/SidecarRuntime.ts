@@ -293,6 +293,8 @@ export class SidecarRuntime {
       k: payload.k,
       coarseK: payload.coarseK,
       enableHybridSearch: payload.enableHybridSearch,
+      pathGlobs: payload.pathGlobs,
+      dateRange: payload.dateRange,
       tags: undefined,
       completion: {
         signal: options?.signal,

@@ -84,7 +84,11 @@ class MemoryStore implements IDocumentStore {
 
   async upsertEmbedding(): Promise<void> {}
 
-  async searchSummaryVectors(): Promise<[]> {
+  async searchSummaryVectors(_q: Float32Array, _k: number, _filter?: import('@src/core/domain/types.js').NodeFilter): Promise<[]> {
+    return [];
+  }
+
+  async searchContentKeyword(): Promise<[]> {
     return [];
   }
 

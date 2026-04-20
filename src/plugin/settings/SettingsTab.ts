@@ -274,6 +274,18 @@ export class ObsidianAISettingTab extends PluginSettingTab {
         });
       });
 
+    new Setting(containerEl)
+      .setName('Enable hybrid keyword + vector retrieval')
+      .setDesc(
+        'Phase-1 merges summary-vector ANN with SQLite FTS5 (BM25) via reciprocal rank fusion. Requires FTS5 populated (reindex after enabling STO-4 migrations if keyword search is empty).',
+      )
+      .addToggle((tg) =>
+        tg.setValue(s.enableHybridSearch).onChange(async (v) => {
+          s.enableHybridSearch = v;
+          await this.aiPlugin.saveSettings();
+        }),
+      );
+
     new Setting(containerEl).setName('Search result count (k)').addText((t) =>
       t.setValue(String(s.searchResultCount)).onChange(async (v) => {
         const n = parseInt(v, 10);

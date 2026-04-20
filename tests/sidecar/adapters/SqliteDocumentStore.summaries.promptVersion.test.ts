@@ -214,6 +214,13 @@ describe('SqliteDocumentStore summaries promptVersion (WKF-4)', () => {
         markdown: md,
       });
       await store.upsertNodes(parsed.nodes);
+      await store.upsertNoteMeta({
+        noteId: 'n1',
+        vaultPath: 'v/a.md',
+        contentHash: 'hm',
+        indexedAt: '2026-01-01T00:00:00.000Z',
+        nodeCount: parsed.nodes.length,
+      });
       const bullet = parsed.nodes.find(
         (n) => n.type === 'bullet' && n.content.includes('uniqueTokenForSearch'),
       );

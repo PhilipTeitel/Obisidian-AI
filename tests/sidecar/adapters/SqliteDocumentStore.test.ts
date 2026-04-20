@@ -219,6 +219,13 @@ describe('SqliteDocumentStore', () => {
       dimension: DIM,
       contentHash: 'h2',
     });
+    await s.upsertNoteMeta({
+      noteId: 'n',
+      vaultPath: 'ann.md',
+      contentHash: 'hx',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 2,
+    });
     const q = new Float32Array(DIM).fill(0.95);
     const hits = await s.searchSummaryVectors(q, 2);
     expect(hits.length).toBeGreaterThanOrEqual(1);
@@ -239,6 +246,20 @@ describe('SqliteDocumentStore', () => {
       model: 'm',
       dimension: DIM,
       contentHash: 'h',
+    });
+    await s.upsertNoteMeta({
+      noteId: 'A',
+      vaultPath: 'a.md',
+      contentHash: 'hx',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 1,
+    });
+    await s.upsertNoteMeta({
+      noteId: 'B',
+      vaultPath: 'b.md',
+      contentHash: 'hx',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 1,
     });
     const q = new Float32Array(DIM).fill(0.5);
     const hits = await s.searchContentVectors(q, 5, { noteIds: ['A'] });
@@ -268,6 +289,13 @@ describe('SqliteDocumentStore', () => {
       model: 'm',
       dimension: DIM,
       contentHash: 'h',
+    });
+    await s.upsertNoteMeta({
+      noteId: 'A',
+      vaultPath: 'types.md',
+      contentHash: 'hx',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 2,
     });
     const q = new Float32Array(DIM).fill(0.2);
     const hits = await s.searchContentVectors(q, 5, {
@@ -360,6 +388,13 @@ describe('SqliteDocumentStore', () => {
       dimension: DIM,
       contentHash: 'h2',
     });
+    await s.upsertNoteMeta({
+      noteId: 'n',
+      vaultPath: 'tag.md',
+      contentHash: 'hx',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 3,
+    });
     const all = await s.searchContentVectors(q, 10);
     expect(new Set(all.map((h) => h.nodeId))).toEqual(new Set(['plain', 'tagged']));
     const filt = await s.searchContentVectors(q, 10, { tagsAny: ['foo'] });
@@ -400,6 +435,13 @@ describe('SqliteDocumentStore', () => {
       model: 'm',
       dimension: DIM,
       contentHash: 'hb',
+    });
+    await s.upsertNoteMeta({
+      noteId: 'n2',
+      vaultPath: 'or.md',
+      contentHash: 'hx',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 3,
     });
     const hits = await s.searchContentVectors(q, 10, { tagsAny: ['a', 'b'] });
     expect(hits.map((h) => h.nodeId).sort()).toEqual(['na', 'nb']);
@@ -451,6 +493,13 @@ describe('SqliteDocumentStore', () => {
       model: 'm',
       dimension: DIM,
       contentHash: 'h2',
+    });
+    await s.upsertNoteMeta({
+      noteId: 'n',
+      vaultPath: 'sub.md',
+      contentHash: 'hx',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 4,
     });
     const all = await s.searchContentVectors(q, 10);
     expect(all.map((h) => h.nodeId).sort()).toEqual(['p1', 'p2']);

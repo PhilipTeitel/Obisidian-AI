@@ -38,7 +38,19 @@ export interface IDocumentStore {
     vector: Float32Array,
     meta: EmbedMeta,
   ): Promise<void>;
-  searchSummaryVectors(query: Float32Array, k: number): Promise<VectorMatch[]>;
+  searchSummaryVectors(
+    query: Float32Array,
+    k: number,
+    filter?: NodeFilter,
+  ): Promise<VectorMatch[]>;
+  /**
+   * BM25-ranked keyword search over FTS5 `nodes.content` (ADR-012). `score` is BM25 (lower is better).
+   */
+  searchContentKeyword(
+    query: string,
+    k: number,
+    filter?: NodeFilter,
+  ): Promise<VectorMatch[]>;
   searchContentVectors(query: Float32Array, k: number, filter?: NodeFilter): Promise<VectorMatch[]>;
   getAncestors(nodeId: string): Promise<DocumentNode[]>;
   getSiblings(nodeId: string): Promise<DocumentNode[]>;

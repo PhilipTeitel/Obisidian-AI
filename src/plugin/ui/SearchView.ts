@@ -94,6 +94,7 @@ export class SearchView extends ItemView {
           k: s.searchResultCount,
           apiKey,
           coarseK: s.chatCoarseK,
+          enableHybridSearch: s.enableHybridSearch,
           search: buildSearchAssemblyFromSettings(s),
         },
       });

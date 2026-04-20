@@ -23,6 +23,8 @@ export interface ObsidianAISettings {
   searchResultCount: number;
   /** Phase-1 summary ANN limit (RET-4); persisted integer in [1, 256]. */
   chatCoarseK: number;
+  /** Hybrid BM25 + vector coarse fusion (RET-5 / ADR-012); default on. */
+  enableHybridSearch: boolean;
   matchedContentBudget: number;
   siblingContextBudget: number;
   parentSummaryBudget: number;

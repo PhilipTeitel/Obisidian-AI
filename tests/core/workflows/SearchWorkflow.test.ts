@@ -50,7 +50,7 @@ describe('SearchWorkflow', () => {
       score: i * 0.01,
     }));
     const embedder = fakeEmbed();
-    await runSearch({ store, embedder }, { query: 'q' });
+    await runSearch({ store, embedder }, { query: 'q', enableHybridSearch: false });
     expect(store.callLog).toEqual(['searchSummaryVectors', 'searchContentVectors']);
   });
 
@@ -59,7 +59,7 @@ describe('SearchWorkflow', () => {
     store.summaryHits = [];
     store.contentHits = [];
     const embedder = fakeEmbed();
-    const res = await runSearch({ store, embedder }, { query: 'q' });
+    const res = await runSearch({ store, embedder }, { query: 'q', enableHybridSearch: false });
     expect(res.results).toEqual([]);
     expect(store.callLog).toEqual(['searchSummaryVectors', 'searchContentVectors']);
   });

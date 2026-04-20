@@ -3,6 +3,7 @@ import {
   DEFAULT_SEARCH_ASSEMBLY,
   validateSearchAssemblyOptions,
 } from '../domain/contextAssembly.js';
+import { fuseRankings } from '../domain/rrf.js';
 import type {
   DocumentNode,
   NodeFilter,
@@ -83,6 +84,18 @@ async function buildSnippet(
   });
 }
 
+const BM25_COARSE_NODE_TYPES = ['note', 'topic', 'subtopic'] as const;
+
+function coarseUserFilterFromRequest(req: SearchRequest): NodeFilter {
+  const f: NodeFilter = {};
+  if (req.tags?.length) f.tagsAny = req.tags;
+  if (req.pathGlobs?.length) f.pathGlobs = req.pathGlobs;
+  if (req.dateRange && (req.dateRange.start || req.dateRange.end)) {
+    f.dateRange = req.dateRange;
+  }
+  return f;
+}
+
 function mergeHitsByNode(a: VectorMatch[], b: VectorMatch[]): Map<string, number> {
   const byNode = new Map<string, number>();
   for (const h of a) {
@@ -109,8 +122,6 @@ export async function runSearch(
   req: SearchRequest,
   assembly?: SearchAssemblyOptions,
 ): Promise<SearchResponse> {
-  void req.enableHybridSearch;
-
   const resolvedAssembly = resolveAssembly(assembly ?? req.search);
   const coarseK = clampCoarseK(req.coarseK);
   const k = req.k ?? DEFAULT_SEARCH_K;
@@ -120,20 +131,35 @@ export async function runSearch(
     return { results: [] };
   }
 
-  const [qVec] = await deps.embedder.embed([queryText], req.apiKey);
-  const summaryHits = await deps.store.searchSummaryVectors(qVec, kSummary);
+  const hybridOn = req.enableHybridSearch !== false;
+  const coarseUserFilter = coarseUserFilterFromRequest(req);
+  const bm25Filter: NodeFilter = {
+    ...coarseUserFilter,
+    nodeTypes: [...BM25_COARSE_NODE_TYPES],
+  };
 
-  let coarseHits = summaryHits;
-  if (req.tags?.length) {
-    const kept: VectorMatch[] = [];
-    for (const h of summaryHits) {
-      const n = await deps.store.getNodeById(h.nodeId);
-      if (!n) continue;
-      if (await deps.store.noteMatchesTagFilter(n.noteId, req.tags)) {
-        kept.push(h);
-      }
-    }
-    coarseHits = kept;
+  const [qVec] = await deps.embedder.embed([queryText], req.apiKey);
+
+  let summaryHits: VectorMatch[];
+  let keywordHits: VectorMatch[] | undefined;
+  if (hybridOn) {
+    [summaryHits, keywordHits] = await Promise.all([
+      deps.store.searchSummaryVectors(qVec, kSummary, coarseUserFilter),
+      deps.store.searchContentKeyword(queryText, kSummary, bm25Filter),
+    ]);
+  } else {
+    summaryHits = await deps.store.searchSummaryVectors(qVec, kSummary, coarseUserFilter);
+  }
+
+  let coarseHits: VectorMatch[];
+  if (hybridOn && keywordHits) {
+    const fused = fuseRankings([
+      summaryHits.map((h) => ({ id: h.nodeId })),
+      keywordHits.map((h) => ({ id: h.nodeId })),
+    ]);
+    coarseHits = fused.slice(0, coarseK).map((row) => ({ nodeId: row.id, score: row.score }));
+  } else {
+    coarseHits = summaryHits;
   }
 
   const floor = fallbackFloorForCoarseK(coarseK);
@@ -142,19 +168,16 @@ export async function runSearch(
   let phase2Hits: VectorMatch[] = [];
   if (coarseHits.length > 0) {
     const roots = coarseHits.map((h: VectorMatch) => h.nodeId);
-    const contentFilter: NodeFilter = { subtreeRootNodeIds: roots };
-    if (req.tags?.length) {
-      contentFilter.tagsAny = req.tags;
-    }
+    const contentFilter: NodeFilter = {
+      ...coarseUserFilter,
+      subtreeRootNodeIds: roots,
+    };
     phase2Hits = await deps.store.searchContentVectors(qVec, kContent, contentFilter);
   }
 
   let fallbackHits: VectorMatch[] = [];
   if (fallbackFired) {
-    const fbFilter: NodeFilter = {};
-    if (req.tags?.length) {
-      fbFilter.tagsAny = req.tags;
-    }
+    const fbFilter: NodeFilter = { ...coarseUserFilter };
     fallbackHits = await deps.store.searchContentVectors(qVec, coarseK, fbFilter);
   }
 
@@ -163,6 +186,10 @@ export async function runSearch(
   deps.log?.debug(
     {
       coarseK,
+      enable_hybrid_search: hybridOn,
+      vector_summary_candidates: summaryHits.length,
+      bm25_candidates: keywordHits?.length ?? 0,
+      fused_coarse_count: coarseHits.length,
       fallback_fired: fallbackFired,
       merged_candidates: byNode.size,
     },

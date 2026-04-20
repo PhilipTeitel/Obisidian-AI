@@ -1,6 +1,8 @@
 import type { ObsidianAISettings } from './types.js';
 import { DEFAULT_CHAT_COARSE_K } from './chatCoarseK.js';
 
+export const DEFAULT_ENABLE_HYBRID_SEARCH = true;
+
 export const DEFAULT_SETTINGS: ObsidianAISettings = {
   embeddingProvider: 'openai',
   embeddingModel: 'text-embedding-3-small',
@@ -20,6 +22,7 @@ export const DEFAULT_SETTINGS: ObsidianAISettings = {
   logLevel: 'info',
   searchResultCount: 20,
   chatCoarseK: DEFAULT_CHAT_COARSE_K,
+  enableHybridSearch: DEFAULT_ENABLE_HYBRID_SEARCH,
   matchedContentBudget: 0.6,
   siblingContextBudget: 0.25,
   parentSummaryBudget: 0.15,

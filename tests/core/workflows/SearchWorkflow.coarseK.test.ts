@@ -51,9 +51,9 @@ describe('SearchWorkflow coarse-K + fallback (RET-4)', () => {
     let summaryK = 0;
     const embedder = fakeEmbed();
     const orig = store.searchSummaryVectors.bind(store);
-    store.searchSummaryVectors = async (q, k) => {
+    store.searchSummaryVectors = async (q, k, f) => {
       summaryK = k;
-      return orig(q, k);
+      return orig(q, k, f);
     };
     await runSearch({ store, embedder }, { query: 'q' });
     expect(summaryK).toBe(DEFAULT_COARSE_K);
@@ -139,17 +139,16 @@ describe('SearchWorkflow coarse-K + fallback (RET-4)', () => {
   it('B5_fallback_independent_of_hybrid_toggle_Y6', async () => {
     const store = new SearchTestStore();
     store.summaryHits = [{ nodeId: 'r', score: 0.1 }];
+    store.keywordHits = [];
     const embedder = fakeEmbed();
-    const run = async (hybrid: boolean | undefined) => {
+    const unrestrictedCount = async (hybrid: boolean | undefined) => {
       store.callLog = [];
       store.contentFilters = [];
       await runSearch({ store, embedder }, { query: 'q', coarseK: 32, enableHybridSearch: hybrid });
-      return [...store.callLog];
+      return store.contentFilters.filter((f) => f !== undefined && !f.subtreeRootNodeIds?.length)
+        .length;
     };
-    const a = await run(true);
-    const b = await run(false);
-    const c = await run(undefined);
-    expect(a).toEqual(b);
-    expect(b).toEqual(c);
+    expect(await unrestrictedCount(true)).toBe(await unrestrictedCount(false));
+    expect(await unrestrictedCount(false)).toBe(await unrestrictedCount(undefined));
   });
 });

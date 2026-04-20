@@ -3,7 +3,7 @@
 **Story**: Introduce an `IDocumentStore.searchContentKeyword` method backed by SQLite FTS5 (`nodes_fts`), fuse its BM25 ranking with the existing summary-vector ANN ranking via reciprocal rank fusion in the coarse phase of `SearchWorkflow` / `ChatWorkflow`, and gate the behavior behind a new `enableHybridSearch` user setting.
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -204,61 +204,61 @@ SettingsTab
 
 ### Phase A: Store-level BM25 via FTS5
 
-- [ ] **A1** — `SqliteDocumentStore.searchContentKeyword('Acme Corp', 10)` returns rows ordered by BM25 against a fixture vault in which multiple notes mention "Acme Corp"; the note that mentions the token most prominently ranks first.
+- [x] **A1** — `SqliteDocumentStore.searchContentKeyword('Acme Corp', 10)` returns rows ordered by BM25 against a fixture vault in which multiple notes mention "Acme Corp"; the note that mentions the token most prominently ranks first.
   - Verification: run against a freshly migrated SQLite DB (migrations 001 + 002 applied) populated with three fixture notes; assert ordering.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.fts.test.ts::A1_bm25_results_real_fts5(vitest)`
-- [ ] **A2** — The MATCH query is sanitized: user inputs containing `"`, `*`, `(`, `)`, `:`, `-`, or `^` do not throw, do not match operator syntax unintentionally, and do not crash the FTS5 parser.
+- [x] **A2** — The MATCH query is sanitized: user inputs containing `"`, `*`, `(`, `)`, `:`, `-`, or `^` do not throw, do not match operator syntax unintentionally, and do not crash the FTS5 parser.
   - Verification: parametrize over six unsafe inputs; each call must succeed and return results consistent with a literal-token interpretation.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.fts.test.ts::A2_sanitize_match_syntax(vitest)`
-- [ ] **A3** — When called with `filter = { nodeTypes: ['note','topic','subtopic'] }`, `searchContentKeyword` returns zero rows of `type = 'bullet'` or `type = 'paragraph'`, even if those rows would have higher BM25.
+- [x] **A3** — When called with `filter = { nodeTypes: ['note','topic','subtopic'] }`, `searchContentKeyword` returns zero rows of `type = 'bullet'` or `type = 'paragraph'`, even if those rows would have higher BM25.
   - Verification: fixture vault contains both summary-bearing and leaf nodes with the same token.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.fts.test.ts::A3_nodeTypes_filter_pushdown(vitest)`
 
 ### Phase B: Pure RRF fusion
 
-- [ ] **B1** — `fuseRankings([listA, listB])` produces a deterministic fused ranking using the RRF formula `score(d) = Σ 1 / (60 + rank_r(d))`; a fixture where document `X` is rank 1 on `listA` and rank 10 on `listB` fuses above document `Y` at ranks 3 and 15.
+- [x] **B1** — `fuseRankings([listA, listB])` produces a deterministic fused ranking using the RRF formula `score(d) = Σ 1 / (60 + rank_r(d))`; a fixture where document `X` is rank 1 on `listA` and rank 10 on `listB` fuses above document `Y` at ranks 3 and 15.
   - Evidence: `tests/core/domain/rrf.test.ts::B1_fused_order_deterministic(vitest)`
-- [ ] **B2** — RRF tie-breaking rule is documented in `rrf.ts` and exercised by a test (two documents with identical fused scores are returned in a stable, documented order).
+- [x] **B2** — RRF tie-breaking rule is documented in `rrf.ts` and exercised by a test (two documents with identical fused scores are returned in a stable, documented order).
   - Evidence: `tests/core/domain/rrf.test.ts::B2_tie_break(vitest)`
 
 ### Phase C: Workflow fusion, toggle, filter pass-through, grounding handoff
 
-- [ ] **C1** — With `enableHybridSearch: true`, `SearchWorkflow` calls **both** `searchSummaryVectors(qv, coarseK)` and `searchContentKeyword(query, coarseK, { nodeTypes: ['note','topic','subtopic'], ...userFilters })`, and the top `coarseK` subtree roots driving Phase 2 are those with the best RRF fused rank.
+- [x] **C1** — With `enableHybridSearch: true`, `SearchWorkflow` calls **both** `searchSummaryVectors(qv, coarseK)` and `searchContentKeyword(query, coarseK, { nodeTypes: ['note','topic','subtopic'], ...userFilters })`, and the top `coarseK` subtree roots driving Phase 2 are those with the best RRF fused rank.
   - Evidence: `tests/core/workflows/SearchWorkflow.hybrid.test.ts::C1_hybrid_on_issues_both_legs_and_fuses(vitest)`
-- [ ] **C2** — With `enableHybridSearch: false`, `SearchWorkflow` issues **zero** calls to `searchContentKeyword`; the coarse candidate ranking exactly matches the pre-hybrid vector-only baseline for the same fixture.
+- [x] **C2** — With `enableHybridSearch: false`, `SearchWorkflow` issues **zero** calls to `searchContentKeyword`; the coarse candidate ranking exactly matches the pre-hybrid vector-only baseline for the same fixture.
   - Evidence: `tests/core/workflows/SearchWorkflow.hybrid.test.ts::C2_hybrid_off_vector_only_no_bm25(vitest)`
-- [ ] **C3** — The BM25 filter passed by `SearchWorkflow` to `searchContentKeyword` always restricts `nodeTypes` to `['note','topic','subtopic']`; a test asserts the spied filter argument on the fake store. Phase 2's call to `searchContentVectors` does **not** carry that restriction.
+- [x] **C3** — The BM25 filter passed by `SearchWorkflow` to `searchContentKeyword` always restricts `nodeTypes` to `['note','topic','subtopic']`; a test asserts the spied filter argument on the fake store. Phase 2's call to `searchContentVectors` does **not** carry that restriction.
   - Evidence: `tests/core/workflows/SearchWorkflow.hybrid.test.ts::C3_bm25_restricted_to_summary_types(vitest)`
-- [ ] **C4** — Given a fixture where a note containing an exact-keyword token (e.g. "Acme Corp") is outside the top 8 vector-summary hits but first on BM25, hybrid fusion places the note inside the coarse-phase cutoff and Phase 2 is invoked on its subtree.
+- [x] **C4** — Given a fixture where a note containing an exact-keyword token (e.g. "Acme Corp") is outside the top 8 vector-summary hits but first on BM25, hybrid fusion places the note inside the coarse-phase cutoff and Phase 2 is invoked on its subtree.
   - Evidence: `tests/core/workflows/SearchWorkflow.hybrid.test.ts::C4_exact_keyword_recovered_by_bm25(vitest)`
-- [ ] **C5** — When the content-only fallback fires (per RET-4) and user-supplied `pathGlobs` / `dateRange` are set on the request, the fallback call to `searchContentVectors` is invoked with those filters still present; a spy asserts the filter argument. "Unrestricted" only drops the `subtreeRootNodeIds` narrowing.
+- [x] **C5** — When the content-only fallback fires (per RET-4) and user-supplied `pathGlobs` / `dateRange` are set on the request, the fallback call to `searchContentVectors` is invoked with those filters still present; a spy asserts the filter argument. "Unrestricted" only drops the `subtreeRootNodeIds` narrowing.
   - Evidence: `tests/core/workflows/SearchWorkflow.hybrid.test.ts::C5_fallback_preserves_user_filters(vitest)`
-- [ ] **C6** — When hybrid coarse retrieval plus the content-only fallback together return zero candidates after user filters, `SearchWorkflow` returns `results: []` and the existing insufficient-evidence path from [REQ-001](../requirements/REQ-001-grounding-policy.md) fires downstream; no fabricated sources are produced.
+- [x] **C6** — When hybrid coarse retrieval plus the content-only fallback together return zero candidates after user filters, `SearchWorkflow` returns `results: []` and the existing insufficient-evidence path from [REQ-001](../requirements/REQ-001-grounding-policy.md) fires downstream; no fabricated sources are produced.
   - Evidence: `tests/core/workflows/SearchWorkflow.hybrid.test.ts::C6_empty_after_filters_routes_to_grounding(vitest)`
-- [ ] **C7** — `ChatWorkflow` invoked from `SidecarRuntime.handleChatStream` uses the same shared retrieval helper as `SearchWorkflow`; the `enableHybridSearch` value threaded from settings reaches the shared helper on a chat request.
+- [x] **C7** — `ChatWorkflow` invoked from `SidecarRuntime.handleChatStream` uses the same shared retrieval helper as `SearchWorkflow`; the `enableHybridSearch` value threaded from settings reaches the shared helper on a chat request.
   - Evidence: `tests/core/workflows/ChatWorkflow.hybrid.test.ts::C7_chat_shares_retrieval_helper_and_toggle(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `src/core/domain/rrf.ts` contains no imports from `src/sidecar/**`, `src/plugin/**`, or any I/O module; the boundary script confirms.
+- [x] **Y1** — **(binding)** `src/core/domain/rrf.ts` contains no imports from `src/sidecar/**`, `src/plugin/**`, or any I/O module; the boundary script confirms.
   - Evidence: `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
-- [ ] **Y2** — **(binding)** The `IDocumentStore` contract suite for `searchContentKeyword` passes against `SqliteDocumentStore`: BM25 ordering, `nodeTypes` filter push-down, and `score`-as-BM25 semantics.
+- [x] **Y2** — **(binding)** The `IDocumentStore` contract suite for `searchContentKeyword` passes against `SqliteDocumentStore`: BM25 ordering, `nodeTypes` filter push-down, and `score`-as-BM25 semantics.
   - Evidence: `tests/contract/document-store.contract.ts::searchContentKeyword_contract(vitest)`
-- [ ] **Y3** — **(binding)** The integration test for `SqliteDocumentStore` exercises the full BM25 + RRF coarse-phase path against a real `better-sqlite3` + FTS5 database (migrations 001 + 002 applied, no mocking of the boundary owned by the adapter) and confirms a fixture where a token-only match is surfaced by hybrid but missed by vector-only.
+- [x] **Y3** — **(binding)** The integration test for `SqliteDocumentStore` exercises the full BM25 + RRF coarse-phase path against a real `better-sqlite3` + FTS5 database (migrations 001 + 002 applied, no mocking of the boundary owned by the adapter) and confirms a fixture where a token-only match is surfaced by hybrid but missed by vector-only.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.fts.test.ts::Y3_bm25_plus_rrf_end_to_end_real_sqlite(vitest)`
-- [ ] **Y4** — **(binding)** With `enableHybridSearch: false`, the integration test confirms zero FTS5 queries are issued against the real SQLite database for a chat/search request (verified by a SQL-level counter or a temporary FTS5 query spy on the adapter).
+- [x] **Y4** — **(binding)** With `enableHybridSearch: false`, the integration test confirms zero FTS5 queries are issued against the real SQLite database for a chat/search request (verified by a SQL-level counter or a temporary FTS5 query spy on the adapter).
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.fts.test.ts::Y4_hybrid_off_no_fts5_query(vitest)`
-- [ ] **Y5** — **(binding)** RRF constant `k = 60` is a single named constant in `src/core/domain/rrf.ts` and is not configurable from workflow options or settings; a grep test confirms no other `k = …` value is passed into the fuser.
+- [x] **Y5** — **(binding)** RRF constant `k = 60` is a single named constant in `src/core/domain/rrf.ts` and is not configurable from workflow options or settings; a grep test confirms no other `k = …` value is passed into the fuser.
   - Evidence: `tests/core/domain/rrf.test.ts::Y5_fixed_k60_constant(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** (no new shared/client split introduced by this story)
-- [ ] **Z5** — New or modified code logs at `debug` level, per request: BM25 candidate count, vector candidate count, fused top-K count, `enableHybridSearch` toggle state, and whether the content-only fallback fired
-- [ ] **Z6** — `/review-story RET-5` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output)
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** (no new shared/client split introduced by this story)
+- [x] **Z5** — New or modified code logs at `debug` level, per request: BM25 candidate count, vector candidate count, fused top-K count, `enableHybridSearch` toggle state, and whether the content-only fallback fired
+- [x] **Z6** — `/review-story RET-5` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output)
 
 ---
 

@@ -61,6 +61,10 @@ export interface NodeFilter {
   subtreeRootNodeIds?: string[];
   /** OR semantics: node matches if it has any of these tags (case-insensitive), RET-3. */
   tagsAny?: string[];
+  /** Vault-relative paths; union semantics (ADR-014, RET-6 push-down). */
+  pathGlobs?: string[];
+  /** Inclusive ISO date range on `note_meta.note_date`; NULL dates excluded when set (ADR-014). */
+  dateRange?: { start?: string; end?: string };
 }
 
 export interface NoteMeta {
@@ -219,6 +223,10 @@ export interface SearchRequest {
   apiKey?: string;
   /** Optional tag filter (OR, case-insensitive); forwarded to Phase 1 prune + Phase 2 ANN. */
   tags?: string[];
+  /** Optional path scope (ADR-014); RET-6 owns full semantics; RET-5 passes through to the store. */
+  pathGlobs?: string[];
+  /** Optional parsed daily-note date range (ADR-014); RET-5 passes through to the store. */
+  dateRange?: { start?: string; end?: string };
   /**
    * Phase-1 summary ANN limit (RET-4 / ADR-012). Clamped to [1, 256]; default 32 when omitted.
    */
@@ -297,6 +305,8 @@ export type SidecarRequest =
         /** Assembly budgets from plugin settings (RET-2 / RET-4). */
         search?: SearchAssemblyOptions;
         enableHybridSearch?: boolean;
+        pathGlobs?: string[];
+        dateRange?: { start?: string; end?: string };
       };
     }
   | { type: 'chat/clear'; payload?: Record<string, never> }
