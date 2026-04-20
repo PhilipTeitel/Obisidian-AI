@@ -531,7 +531,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
     content_rowid='rowid',
     tokenize='unicode61 remove_diacritics 1'
 );
--- Triggers keep nodes_fts synchronized with nodes (see src/sidecar/db/migrations/002_fts.sql)
+-- Triggers keep nodes_fts synchronized with nodes (`src/sidecar/db/migrations/002_fts.sql`; keyword search in [RET-5](docs/features/RET-5.md))
 
 -- Queue items (crash recovery for InProcessQueue) [ADR-007]
 CREATE TABLE IF NOT EXISTS queue_items (
@@ -932,14 +932,15 @@ If you enabled `--inspect=0`, Node chooses a random port, so **Attach to Node Pr
 | `npm run build:plugin`         | Build plugin bundle into `dist/plugin/` (`main.js`, `manifest.json`, `styles.css`)           |
 | `npm run build:sidecar`        | Build sidecar CJS bundle (`dist/sidecar/server.cjs`) and copy SQL migrations                 |
 | `npm run typecheck`            | Type-check `src/core`, `src/plugin`, `src/sidecar`, and `tests/`\*\* (no emit)               |
-| `npm run test`                 | Full suite: `tests/core` + `tests/plugin` + `tests/sidecar` (same as unit + integration)     |
+| `npm run test`                 | Full Vitest run: `tests/**` including `tests/integration` (e.g. STO-4 binding tests) and `tests/sidecar` |
 | `npm run test:unit`            | Unit tests: `tests/core` and `tests/plugin` only (no native sidecar stack)                   |
-| `npm run test:integration`     | Integration tests: `tests/sidecar` (SQLite, sqlite-vec, HTTP, runtime)                       |
+| `npm run test:integration`     | Integration-focused: `tests/sidecar` (SQLite, sqlite-vec, HTTP, runtime); use `npm run test` for `tests/integration` |
 | `npm run lint`                 | ESLint 9 flat config over repo sources and tooling configs                                   |
 | `npm run lint:fix`             | ESLint with `--fix`                                                                          |
 | `npm run format`               | Prettier write                                                                               |
 | `npm run format:check`         | Prettier check (CI-friendly)                                                                 |
 | `npm run verify:plugin-bundle` | Fail if `dist/plugin/main.js` contains forbidden native/SQLite stack markers (FND-1)         |
+| `npm run verify:stack`        | Static checks for migration 002 / sidecar test surface (FTS tokenizer literal, no loose `any`, import paths) ([STO-4](docs/features/STO-4.md)) |
 | `npm run check:boundaries`     | Fail if `src/core` or `src/plugin` violate import boundaries (FND-1)                         |
 | `npm run smoke:sidecar`        | Run built sidecar entry once (`dist/sidecar/server.cjs`; expects prior `build:sidecar`)      |
 | `npm run deploy:plugin`        | Build (unless `--no-build`), copy `dist/plugin/` + `dist/sidecar/` into the vault plugin dir |
@@ -1112,7 +1113,7 @@ Parsing pipeline for [§4 hierarchical model](#4-hierarchical-document-model), [
 | [STO-1](docs/features/STO-1.md) | Complete | SQLite migrations: `nodes`, `summaries`, `tags`, `cross_refs`, `note_meta`, `queue_items`, `job_steps` | M    | [§8 SQLite Schema](#8-sqlite-schema)                                                                        |
 | [STO-2](docs/features/STO-2.md) | Complete | `vec0` virtual tables + `embedding_meta`; dimension aligned with settings                              | M    | `better-sqlite3` + `sqlite-vec` in sidecar only                                                             |
 | [STO-3](docs/features/STO-3.md) | Complete | `SqliteDocumentStore` implementing `IDocumentStore`                                                    | L    | CRUD, ANN search, ancestors/siblings, note meta                                                             |
-| [STO-4](docs/features/STO-4.md) | Planned  | `002_fts.sql`: FTS5 virtual table + `note_meta.note_date` + `summaries.prompt_version`                 | M    | Enables RET-5 / RET-6 / WKF-4 ([ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md), [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) |
+| [STO-4](docs/features/STO-4.md) | Complete | `002_fts.sql`: FTS5 virtual table + `note_meta.note_date` + `summaries.prompt_version`                 | M    | `runMigrations` / `runMigration002`; `npm run verify:stack`; enables RET-5 / RET-6 / WKF-4 ([ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md), [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) |
 | [QUE-1](docs/features/QUE-1.md) | Complete | `InProcessQueue` + `IQueuePort` with crash-safe `queue_items`                                          | M    | Configurable concurrency; ack/nack/dead-letter                                                              |
 | [QUE-2](docs/features/QUE-2.md) | Complete | `job_steps` integration: idempotent steps, resume, retry cap                                           | L    | Emit step transitions for progress ([ADR-008](docs/decisions/ADR-008-idempotent-indexing-state-machine.md)) |
 

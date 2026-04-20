@@ -3,7 +3,7 @@
 **Story**: Ship the additive SQLite migration **`002_fts.sql`** that (a) creates an external-content **FTS5 virtual table** `nodes_fts` over `nodes.content` with sync triggers, (b) adds `note_meta.note_date TEXT NULL` + index, and (c) adds `summaries.prompt_version TEXT NOT NULL DEFAULT 'legacy'` + index; extend `migrate.ts` to apply it idempotently and to rebuild the FTS index when it is empty but `nodes` is not; make `SqliteDocumentStore` run against the migrated schema so downstream stories ([RET-5](RET-5.md), [RET-6](RET-6.md), [WKF-4](WKF-4.md)) can build on a real FTS5 / `note_date` / `prompt_version` surface.
 **Epic**: 3 — SQLite store, vectors, and indexing persistence
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -202,66 +202,66 @@ Not applicable.
 
 ### Phase A: Migration mechanics
 
-- [ ] **A1** — Fresh DB apply: `runMigrations(db)` runs `001_relational.sql` then `002_fts.sql` against a freshly-opened temp DB without error; afterwards `sqlite_master` lists `nodes_fts`, `idx_note_meta_note_date`, and `idx_summaries_prompt_version`.
+- [x] **A1** — Fresh DB apply: `runMigrations(db)` runs `001_relational.sql` then `002_fts.sql` against a freshly-opened temp DB without error; afterwards `sqlite_master` lists `nodes_fts`, `idx_note_meta_note_date`, and `idx_summaries_prompt_version`.
   - Evidence: `tests/sidecar/db/migrations.002.test.ts::A1_fresh_apply(vitest)`
-- [ ] **A2** — Idempotent re-apply: `runMigrations(db)` called twice in a row against the same DB is a no-op; the second invocation emits no errors, does not attempt the `ALTER TABLE` statements (verified via `PRAGMA table_info` pre-checks), and does not re-fire the rebuild log line.
+- [x] **A2** — Idempotent re-apply: `runMigrations(db)` called twice in a row against the same DB is a no-op; the second invocation emits no errors, does not attempt the `ALTER TABLE` statements (verified via `PRAGMA table_info` pre-checks), and does not re-fire the rebuild log line.
   - Evidence: `tests/sidecar/db/migrations.002.test.ts::A2_idempotent(vitest)`
 
 ### Phase B: FTS5 sync triggers
 
-- [ ] **B1** — Insert/delete/update triggers: inserting a row into `nodes` creates a matching row in `nodes_fts` with identical `rowid`; deleting the row removes it from `nodes_fts`; updating `nodes.content` rebuilds that row's content in `nodes_fts`.
+- [x] **B1** — Insert/delete/update triggers: inserting a row into `nodes` creates a matching row in `nodes_fts` with identical `rowid`; deleting the row removes it from `nodes_fts`; updating `nodes.content` rebuilds that row's content in `nodes_fts`.
   - Evidence: `tests/sidecar/db/migrations.002.test.ts::B1_triggers(vitest)`
-- [ ] **B2** — BM25 round-trip: with a 3-row `nodes` fixture containing "Acme Corp", "acme corp", and "unrelated text", a `SELECT rowid FROM nodes_fts WHERE nodes_fts MATCH 'acme'` returns the two Acme rows (ordered by BM25) and not the unrelated row.
+- [x] **B2** — BM25 round-trip: with a 3-row `nodes` fixture containing "Acme Corp", "acme corp", and "unrelated text", a `SELECT rowid FROM nodes_fts WHERE nodes_fts MATCH 'acme'` returns the two Acme rows (ordered by BM25) and not the unrelated row.
   - Evidence: `tests/sidecar/db/migrations.002.test.ts::B2_match_bm25(vitest)`
 
 ### Phase C: Rebuild path
 
-- [ ] **C1** — Rebuild fires when `nodes_fts` is empty but `nodes` is not: given a DB where `nodes` has 3 rows and `nodes_fts` has 0 (simulating a raw-SQL state where the virtual table was created without the rebuild step), re-running `runMigrations(db)` populates `nodes_fts` with those 3 rows and logs one `info` line recording the rebuild.
+- [x] **C1** — Rebuild fires when `nodes_fts` is empty but `nodes` is not: given a DB where `nodes` has 3 rows and `nodes_fts` has 0 (simulating a raw-SQL state where the virtual table was created without the rebuild step), re-running `runMigrations(db)` populates `nodes_fts` with those 3 rows and logs one `info` line recording the rebuild.
   - Evidence: `tests/sidecar/db/migrations.002.rebuild.test.ts::C1_rebuild(vitest)`
-- [ ] **C2** — No spurious rebuild: when `nodes_fts` and `nodes` are both in sync, re-running `runMigrations(db)` does not issue `INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')` and does not log the rebuild line.
+- [x] **C2** — No spurious rebuild: when `nodes_fts` and `nodes` are both in sync, re-running `runMigrations(db)` does not issue `INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')` and does not log the rebuild line.
   - Evidence: `tests/sidecar/db/migrations.002.rebuild.test.ts::C2_no_rebuild_when_synced(vitest)`
 
 ### Phase D: Column additions and backfill
 
-- [ ] **D1** — Column shape: after migration, `PRAGMA table_info(note_meta)` lists `note_date` with `type='TEXT'` and `notnull=0`; `PRAGMA table_info(summaries)` lists `prompt_version` with `type='TEXT'`, `notnull=1`, and `dflt_value='''legacy'''` (or equivalent quoted-literal representation).
+- [x] **D1** — Column shape: after migration, `PRAGMA table_info(note_meta)` lists `note_date` with `type='TEXT'` and `notnull=0`; `PRAGMA table_info(summaries)` lists `prompt_version` with `type='TEXT'`, `notnull=1`, and `dflt_value='''legacy'''` (or equivalent quoted-literal representation).
   - Evidence: `tests/sidecar/db/migrations.002.test.ts::D1_columns(vitest)`
-- [ ] **D2** — Backfill: seed a DB with a `summaries` row written under 001 only, apply 002, and assert the pre-existing row ends up with `prompt_version = 'legacy'`.
+- [x] **D2** — Backfill: seed a DB with a `summaries` row written under 001 only, apply 002, and assert the pre-existing row ends up with `prompt_version = 'legacy'`.
   - Evidence: `tests/sidecar/db/migrations.002.test.ts::D2_backfill(vitest)`
-- [ ] **D3** — NULL `note_date` permitted: seed a `note_meta` row with no `note_date` value (i.e. leave the column NULL) through `upsertNoteMeta`; round-trip read returns `note_date = NULL`.
+- [x] **D3** — NULL `note_date` permitted: seed a `note_meta` row with no `note_date` value (i.e. leave the column NULL) through `upsertNoteMeta`; round-trip read returns `note_date = NULL`.
   - Evidence: `tests/sidecar/db/migrations.002.test.ts::D3_note_date_null(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `002_fts.sql` runs idempotently via `runMigrations` twice against the same real `better-sqlite3` file; second call is a no-op.
+- [x] **Y1** — **(binding)** `002_fts.sql` runs idempotently via `runMigrations` twice against the same real `better-sqlite3` file; second call is a no-op.
   - Evidence: `tests/integration/sqlite-document-store.migration-002.test.ts::Y1_idempotent_against_real_sqlite(vitest)`
-- [ ] **Y2** — **(binding)** `nodes_fts` is external-content (`content='nodes', content_rowid='rowid'`) and FTS5 + sqlite-vec extensions co-exist in the loaded build; asserted via `PRAGMA module_list` / reflection and a round-trip MATCH query.
+- [x] **Y2** — **(binding)** `nodes_fts` is external-content (`content='nodes', content_rowid='rowid'`) and FTS5 + sqlite-vec extensions co-exist in the loaded build; asserted via `PRAGMA module_list` / reflection and a round-trip MATCH query.
   - Evidence: `tests/integration/sqlite-document-store.migration-002.test.ts::Y2_external_content_and_extensions(vitest)`
-- [ ] **Y3** — **(binding)** Tokenizer is declared as `unicode61 remove_diacritics 1`; asserted by grepping the migration file and by inspecting `sqlite_master.sql` for `nodes_fts`.
+- [x] **Y3** — **(binding)** Tokenizer is declared as `unicode61 remove_diacritics 1`; asserted by grepping the migration file and by inspecting `sqlite_master.sql` for `nodes_fts`.
   - Evidence: `scripts/verify-stack.mjs(npm run verify:stack)` — checks the literal string in `src/sidecar/db/migrations/002_fts.sql`.
-- [ ] **Y4** — **(binding)** Rebuild fires exactly once when `nodes_fts` is empty and `nodes` is not, and logs a single `info` line; no rebuild fires when the two are already in sync.
+- [x] **Y4** — **(binding)** Rebuild fires exactly once when `nodes_fts` is empty and `nodes` is not, and logs a single `info` line; no rebuild fires when the two are already in sync.
   - Evidence: `tests/integration/sqlite-document-store.migration-002.test.ts::Y4_rebuild_once(vitest)`
-- [ ] **Y5** — **(binding)** `note_meta.note_date` exists as `TEXT NULL` with index `idx_note_meta_note_date`; asserted against a real migrated DB via `PRAGMA table_info` + `sqlite_master`.
+- [x] **Y5** — **(binding)** `note_meta.note_date` exists as `TEXT NULL` with index `idx_note_meta_note_date`; asserted against a real migrated DB via `PRAGMA table_info` + `sqlite_master`.
   - Evidence: `tests/integration/sqlite-document-store.migration-002.test.ts::Y5_note_date_column_and_index(vitest)`
-- [ ] **Y6** — **(binding)** `summaries.prompt_version` exists as `TEXT NOT NULL DEFAULT 'legacy'` with index `idx_summaries_prompt_version`; pre-existing rows are backfilled to `'legacy'`; asserted against a real migrated DB.
+- [x] **Y6** — **(binding)** `summaries.prompt_version` exists as `TEXT NOT NULL DEFAULT 'legacy'` with index `idx_summaries_prompt_version`; pre-existing rows are backfilled to `'legacy'`; asserted against a real migrated DB.
   - Evidence: `tests/integration/sqlite-document-store.migration-002.test.ts::Y6_prompt_version_column_and_backfill(vitest)`
-- [ ] **Y7** — **(binding)** Migration is additive: running 002 against a DB with seeded `nodes`, `note_meta`, `summaries`, and vector rows does not drop, rename, or re-type any column from 001; every seeded row is still present and readable post-migration.
+- [x] **Y7** — **(binding)** Migration is additive: running 002 against a DB with seeded `nodes`, `note_meta`, `summaries`, and vector rows does not drop, rename, or re-type any column from 001; every seeded row is still present and readable post-migration.
   - Evidence: `tests/integration/sqlite-document-store.migration-002.test.ts::Y7_additive_no_data_loss(vitest)`
-- [ ] **Y8** — **(binding)** `IDocumentStore` contract round-trip holds against the migrated `SqliteDocumentStore`: contract-suite rows for `upsertNodes`, `upsertSummary`, and `upsertNoteMeta` pass unchanged, proving the schema delta did not break the port.
+- [x] **Y8** — **(binding)** `IDocumentStore` contract round-trip holds against the migrated `SqliteDocumentStore`: contract-suite rows for `upsertNodes`, `upsertSummary`, and `upsertNoteMeta` pass unchanged, proving the schema delta did not break the port.
   - Evidence: `tests/contract/document-store.contract.ts::contract_round_trip(vitest)` wired in `tests/integration/sqlite-document-store.migration-002.test.ts::Y8_contract_roundtrip_on_migrated_schema(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces.
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces.
   - Evidence: `npm run build`
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings).
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings).
   - Evidence: `npm run lint`
-- [ ] **Z3** — No `any` types in any new or modified file (`src/sidecar/db/migrate.ts`, the new test files, the contract test, and any helper).
+- [x] **Z3** — No `any` types in any new or modified file (`src/sidecar/db/migrate.ts`, the new test files, the contract test, and any helper).
   - Evidence: `scripts/verify-stack.mjs(npm run verify:stack)` — greps for `: any` / `as any` in the changed surface.
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — not applicable to STO-4's sidecar-only files; confirm by grep.
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — not applicable to STO-4's sidecar-only files; confirm by grep.
   - Evidence: `scripts/verify-stack.mjs(npm run verify:stack)` — greps the changed surface for relative `shared/types` imports.
-- [ ] **Z5** — New or modified code includes appropriate logging: migration start/finish and rebuild-fired flag at `info`; column-already-present shortcut at `debug`; unexpected SQL errors bubble up with the migration step name.
+- [x] **Z5** — New or modified code includes appropriate logging: migration start/finish and rebuild-fired flag at `info`; column-already-present shortcut at `debug`; unexpected SQL errors bubble up with the migration step name.
   - Evidence: `tests/sidecar/db/migrations.002.test.ts::Z5_logs_at_info(vitest)`
-- [ ] **Z6** — `/review-story STO-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output).
+- [x] **Z6** — `/review-story STO-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output).
   - Evidence: `/review-story STO-4` summary line.
 
 ---

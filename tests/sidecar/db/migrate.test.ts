@@ -30,6 +30,7 @@ describe('STO-1 relational migrations', () => {
     const names = tableNames(db);
     for (const t of [
       'nodes',
+      'nodes_fts',
       'summaries',
       'tags',
       'cross_refs',
@@ -51,6 +52,8 @@ describe('STO-1 relational migrations', () => {
       'idx_nodes_parent',
       'idx_nodes_type',
       'idx_nodes_hash',
+      'idx_note_meta_note_date',
+      'idx_summaries_prompt_version',
       'idx_tags_tag',
       'idx_tags_node',
       'idx_xref_source',

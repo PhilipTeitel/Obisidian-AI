@@ -57,6 +57,7 @@ export class SqliteDocumentStore implements IDocumentStore {
     }
   }
 
+  /** Inserts replace per-note; SQLite triggers mirror `nodes.content` into `nodes_fts` (STO-4). */
   async upsertNodes(nodes: DocumentNode[]): Promise<void> {
     if (nodes.length === 0) return;
     const noteIds = [...new Set(nodes.map((n) => n.noteId))];

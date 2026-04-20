@@ -6,6 +6,21 @@ import Database from 'better-sqlite3';
 type SqliteDatabase = InstanceType<typeof Database>;
 import { loadSqliteVec } from './load-sqlite-vec.js';
 
+/** Optional logger for migration 002 (STO-4); matches pino-style (object, message). */
+export type MigrationLogger = {
+  info(meta: Record<string, unknown>, msg: string): void;
+  debug(meta: Record<string, unknown>, msg: string): void;
+};
+
+const noopMigrationLogger: MigrationLogger = {
+  info(): void {},
+  debug(): void {},
+};
+
+function resolveMigrationLogger(log?: MigrationLogger): MigrationLogger {
+  return log ?? noopMigrationLogger;
+}
+
 /**
  * SQL files live in ./migrations next to this module (Vitest / TS source) or next to the built
  * `server.cjs` (esbuild CJS output leaves `import.meta.url` empty, so use `process.argv[1]`).
@@ -37,17 +52,80 @@ function readMigrationSql(filename: string): string {
   return fs.readFileSync(full, 'utf8');
 }
 
+function tableColumnNames(db: SqliteDatabase, table: string): Set<string> {
+  const rows = db.pragma(`table_info(${table})`) as { name: string }[];
+  return new Set(rows.map((r) => r.name));
+}
+
 /**
- * Apply README §8 relational DDL (STO-1). Idempotent via IF NOT EXISTS + user_version.
+ * STO-4: FTS5 (`nodes_fts`), `note_meta.note_date`, `summaries.prompt_version`.
+ * Steps 1–3 run in a transaction; FTS5 `rebuild` runs outside (SQLite forbids it in a transaction).
  */
-export function runRelationalMigrations(db: SqliteDatabase): void {
-  const current = db.pragma('user_version', { simple: true }) as number;
-  if (current >= RELATIONAL_USER_VERSION) {
-    return;
+export function runMigration002(db: SqliteDatabase, log?: MigrationLogger): void {
+  const logger = resolveMigrationLogger(log);
+  logger.info({ step: 'sto4_migration_002_start' }, 'STO-4: applying migration 002 (FTS5, note_date, prompt_version)');
+
+  const txn = db.transaction(() => {
+    const noteMetaCols = tableColumnNames(db, 'note_meta');
+    if (!noteMetaCols.has('note_date')) {
+      db.exec('ALTER TABLE note_meta ADD COLUMN note_date TEXT');
+      logger.debug({ column: 'note_meta.note_date' }, 'STO-4: added note_meta.note_date');
+    } else {
+      logger.debug({ column: 'note_meta.note_date' }, 'STO-4: note_meta.note_date already present');
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_note_meta_note_date ON note_meta(note_date)');
+
+    const summaryCols = tableColumnNames(db, 'summaries');
+    if (!summaryCols.has('prompt_version')) {
+      db.exec(`ALTER TABLE summaries ADD COLUMN prompt_version TEXT NOT NULL DEFAULT 'legacy'`);
+      logger.debug({ column: 'summaries.prompt_version' }, 'STO-4: added summaries.prompt_version');
+    } else {
+      logger.debug({ column: 'summaries.prompt_version' }, 'STO-4: summaries.prompt_version already present');
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS idx_summaries_prompt_version ON summaries(prompt_version)');
+
+    db.exec(readMigrationSql('002_fts.sql'));
+  });
+  txn();
+
+  // FTS5 external-content rebuild cannot run inside the transaction above (SQLite limitation).
+  // For content='nodes', COUNT(*) on the nodes_fts shadow can mirror node rows before the
+  // full-text index is populated; nodes_fts_docsize stays empty until rebuild/triggers index content.
+  const docsizeCount = db.prepare('SELECT COUNT(*) AS c FROM nodes_fts_docsize').get() as {
+    c: number;
+  };
+  const nodeCount = db.prepare('SELECT COUNT(*) AS c FROM nodes').get() as { c: number };
+  if (docsizeCount.c === 0 && nodeCount.c > 0) {
+    logger.info(
+      { step: 'nodes_fts_rebuild', nodeCount: nodeCount.c },
+      'STO-4: rebuilding nodes_fts (index empty, nodes non-empty)',
+    );
+    db.exec(`INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')`);
   }
-  const sql = readMigrationSql('001_relational.sql');
-  db.exec(sql);
-  db.pragma(`user_version = ${RELATIONAL_USER_VERSION}`);
+
+  logger.info({ step: 'sto4_migration_002_complete' }, 'STO-4: migration 002 complete');
+}
+
+/**
+ * Apply STO-1 relational DDL then STO-4 migration 002. Idempotent.
+ * Alias for acceptance criteria that name `runMigrations`.
+ */
+export function runMigrations(db: SqliteDatabase, log?: MigrationLogger): void {
+  runRelationalMigrations(db, log);
+}
+
+/**
+ * Apply README §8 relational DDL (STO-1), then STO-4 additive migration 002.
+ * Idempotent via user_version for 001 and guards + IF NOT EXISTS for 002.
+ */
+export function runRelationalMigrations(db: SqliteDatabase, log?: MigrationLogger): void {
+  const current = db.pragma('user_version', { simple: true }) as number;
+  if (current < RELATIONAL_USER_VERSION) {
+    const sql = readMigrationSql('001_relational.sql');
+    db.exec(sql);
+    db.pragma(`user_version = ${RELATIONAL_USER_VERSION}`);
+  }
+  runMigration002(db, log);
 }
 
 function ensureSchemaMetaTable(db: SqliteDatabase): void {
