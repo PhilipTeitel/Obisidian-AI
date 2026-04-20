@@ -18,13 +18,29 @@ import type { IEmbeddingPort } from '../ports/IEmbeddingPort.js';
 /** When `SearchRequest.k` is omitted (sidecar maps settings later). */
 export const DEFAULT_SEARCH_K = 20;
 
+/** Default Phase-1 summary ANN limit (ADR-012, RET-4). */
+export const DEFAULT_COARSE_K = 32;
+
+const COARSE_K_MIN = 1;
+const COARSE_K_MAX = 256;
+
+export function clampCoarseK(raw: number | undefined): number {
+  if (raw === undefined) return DEFAULT_COARSE_K;
+  const n = Math.floor(raw);
+  if (!Number.isFinite(n)) return DEFAULT_COARSE_K;
+  return Math.min(COARSE_K_MAX, Math.max(COARSE_K_MIN, n));
+}
+
+export function fallbackFloorForCoarseK(coarseK: number): number {
+  return Math.max(4, Math.floor(coarseK / 4));
+}
+
 /**
- * Maps final result cap `k` to ANN limits. Tested in `tests/core/workflows/SearchWorkflow.test.ts`.
- * Summary search uses a smaller top-K to bound coarse candidates; content uses full `k`.
+ * Maps final result cap `k` to ANN limits. `kSummary` is the configurable coarse-K (RET-4), not `min(k, 8)`.
  */
-export function mapSearchK(k: number): { kSummary: number; kContent: number } {
+export function mapSearchK(k: number, coarseK: number): { kSummary: number; kContent: number } {
   return {
-    kSummary: Math.min(k, 8),
+    kSummary: coarseK,
     kContent: k,
   };
 }
@@ -32,6 +48,7 @@ export function mapSearchK(k: number): { kSummary: number; kContent: number } {
 export interface SearchWorkflowDeps {
   store: IDocumentStore;
   embedder: IEmbeddingPort;
+  log?: { debug: (obj: Record<string, unknown>, msg?: string) => void };
 }
 
 function resolveAssembly(assembly?: SearchAssemblyOptions): SearchAssemblyOptions {
@@ -66,17 +83,38 @@ async function buildSnippet(
   });
 }
 
+function mergeHitsByNode(a: VectorMatch[], b: VectorMatch[]): Map<string, number> {
+  const byNode = new Map<string, number>();
+  for (const h of a) {
+    const prev = byNode.get(h.nodeId);
+    if (prev === undefined || h.score < prev) {
+      byNode.set(h.nodeId, h.score);
+    }
+  }
+  for (const h of b) {
+    const prev = byNode.get(h.nodeId);
+    if (prev === undefined || h.score < prev) {
+      byNode.set(h.nodeId, h.score);
+    }
+  }
+  return byNode;
+}
+
 /**
- * Three-phase semantic search (ADR-003): summary ANN → content ANN within subtrees → assembly.
+ * Three-phase semantic search (ADR-003): summary ANN → content ANN within subtrees → assembly;
+ * optional unrestricted content ANN when Phase 1 under-delivers (RET-4 / ADR-012).
  */
 export async function runSearch(
   deps: SearchWorkflowDeps,
   req: SearchRequest,
   assembly?: SearchAssemblyOptions,
 ): Promise<SearchResponse> {
-  const resolvedAssembly = resolveAssembly(assembly);
+  void req.enableHybridSearch;
+
+  const resolvedAssembly = resolveAssembly(assembly ?? req.search);
+  const coarseK = clampCoarseK(req.coarseK);
   const k = req.k ?? DEFAULT_SEARCH_K;
-  const { kSummary, kContent } = mapSearchK(k);
+  const { kSummary, kContent } = mapSearchK(k, coarseK);
   const queryText = req.query.trim();
   if (!queryText) {
     return { results: [] };
@@ -84,11 +122,7 @@ export async function runSearch(
 
   const [qVec] = await deps.embedder.embed([queryText], req.apiKey);
   const summaryHits = await deps.store.searchSummaryVectors(qVec, kSummary);
-  if (summaryHits.length === 0) {
-    return { results: [] };
-  }
 
-  // RET-3: drop coarse regions whose note has no matching tag (tags often live on leaves).
   let coarseHits = summaryHits;
   if (req.tags?.length) {
     const kept: VectorMatch[] = [];
@@ -101,24 +135,40 @@ export async function runSearch(
     }
     coarseHits = kept;
   }
-  if (coarseHits.length === 0) {
-    return { results: [] };
-  }
 
-  const roots = coarseHits.map((h: VectorMatch) => h.nodeId);
-  const contentFilter: NodeFilter = { subtreeRootNodeIds: roots };
-  if (req.tags?.length) {
-    contentFilter.tagsAny = req.tags;
-  }
-  const contentHits = await deps.store.searchContentVectors(qVec, kContent, contentFilter);
+  const floor = fallbackFloorForCoarseK(coarseK);
+  const fallbackFired = coarseHits.length < floor;
 
-  const byNode = new Map<string, number>();
-  for (const h of contentHits) {
-    const prev = byNode.get(h.nodeId);
-    if (prev === undefined || h.score < prev) {
-      byNode.set(h.nodeId, h.score);
+  let phase2Hits: VectorMatch[] = [];
+  if (coarseHits.length > 0) {
+    const roots = coarseHits.map((h: VectorMatch) => h.nodeId);
+    const contentFilter: NodeFilter = { subtreeRootNodeIds: roots };
+    if (req.tags?.length) {
+      contentFilter.tagsAny = req.tags;
     }
+    phase2Hits = await deps.store.searchContentVectors(qVec, kContent, contentFilter);
   }
+
+  let fallbackHits: VectorMatch[] = [];
+  if (fallbackFired) {
+    const fbFilter: NodeFilter = {};
+    if (req.tags?.length) {
+      fbFilter.tagsAny = req.tags;
+    }
+    fallbackHits = await deps.store.searchContentVectors(qVec, coarseK, fbFilter);
+  }
+
+  const byNode = mergeHitsByNode(phase2Hits, fallbackHits);
+
+  deps.log?.debug(
+    {
+      coarseK,
+      fallback_fired: fallbackFired,
+      merged_candidates: byNode.size,
+    },
+    'searchworkflow.retrieval',
+  );
+
   const ranked = [...byNode.entries()]
     .map(([nodeId, score]) => ({ nodeId, score }))
     .sort((a, b) => a.score - b.score)

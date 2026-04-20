@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { DEFAULT_SEARCH_ASSEMBLY } from '../../core/domain/contextAssembly.js';
 import type {
   ChatStreamChunk,
   IndexStatusResponse,
@@ -133,7 +132,7 @@ export class SidecarRuntime {
       baseUrl: process.env.OBSIDIAN_AI_EMBEDDING_BASE_URL ?? 'https://api.openai.com/v1',
       model: process.env.OBSIDIAN_AI_EMBEDDING_MODEL ?? 'text-embedding-3-small',
     });
-    return { store: this.store!, embedder: embed };
+    return { store: this.store!, embedder: embed, log: this.log };
   }
 
   private getChatWorkflowDeps() {
@@ -267,7 +266,7 @@ export class SidecarRuntime {
       }
       case 'search': {
         this.ensureDb();
-        const body = await runSearch(this.getSearchDeps(), req.payload, DEFAULT_SEARCH_ASSEMBLY);
+        const body = await runSearch(this.getSearchDeps(), req.payload);
         this.log.info(
           { op: 'search', ms: Date.now() - t0, n: body.results.length },
           'sidecar.search',
@@ -289,8 +288,11 @@ export class SidecarRuntime {
     this.ensureDb();
     const deps = this.getChatWorkflowDeps();
     const stream = runChatStream(deps, payload.messages, {
-      search: DEFAULT_SEARCH_ASSEMBLY,
+      search: payload.search,
       apiKey: payload.apiKey,
+      k: payload.k,
+      coarseK: payload.coarseK,
+      enableHybridSearch: payload.enableHybridSearch,
       tags: undefined,
       completion: {
         signal: options?.signal,

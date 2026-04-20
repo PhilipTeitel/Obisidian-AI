@@ -7,6 +7,7 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.chatModel).toBe('gpt-4o-mini');
     expect(DEFAULT_SETTINGS.chatTimeout).toBe(30_000);
     expect(DEFAULT_SETTINGS.searchResultCount).toBe(20);
+    expect(DEFAULT_SETTINGS.chatCoarseK).toBe(32);
     expect(DEFAULT_SETTINGS.embeddingDimension).toBe(1536);
     expect(DEFAULT_SETTINGS.sidecarInspector).toBe(false);
     expect(DEFAULT_SETTINGS.transport).toBe('stdio');

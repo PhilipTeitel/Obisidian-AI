@@ -45,18 +45,23 @@ describe('SearchWorkflow', () => {
 
   it('A2_summary_before_content', async () => {
     const store = new SearchTestStore();
+    store.summaryHits = Array.from({ length: 8 }, (_, i) => ({
+      nodeId: `s${i}`,
+      score: i * 0.01,
+    }));
     const embedder = fakeEmbed();
     await runSearch({ store, embedder }, { query: 'q' });
     expect(store.callLog).toEqual(['searchSummaryVectors', 'searchContentVectors']);
   });
 
-  it('A3_no_coarse_no_drilldown', async () => {
+  it('A3_no_coarse_triggers_fallback', async () => {
     const store = new SearchTestStore();
     store.summaryHits = [];
+    store.contentHits = [];
     const embedder = fakeEmbed();
     const res = await runSearch({ store, embedder }, { query: 'q' });
     expect(res.results).toEqual([]);
-    expect(store.callLog).toEqual(['searchSummaryVectors']);
+    expect(store.callLog).toEqual(['searchSummaryVectors', 'searchContentVectors']);
   });
 
   it('B1_result_shape', async () => {
@@ -100,8 +105,8 @@ describe('SearchWorkflow', () => {
   });
 
   it('mapSearchK_documented', () => {
-    expect(mapSearchK(20)).toEqual({ kSummary: 8, kContent: 20 });
-    expect(mapSearchK(5)).toEqual({ kSummary: 5, kContent: 5 });
+    expect(mapSearchK(20, 32)).toEqual({ kSummary: 32, kContent: 20 });
+    expect(mapSearchK(5, 8)).toEqual({ kSummary: 8, kContent: 5 });
   });
 
   it('default_k_uses_DEFAULT_SEARCH_K', async () => {
@@ -136,13 +141,14 @@ describe('SearchWorkflow', () => {
 
   it('passes_subtree_roots_from_summary_hits', async () => {
     const store = new SearchTestStore();
-    store.summaryHits = [
-      { nodeId: 's1', score: 0.1 },
-      { nodeId: 's2', score: 0.2 },
-    ];
+    store.summaryHits = Array.from({ length: 4 }, (_, i) => ({
+      nodeId: `s${i}`,
+      score: i * 0.01,
+    }));
     const embedder = fakeEmbed();
-    await runSearch({ store, embedder }, { query: 'q' });
-    expect(store.lastContentFilter?.subtreeRootNodeIds).toEqual(['s1', 's2']);
+    await runSearch({ store, embedder }, { query: 'q', coarseK: 16 });
+    const phase2Filter = store.contentFilters.find((f) => (f?.subtreeRootNodeIds?.length ?? 0) > 0);
+    expect(phase2Filter?.subtreeRootNodeIds).toEqual(['s0', 's1', 's2', 's3']);
   });
 
   it('B2_snippet_within_budget', async () => {

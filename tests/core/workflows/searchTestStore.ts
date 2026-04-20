@@ -31,6 +31,9 @@ export class SearchTestStore implements IDocumentStore {
   nodes = new Map<string, DocumentNode>();
   meta = new Map<string, NoteMeta>();
   lastContentFilter: NodeFilter | undefined;
+  /** Every `searchContentVectors` filter (including undefined for unrestricted). */
+  contentFilters: (NodeFilter | undefined)[] = [];
+  lastSummaryK = 0;
 
   constructor() {
     this.nodes.set(
@@ -79,9 +82,10 @@ export class SearchTestStore implements IDocumentStore {
   }
   async upsertEmbedding(): Promise<void> {}
 
-  async searchSummaryVectors(_q: Float32Array, _k: number): Promise<VectorMatch[]> {
+  async searchSummaryVectors(_q: Float32Array, k: number): Promise<VectorMatch[]> {
     this.callLog.push('searchSummaryVectors');
-    return this.summaryHits;
+    this.lastSummaryK = k;
+    return this.summaryHits.slice(0, k);
   }
 
   async searchContentVectors(
@@ -91,6 +95,7 @@ export class SearchTestStore implements IDocumentStore {
   ): Promise<VectorMatch[]> {
     this.callLog.push('searchContentVectors');
     this.lastContentFilter = filter;
+    this.contentFilters.push(filter);
     return this.contentHits;
   }
 

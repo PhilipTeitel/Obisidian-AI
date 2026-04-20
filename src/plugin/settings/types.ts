@@ -21,6 +21,8 @@ export interface ObsidianAISettings {
   transport: 'stdio' | 'http';
   logLevel: 'debug' | 'info' | 'warn' | 'error';
   searchResultCount: number;
+  /** Phase-1 summary ANN limit (RET-4); persisted integer in [1, 256]. */
+  chatCoarseK: number;
   matchedContentBudget: number;
   siblingContextBudget: number;
   parentSummaryBudget: number;

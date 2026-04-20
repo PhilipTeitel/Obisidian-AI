@@ -1,4 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { normalizeChatCoarseKFromUserInput } from './chatCoarseK.js';
 import { getOpenAIApiKey, setOpenAIApiKey } from './secretSettings.js';
 import type { ObsidianAISettings } from './types.js';
 
@@ -238,6 +239,40 @@ export class ObsidianAISettingTab extends PluginSettingTab {
           await this.aiPlugin.saveSettings();
         }),
     );
+
+    containerEl.createEl('h3', { text: 'Retrieval' });
+
+    const coarseWarnEl = containerEl.createDiv({ cls: 'mod-warning' });
+    coarseWarnEl.style.minHeight = '1.25em';
+
+    let coarseDebounce: ReturnType<typeof setTimeout> | null = null;
+    new Setting(containerEl)
+      .setName('Coarse candidate count (chatCoarseK)')
+      .setDesc(
+        'Phase-1 summary ANN limit (1–256, default 32). Applies to chat and semantic search on the next query; no reindex required.',
+      )
+      .addText((t) => {
+        t.setValue(String(s.chatCoarseK));
+        const commit = async () => {
+          const { value, warning } = normalizeChatCoarseKFromUserInput(t.getValue());
+          s.chatCoarseK = value;
+          if (t.getValue().trim() === '') {
+            t.setValue(String(value));
+          }
+          coarseWarnEl.setText(warning ?? '');
+          await this.aiPlugin.saveSettings();
+        };
+        t.inputEl.addEventListener('blur', () => {
+          void commit();
+        });
+        t.onChange(() => {
+          if (coarseDebounce) clearTimeout(coarseDebounce);
+          coarseDebounce = setTimeout(() => {
+            coarseDebounce = null;
+            void commit();
+          }, 400);
+        });
+      });
 
     new Setting(containerEl).setName('Search result count (k)').addText((t) =>
       t.setValue(String(s.searchResultCount)).onChange(async (v) => {

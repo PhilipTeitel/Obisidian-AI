@@ -22,6 +22,38 @@ function sampleNode(overrides: Partial<DocumentNode> = {}): DocumentNode {
   };
 }
 
+const EMBED_DIM = 4;
+
+/** RET-4 / ADR-012: unrestricted `searchContentVectors` (no `subtreeRootNodeIds`) must return ANN rows. */
+export async function assertUnrestrictedContentSearchContract(store: IDocumentStore): Promise<void> {
+  const q = new Float32Array(EMBED_DIM).fill(0.15);
+  await store.upsertNodes([
+    sampleNode({ id: 'ctr_a', noteId: 'note_ctr_a', type: 'topic' }),
+    sampleNode({
+      id: 'ctr_b',
+      noteId: 'note_ctr_a',
+      parentId: 'ctr_a',
+      type: 'paragraph',
+      depth: 1,
+      content: 'leaf body',
+    }),
+  ]);
+  const meta = {
+    model: 'm',
+    dimension: EMBED_DIM,
+    contentHash: 'h_ctr',
+  };
+  await store.upsertEmbedding('ctr_a', 'summary', q, meta);
+  await store.upsertEmbedding('ctr_b', 'content', q, meta);
+
+  const scoped = await store.searchContentVectors(q, 8, { subtreeRootNodeIds: ['ctr_a'] });
+  const unrestricted = await store.searchContentVectors(q, 8);
+  expect(scoped.length).toBeGreaterThan(0);
+  expect(unrestricted.length).toBeGreaterThan(0);
+  const ids = new Set(unrestricted.map((m) => m.nodeId));
+  expect(ids.size).toBe(unrestricted.length);
+}
+
 /** Port-level round-trip used by adapter integration tests (STO-4 Y8). */
 export async function runDocumentStoreContractRoundTrip(store: IDocumentStore): Promise<void> {
   await store.upsertNodes([sampleNode()]);
@@ -53,6 +85,16 @@ describe('IDocumentStore contract', () => {
     const store = new SqliteDocumentStore(db);
     try {
       await runDocumentStoreContractRoundTrip(store);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('Y8_unrestricted_content_search_contract', async () => {
+    const db = openMigratedMemoryDb({ embeddingDimension: EMBED_DIM });
+    const store = new SqliteDocumentStore(db);
+    try {
+      await assertUnrestrictedContentSearchContract(store);
     } finally {
       db.close();
     }

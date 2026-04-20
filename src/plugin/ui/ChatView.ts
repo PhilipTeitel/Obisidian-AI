@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { ChatMessage, Source } from '../../core/domain/types.js';
+import { buildSearchAssemblyFromSettings } from '../settings/buildSearchAssembly.js';
 import { getOpenAIApiKey } from '../settings/secretSettings.js';
 import type ObsidianAIPlugin from '../main.js';
 import { showAiNotice } from './showAiNotice.js';
@@ -132,11 +133,15 @@ export class ChatView extends ItemView {
 
     let assistantAcc = '';
     try {
+      const ps = this.plugin.settings;
       for await (const chunk of transport.streamChat(
         {
           messages: messagesForRequest,
           apiKey,
           timeoutMs,
+          k: ps.searchResultCount,
+          coarseK: ps.chatCoarseK,
+          search: buildSearchAssemblyFromSettings(ps),
         },
         { signal },
       )) {

@@ -1,3 +1,4 @@
+import { DEFAULT_SEARCH_ASSEMBLY, validateSearchAssemblyOptions } from '../domain/contextAssembly.js';
 import type { ChatMessage, SearchAssemblyOptions, Source } from '../domain/types.js';
 import type { ChatCompletionOptions, IChatPort } from '../ports/IChatPort.js';
 import type { SearchWorkflowDeps } from './SearchWorkflow.js';
@@ -12,10 +13,12 @@ export interface ChatWorkflowDeps extends SearchWorkflowDeps {
 }
 
 export interface ChatWorkflowOptions {
-  search: SearchAssemblyOptions;
+  search?: SearchAssemblyOptions;
   apiKey?: string;
   k?: number;
   tags?: string[];
+  coarseK?: number;
+  enableHybridSearch?: boolean;
   /** ADR-009: passed through to chat streaming guard + `IChatPort.complete`. */
   completion?: ChatCompletionOptions;
 }
@@ -48,6 +51,9 @@ export async function* runChatStream(
     throw new Error('ChatWorkflow: no user message with non-empty content');
   }
 
+  const searchAssembly = options.search ?? DEFAULT_SEARCH_ASSEMBLY;
+  validateSearchAssemblyOptions(searchAssembly);
+
   const searchRes = await runSearch(
     deps,
     {
@@ -55,8 +61,10 @@ export async function* runChatStream(
       apiKey: options.apiKey,
       k: options.k ?? DEFAULT_SEARCH_K,
       tags: options.tags,
+      coarseK: options.coarseK,
+      enableHybridSearch: options.enableHybridSearch,
     },
-    options.search,
+    searchAssembly,
   );
 
   const context =

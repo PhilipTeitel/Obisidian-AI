@@ -219,6 +219,16 @@ export interface SearchRequest {
   apiKey?: string;
   /** Optional tag filter (OR, case-insensitive); forwarded to Phase 1 prune + Phase 2 ANN. */
   tags?: string[];
+  /**
+   * Phase-1 summary ANN limit (RET-4 / ADR-012). Clamped to [1, 256]; default 32 when omitted.
+   */
+  coarseK?: number;
+  /** Context assembly from plugin settings; when omitted, SearchWorkflow uses README defaults. */
+  search?: SearchAssemblyOptions;
+  /**
+   * RET-5 hybrid toggle; RET-4: content-only fallback must not consult this (ADR-012 Decision 5).
+   */
+  enableHybridSearch?: boolean;
 }
 
 export interface SearchResult {
@@ -280,6 +290,13 @@ export type SidecarRequest =
         apiKey?: string;
         /** Wall-clock budget for the stream (maps to `IChatPort` / workflow; ADR-009). */
         timeoutMs?: number;
+        /** Phase-1 coarse-K (RET-4); defaults in workflow when omitted. */
+        coarseK?: number;
+        /** Final search `k` for retrieval (defaults in ChatWorkflow when omitted). */
+        k?: number;
+        /** Assembly budgets from plugin settings (RET-2 / RET-4). */
+        search?: SearchAssemblyOptions;
+        enableHybridSearch?: boolean;
       };
     }
   | { type: 'chat/clear'; payload?: Record<string, never> }

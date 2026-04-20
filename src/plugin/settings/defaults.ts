@@ -1,4 +1,5 @@
 import type { ObsidianAISettings } from './types.js';
+import { DEFAULT_CHAT_COARSE_K } from './chatCoarseK.js';
 
 export const DEFAULT_SETTINGS: ObsidianAISettings = {
   embeddingProvider: 'openai',
@@ -18,6 +19,7 @@ export const DEFAULT_SETTINGS: ObsidianAISettings = {
   transport: 'stdio',
   logLevel: 'info',
   searchResultCount: 20,
+  chatCoarseK: DEFAULT_CHAT_COARSE_K,
   matchedContentBudget: 0.6,
   siblingContextBudget: 0.25,
   parentSummaryBudget: 0.15,

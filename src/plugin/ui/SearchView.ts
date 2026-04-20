@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { SearchResult } from '../../core/domain/types.js';
+import { buildSearchAssemblyFromSettings } from '../settings/buildSearchAssembly.js';
 import { getOpenAIApiKey } from '../settings/secretSettings.js';
 import type ObsidianAIPlugin from '../main.js';
 import { showAiNotice } from './showAiNotice.js';
@@ -88,7 +89,13 @@ export class SearchView extends ItemView {
     try {
       const res = await transport.send({
         type: 'search',
-        payload: { query: q, k: s.searchResultCount, apiKey },
+        payload: {
+          query: q,
+          k: s.searchResultCount,
+          apiKey,
+          coarseK: s.chatCoarseK,
+          search: buildSearchAssemblyFromSettings(s),
+        },
       });
       if (res.type !== 'search') {
         showAiNotice('Unexpected search response.');

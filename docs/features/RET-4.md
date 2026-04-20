@@ -3,7 +3,7 @@
 **Story**: Replace the hard-coded `kSummary = Math.min(k, 8)` in [`SearchWorkflow.mapSearchK`](../../src/core/workflows/SearchWorkflow.ts) with a user-configurable `chatCoarseK` setting threaded through plugin settings → sidecar → workflow; add a **content-only fallback** ANN when the coarse phase returns fewer usable hits than a configurable floor; apply the same retrieval options to `ChatWorkflow` so chat and search do not diverge.
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -168,106 +168,106 @@ SettingsTab
 
 ### Phase A: Coarse-K configurability
 
-- [ ] **A1** — `chatCoarseK` setting controls the coarse-phase ceiling
+- [x] **A1** — `chatCoarseK` setting controls the coarse-phase ceiling
   - With a fake store returning 40 summary hits and `coarseK = 25`, Phase 2 is invoked with descendants of exactly 25 candidate subtrees. The 8-summary ceiling does not re-enter.
   - Evidence: `tests/core/workflows/SearchWorkflow.coarseK.test.ts::A1_respects_coarseK_S1_S2(vitest)`
 
-- [ ] **A2** — Default `coarseK` is `DEFAULT_COARSE_K = 32`
+- [x] **A2** — Default `coarseK` is `DEFAULT_COARSE_K = 32`
   - When neither the caller nor the settings override `coarseK`, retrieval behaves as if `coarseK = 32`; `kSummary` is 32, not 8.
   - Evidence: `tests/core/workflows/SearchWorkflow.coarseK.test.ts::A2_default_32_S6(vitest)`
 
-- [ ] **A3** — `Math.min(k, 8)` cap is gone
+- [x] **A3** — `Math.min(k, 8)` cap is gone
   - Static check: `src/core/workflows/SearchWorkflow.ts` no longer contains the expression `Math.min(k, 8)` or any equivalent hardcoded 8-cap on `kSummary`.
   - Evidence: `rg -n "Math\.min\(k,\s*8\)" src/core/workflows/SearchWorkflow.ts` returns no matches.
 
 ### Phase B: Content-only fallback
 
-- [ ] **B1** — Fallback fires when coarse hits are below the floor
+- [x] **B1** — Fallback fires when coarse hits are below the floor
   - When coarse returns `< fallbackFloor` hits (where `fallbackFloor = max(4, floor(coarseK / 4))`), `IDocumentStore.searchContentVectors` is invoked with a filter that **lacks** `subtreeRootNodeIds`.
   - Evidence: `tests/core/workflows/SearchWorkflow.coarseK.test.ts::B1_fallback_fires_below_floor_S3(vitest)`
 
-- [ ] **B2** — Fallback results merged and deduplicated
+- [x] **B2** — Fallback results merged and deduplicated
   - Fallback results are merged with Phase 2 descendants from the coarse hits; no `nodeId` appears twice in the merged candidate set.
   - Evidence: `tests/core/workflows/SearchWorkflow.coarseK.test.ts::B2_merge_dedup_S3(vitest)`
 
-- [ ] **B3** — Coarse empty → fallback still runs; empty-after-fallback returns `[]`
+- [x] **B3** — Coarse empty → fallback still runs; empty-after-fallback returns `[]`
   - When coarse returns zero hits, the fallback runs unconditionally. If the fallback is also empty, the workflow returns `results: []` (feeds the CHAT-3 insufficient-evidence path rather than a "terminal summary miss").
   - Evidence: `tests/core/workflows/SearchWorkflow.coarseK.test.ts::B3_coarse_empty_fallback_runs_S4_S8(vitest)`
 
-- [ ] **B4** — Fallback does **not** run when coarse is above the floor
+- [x] **B4** — Fallback does **not** run when coarse is above the floor
   - When coarse returns `≥ fallbackFloor` hits, `searchContentVectors` is **not** invoked without a subtree filter; the candidate set is drawn from coarse descendants only.
   - Evidence: `tests/core/workflows/SearchWorkflow.coarseK.test.ts::B4_above_floor_no_fallback_S9(vitest)`
 
-- [ ] **B5** — Fallback is independent of `enableHybridSearch`
+- [x] **B5** — Fallback is independent of `enableHybridSearch`
   - Toggling `enableHybridSearch` off (or leaving it off in the RET-4 vector-only world) does not disable the fallback; the fallback fires based only on the floor comparison.
   - Evidence: `tests/core/workflows/SearchWorkflow.coarseK.test.ts::B5_fallback_independent_of_hybrid_toggle_Y6(vitest)`
 
 ### Phase C: Chat/search parity
 
-- [ ] **C1** — `ChatWorkflow` uses settings-derived retrieval options
+- [x] **C1** — `ChatWorkflow` uses settings-derived retrieval options
   - `ChatWorkflow` invoked from the sidecar runtime uses retrieval options derived from settings (including `coarseK`), not the legacy `DEFAULT_SEARCH_ASSEMBLY` constant. The same query in chat and search applies the same coarse-K ceiling and the same fallback rule.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.chatRetrieval.test.ts::C1_settings_propagate_to_chat_S5(vitest)`
 
-- [ ] **C2** — Chat and search share the same retrieval helper
+- [x] **C2** — Chat and search share the same retrieval helper
   - Static/behavioral check: chat and search route through the same shared retrieval helper (per RET-1 Y5), so a change to retrieval behavior affects both paths identically.
   - Evidence: `tests/core/workflows/ChatWorkflow.coarseK.test.ts::C2_shared_retrieval_helper_S5(vitest)`
 
 ### Phase D: Settings surface & runtime changes
 
-- [ ] **D1** — Invalid `chatCoarseK` values are clamped with inline feedback
+- [x] **D1** — Invalid `chatCoarseK` values are clamped with inline feedback
   - Committing a value `<= 0`, a non-integer, or a value `> 256` clamps to `[1, 256]` (or rejects the input at the control) and surfaces inline feedback stating the effective value. No subsequent query falls back to 0, to 8, or to an absurdly large value.
   - Evidence: `tests/plugin/settings/SettingsTab.chatCoarseK.test.ts::D1_clamp_and_warn_S7(vitest)`
 
-- [ ] **D2** — Changing `chatCoarseK` takes effect on the next query without reindexing
+- [x] **D2** — Changing `chatCoarseK` takes effect on the next query without reindexing
   - After the user saves a new `chatCoarseK` value, the next chat/search request uses the new value. No vault reindex, cache clear, or Obsidian restart is required.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.chatRetrieval.test.ts::D2_runtime_setting_change_S10(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** No `min(k, 8)` cap remains in `SearchWorkflow`
+- [x] **Y1** — **(binding)** No `min(k, 8)` cap remains in `SearchWorkflow`
   - The hardcoded 8-cap on `kSummary` is gone; `kSummary` is `coarseK` (or the default 32 when unset).
   - Evidence: `rg -n "Math\.min\(k,\s*8\)" src/core/workflows/SearchWorkflow.ts` returns no matches; also cross-checked by `tests/core/workflows/SearchWorkflow.coarseK.test.ts::A1_respects_coarseK_S1_S2`.
 
-- [ ] **Y2** — **(binding)** `SearchRequest` and `ChatWorkflowOptions` expose `coarseK?: number`; sidecar threads settings → workflow
+- [x] **Y2** — **(binding)** `SearchRequest` and `ChatWorkflowOptions` expose `coarseK?: number`; sidecar threads settings → workflow
   - Type check + runtime check: both interfaces accept `coarseK`; the sidecar passes `settings.chatCoarseK` into both workflows when no per-request override is supplied.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.chatRetrieval.test.ts::Y2_sidecar_threads_chatCoarseK(vitest)`
 
-- [ ] **Y3** — **(binding)** Content-only fallback is served by the real `SqliteDocumentStore`
+- [x] **Y3** — **(binding)** Content-only fallback is served by the real `SqliteDocumentStore`
   - Integration test against a real SQLite database (no mocked persistence) seeds `vec_content`, invokes `SearchWorkflow` with a query whose coarse phase returns below the floor, and asserts the fallback reaches `SqliteDocumentStore.searchContentVectors` with an **absent** `subtreeRootNodeIds` filter and returns merged, deduplicated candidates. This is the hexagonal pairing check for the `IDocumentStore` port — silent swapping of the persistence boundary for an in-memory fake would cause this test to fail.
   - Evidence: `tests/integration/sqlite-document-store.fallback.test.ts::Y3_fallback_hits_real_sqlite_S3_S4(vitest)`
 
-- [ ] **Y4** — **(binding)** `SidecarRuntime.handleChatStream` no longer uses `DEFAULT_SEARCH_ASSEMBLY`
+- [x] **Y4** — **(binding)** `SidecarRuntime.handleChatStream` no longer uses `DEFAULT_SEARCH_ASSEMBLY`
   - Static + behavioral check: the `DEFAULT_SEARCH_ASSEMBLY` hardcode is removed from `handleChatStream`; retrieval options are derived from plugin settings. `rg -n "DEFAULT_SEARCH_ASSEMBLY" src/sidecar/runtime/SidecarRuntime.ts` returns no matches (or only an import removal).
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.chatRetrieval.test.ts::Y4_no_default_search_assembly_hardcode_S5(vitest)` plus the grep above.
 
-- [ ] **Y5** — **(binding)** Empty-after-fallback preserves the insufficient-evidence path
+- [x] **Y5** — **(binding)** Empty-after-fallback preserves the insufficient-evidence path
   - When both coarse and fallback return zero usable matches, the workflow hands an empty context set to the chat path and the CHAT-3 / ADR-011 / REQ-001 S2 insufficient-evidence reply fires unchanged.
   - Evidence: `tests/core/workflows/ChatWorkflow.coarseK.test.ts::Y5_empty_after_fallback_keeps_grounding_S8(vitest)`
 
-- [ ] **Y6** — **(binding)** Fallback independent of hybrid toggle
+- [x] **Y6** — **(binding)** Fallback independent of hybrid toggle
   - Toggling `enableHybridSearch` has no effect on whether the content-only fallback runs; the gate is the floor comparison only.
   - Evidence: `tests/core/workflows/SearchWorkflow.coarseK.test.ts::B5_fallback_independent_of_hybrid_toggle_Y6(vitest)` (shared with B5).
 
-- [ ] **Y7** — **(binding)** `chatCoarseK` is a runtime parameter, not a build-time constant
+- [x] **Y7** — **(binding)** `chatCoarseK` is a runtime parameter, not a build-time constant
   - Changing `chatCoarseK` between two requests changes the effective `kSummary` on the second request without any reindex / restart.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.chatRetrieval.test.ts::D2_runtime_setting_change_S10(vitest)` (shared with D2).
 
-- [ ] **Y8** — **(binding)** `IDocumentStore` contract covers the unrestricted `searchContentVectors` call
+- [x] **Y8** — **(binding)** `IDocumentStore` contract covers the unrestricted `searchContentVectors` call
   - Contract test asserts that any adapter for `IDocumentStore` accepts `searchContentVectors(query, k)` with no filter (or filter lacking `subtreeRootNodeIds`) and returns `VectorMatch[]` with unique `nodeId`s suitable for dedup-merge. Guards against silent substitution of the port semantics.
   - Evidence: `tests/contract/document-store.contract.ts::Y8_unrestricted_content_search_contract(vitest)`
 
-- [ ] **Y9** — **(binding)** No forbidden imports in `src/core/workflows/`
+- [x] **Y9** — **(binding)** No forbidden imports in `src/core/workflows/`
   - `npm run check:boundaries` passes; core workflows do not import sidecar-only modules.
   - Evidence: `npm run check:boundaries`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** for this story; no new client-side shared-type imports are introduced beyond existing conventions. If any new such import is added by the Implementer, it must use the alias.
-- [ ] **Z5** — New or modified code logs `coarseK`, the `fallback_fired` flag, and the final merged result count at `debug` level for each chat/search request (per the implementer's logging guidelines)
-- [ ] **Z6** — `/review-story RET-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output)
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** for this story; no new client-side shared-type imports are introduced beyond existing conventions. If any new such import is added by the Implementer, it must use the alias.
+- [x] **Z5** — New or modified code logs `coarseK`, the `fallback_fired` flag, and the final merged result count at `debug` level for each chat/search request (per the implementer's logging guidelines)
+- [x] **Z6** — `/review-story RET-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output)
 
 ---
 
