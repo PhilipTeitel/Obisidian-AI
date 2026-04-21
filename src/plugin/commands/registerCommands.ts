@@ -40,7 +40,12 @@ async function buildIndexPayload(plugin: ObsidianAIPlugin) {
       return { path: vf.path, content, hash: hashVaultText(content) };
     }),
   );
-  return { files, apiKey };
+  return {
+    files,
+    apiKey,
+    dailyNotePathGlobs: plugin.settings.dailyNotePathGlobs,
+    dailyNoteDatePattern: plugin.settings.dailyNoteDatePattern,
+  };
 }
 
 async function revealView(plugin: ObsidianAIPlugin, viewType: string): Promise<void> {
@@ -79,10 +84,10 @@ async function runIncrementalReindex(plugin: ObsidianAIPlugin): Promise<void> {
     return;
   }
   try {
-    const { files, apiKey } = await buildIndexPayload(plugin);
+    const { files, apiKey, dailyNotePathGlobs, dailyNoteDatePattern } = await buildIndexPayload(plugin);
     const res = await transport.send({
       type: 'index/incremental',
-      payload: { files, deletedPaths: [], apiKey },
+      payload: { files, deletedPaths: [], apiKey, dailyNotePathGlobs, dailyNoteDatePattern },
     });
     if (res.type === 'index/incremental') {
       showAiNotice(formatIndexAck('incremental', res.body));

@@ -213,7 +213,14 @@ export class SidecarRuntime {
         const runId = randomUUID();
         const r = await planAndApplyIncrementalIndex(
           { store: this.store!, queue: this.queue!, jobSteps: this.jobSteps! },
-          { runId, files: req.payload.files, deletedPaths: [], forceReindex: true },
+          {
+            runId,
+            files: req.payload.files,
+            deletedPaths: [],
+            forceReindex: true,
+            dailyNotePathGlobs: req.payload.dailyNotePathGlobs,
+            dailyNoteDatePattern: req.payload.dailyNoteDatePattern,
+          },
         );
         this.log.info(
           { op: 'index/full', runId, enqueued: r.enqueued, ms: Date.now() - t0 },
@@ -241,6 +248,8 @@ export class SidecarRuntime {
             runId,
             files: req.payload.files,
             deletedPaths: req.payload.deletedPaths,
+            dailyNotePathGlobs: req.payload.dailyNotePathGlobs,
+            dailyNoteDatePattern: req.payload.dailyNoteDatePattern,
           },
         );
         this.log.info(
@@ -266,6 +275,14 @@ export class SidecarRuntime {
       }
       case 'search': {
         this.ensureDb();
+        this.log.debug(
+          {
+            path_globs_count: req.payload.pathGlobs?.length ?? 0,
+            date_range_start: req.payload.dateRange?.start,
+            date_range_end: req.payload.dateRange?.end,
+          },
+          'sidecar.search.filters',
+        );
         const body = await runSearch(this.getSearchDeps(), req.payload);
         this.log.info(
           { op: 'search', ms: Date.now() - t0, n: body.results.length },
@@ -286,6 +303,14 @@ export class SidecarRuntime {
   ): AsyncGenerator<ChatStreamChunk, ChatWorkflowResult> {
     const t0 = Date.now();
     this.ensureDb();
+    this.log.debug(
+      {
+        path_globs_count: payload.pathGlobs?.length ?? 0,
+        date_range_start: payload.dateRange?.start,
+        date_range_end: payload.dateRange?.end,
+      },
+      'sidecar.chat.filters',
+    );
     const deps = this.getChatWorkflowDeps();
     const stream = runChatStream(deps, payload.messages, {
       search: payload.search,

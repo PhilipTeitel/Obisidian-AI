@@ -25,6 +25,10 @@ export interface ObsidianAISettings {
   chatCoarseK: number;
   /** Hybrid BM25 + vector coarse fusion (RET-5 / ADR-012); default on. */
   enableHybridSearch: boolean;
+  /** Globs for daily-note paths; used when indexing to populate `note_meta.note_date` (RET-6). */
+  dailyNotePathGlobs: string[];
+  /** Basename pattern for daily-note dates: `YYYY`, `MM`, `DD` tokens (RET-6). */
+  dailyNoteDatePattern: string;
   matchedContentBudget: number;
   siblingContextBudget: number;
   parentSummaryBudget: number;

@@ -3,6 +3,7 @@ import {
   DEFAULT_SEARCH_ASSEMBLY,
   validateSearchAssemblyOptions,
 } from '../domain/contextAssembly.js';
+import { compilePathGlobs } from '../domain/pathGlob.js';
 import { fuseRankings } from '../domain/rrf.js';
 import type {
   DocumentNode,
@@ -49,7 +50,10 @@ export function mapSearchK(k: number, coarseK: number): { kSummary: number; kCon
 export interface SearchWorkflowDeps {
   store: IDocumentStore;
   embedder: IEmbeddingPort;
-  log?: { debug: (obj: Record<string, unknown>, msg?: string) => void };
+  log?: {
+    debug: (obj: Record<string, unknown>, msg?: string) => void;
+    warn?: (obj: Record<string, unknown>, msg?: string) => void;
+  };
 }
 
 function resolveAssembly(assembly?: SearchAssemblyOptions): SearchAssemblyOptions {
@@ -86,10 +90,24 @@ async function buildSnippet(
 
 const BM25_COARSE_NODE_TYPES = ['note', 'topic', 'subtopic'] as const;
 
-function coarseUserFilterFromRequest(req: SearchRequest): NodeFilter {
+function coarseUserFilterFromRequest(
+  req: SearchRequest,
+  log?: SearchWorkflowDeps['log'],
+): NodeFilter {
   const f: NodeFilter = {};
   if (req.tags?.length) f.tagsAny = req.tags;
-  if (req.pathGlobs?.length) f.pathGlobs = req.pathGlobs;
+  if (req.pathGlobs?.length) {
+    try {
+      const c = compilePathGlobs(req.pathGlobs);
+      f.pathRegex = c.pathRegex;
+      f.pathLikes = c.pathLikes;
+    } catch (e) {
+      log?.warn?.(
+        { err: e instanceof Error ? e.message : String(e), raw: req.pathGlobs },
+        'searchworkflow.path_globs_invalid',
+      );
+    }
+  }
   if (req.dateRange && (req.dateRange.start || req.dateRange.end)) {
     f.dateRange = req.dateRange;
   }
@@ -132,7 +150,7 @@ export async function runSearch(
   }
 
   const hybridOn = req.enableHybridSearch !== false;
-  const coarseUserFilter = coarseUserFilterFromRequest(req);
+  const coarseUserFilter = coarseUserFilterFromRequest(req, deps.log);
   const bm25Filter: NodeFilter = {
     ...coarseUserFilter,
     nodeTypes: [...BM25_COARSE_NODE_TYPES],
@@ -192,6 +210,9 @@ export async function runSearch(
       fused_coarse_count: coarseHits.length,
       fallback_fired: fallbackFired,
       merged_candidates: byNode.size,
+      path_globs_count: req.pathGlobs?.length ?? 0,
+      date_range_start: req.dateRange?.start,
+      date_range_end: req.dateRange?.end,
     },
     'searchworkflow.retrieval',
   );

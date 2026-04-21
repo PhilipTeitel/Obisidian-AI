@@ -286,6 +286,35 @@ export class ObsidianAISettingTab extends PluginSettingTab {
         }),
       );
 
+    containerEl.createEl('h4', { text: 'Advanced retrieval — daily notes' });
+
+    new Setting(containerEl)
+      .setName('Daily note path globs')
+      .setDesc(
+        'One vault-relative glob per line (default Daily/**/*.md). Used when indexing to parse dates from filenames into note_meta.note_date. Reindex after changing.',
+      )
+      .addTextArea((ta) => {
+        ta.setValue(s.dailyNotePathGlobs.join('\n')).onChange(async (v) => {
+          const lines = v
+            .split('\n')
+            .map((x) => x.trim())
+            .filter(Boolean);
+          s.dailyNotePathGlobs = lines.length > 0 ? lines : ['Daily/**/*.md'];
+          await this.aiPlugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Daily note date pattern')
+      .setDesc('Filename stem pattern using tokens YYYY, MM, DD (e.g. YYYY-MM-DD).')
+      .addText((t) =>
+        t.setValue(s.dailyNoteDatePattern).onChange(async (v) => {
+          const x = v.trim();
+          s.dailyNoteDatePattern = x.length > 0 ? x : 'YYYY-MM-DD';
+          await this.aiPlugin.saveSettings();
+        }),
+      );
+
     new Setting(containerEl).setName('Search result count (k)').addText((t) =>
       t.setValue(String(s.searchResultCount)).onChange(async (v) => {
         const n = parseInt(v, 10);

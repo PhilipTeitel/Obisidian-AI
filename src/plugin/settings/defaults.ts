@@ -23,6 +23,8 @@ export const DEFAULT_SETTINGS: ObsidianAISettings = {
   searchResultCount: 20,
   chatCoarseK: DEFAULT_CHAT_COARSE_K,
   enableHybridSearch: DEFAULT_ENABLE_HYBRID_SEARCH,
+  dailyNotePathGlobs: ['Daily/**/*.md'],
+  dailyNoteDatePattern: 'YYYY-MM-DD',
   matchedContentBudget: 0.6,
   siblingContextBudget: 0.25,
   parentSummaryBudget: 0.15,

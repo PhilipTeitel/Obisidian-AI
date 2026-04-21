@@ -61,8 +61,15 @@ export interface NodeFilter {
   subtreeRootNodeIds?: string[];
   /** OR semantics: node matches if it has any of these tags (case-insensitive), RET-3. */
   tagsAny?: string[];
-  /** Vault-relative paths; union semantics (ADR-014, RET-6 push-down). */
-  pathGlobs?: string[];
+  /**
+   * Union regex for `note_meta.vault_path` (compiled from `SearchRequest.pathGlobs` in the workflow).
+   * Enforced in the store before ANN scoring (ADR-014 / RET-6).
+   */
+  pathRegex?: string;
+  /**
+   * One SQL LIKE pattern per glob; OR together as a fast prefilter with `pathRegex` as the precise check.
+   */
+  pathLikes?: string[];
   /** Inclusive ISO date range on `note_meta.note_date`; NULL dates excluded when set (ADR-014). */
   dateRange?: { start?: string; end?: string };
 }
@@ -73,6 +80,8 @@ export interface NoteMeta {
   contentHash: string;
   indexedAt: string;
   nodeCount: number;
+  /** Parsed from daily-note filename when path matches settings; otherwise null (ADR-014 / STO-4). */
+  noteDate?: string | null;
 }
 
 /** `job_steps.current_step` CHECK (README §8 / ADR-008) — lowercase snake_case. */
@@ -168,6 +177,8 @@ export interface NoteIndexJob {
   noteTitle: string;
   markdown: string;
   contentHash: string;
+  dailyNotePathGlobs?: string[];
+  dailyNoteDatePattern?: string;
 }
 
 // --- Sidecar wire shapes (README API Contract; framing deferred to SRV-*) ---
@@ -181,12 +192,17 @@ export interface IndexFilePayload {
 export interface IndexFullRequest {
   files: IndexFilePayload[];
   apiKey?: string;
+  /** Defaults applied in the indexer when omitted (RET-6). */
+  dailyNotePathGlobs?: string[];
+  dailyNoteDatePattern?: string;
 }
 
 export interface IndexIncrementalRequest {
   files: IndexFilePayload[];
   deletedPaths: string[];
   apiKey?: string;
+  dailyNotePathGlobs?: string[];
+  dailyNoteDatePattern?: string;
 }
 
 export interface IndexRunAck {

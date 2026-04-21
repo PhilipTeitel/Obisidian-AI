@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { compilePathGlobs } from '@src/core/domain/pathGlob.js';
 import type { VectorMatch } from '@src/core/domain/types.js';
 import type { IEmbeddingPort } from '@src/core/ports/IEmbeddingPort.js';
 import { runSearch } from '@src/core/workflows/SearchWorkflow.js';
@@ -130,7 +131,9 @@ describe('SearchWorkflow hybrid (RET-5)', () => {
       },
     );
     const fallback = store.contentFilters.find((f) => !f?.subtreeRootNodeIds?.length);
-    expect(fallback?.pathGlobs).toEqual(['Daily/*.md']);
+    const compiled = compilePathGlobs(['Daily/*.md']);
+    expect(fallback?.pathRegex).toBe(compiled.pathRegex);
+    expect(fallback?.pathLikes).toEqual(compiled.pathLikes);
     expect(fallback?.dateRange).toEqual({ start: '2026-02-01', end: '2026-02-28' });
   });
 

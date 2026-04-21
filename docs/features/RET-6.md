@@ -3,7 +3,7 @@
 **Story**: Extend `SearchRequest` and chat retrieval options with optional `pathGlobs` and `dateRange` filters; compile globs to SQL `LIKE`/regex predicates in `SqliteDocumentStore`; parse daily-note filenames into the new `note_meta.note_date` column during indexing and apply date-range filters against it; surface the filters in the chat UI via lightweight slash-command parsing.
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -238,94 +238,94 @@ SettingsTab
 
 ### Phase A: Pure helpers
 
-- [ ] **A1** — `compilePathGlob('Daily/**/*.md')` produces a regex matching `Daily/2026-04-16.md` and `Daily/sub/2026-04-16.md`, and rejecting `Other/notes.md` and `Daily/2026-04-16.txt`.
+- [x] **A1** — `compilePathGlob('Daily/**/*.md')` produces a regex matching `Daily/2026-04-16.md` and `Daily/sub/2026-04-16.md`, and rejecting `Other/notes.md` and `Daily/2026-04-16.txt`.
   - Detailed: also returns a SQL `LIKE` fragment that the adapter uses as a fast first-pass filter; `**` → any, `*` → non-slash, `?` → single non-slash.
   - Evidence: `tests/core/domain/pathGlob.test.ts::A1_daily_glob(vitest)`
 
-- [ ] **A2** — `parseDailyNoteDate('2026-04-16', 'YYYY-MM-DD')` returns `'2026-04-16'`; a non-matching basename (e.g. `'planning'`) returns `null`; an invalid calendar date (e.g. `'2026-13-40'`) returns `null`.
+- [x] **A2** — `parseDailyNoteDate('2026-04-16', 'YYYY-MM-DD')` returns `'2026-04-16'`; a non-matching basename (e.g. `'planning'`) returns `null`; an invalid calendar date (e.g. `'2026-13-40'`) returns `null`.
   - Evidence: `tests/core/domain/dailyNoteDate.test.ts::A2_parse_and_reject(vitest)`
 
-- [ ] **A3** — `parseChatInput('what did I do? path:Daily/**/*.md last:14d')` returns `text = 'what did I do?'`, `pathGlobs = ['Daily/**/*.md']`, and `dateRange.start = today - 14 days` (ISO). Unknown tokens remain in `text`.
+- [x] **A3** — `parseChatInput('what did I do? path:Daily/**/*.md last:14d')` returns `text = 'what did I do?'`, `pathGlobs = ['Daily/**/*.md']`, and `dateRange.start = today - 14 days` (ISO). Unknown tokens remain in `text`.
   - Evidence: `tests/core/domain/chatInputParser.test.ts::A3_extracts_path_and_last(vitest)`
 
-- [ ] **A4** — `parseChatInput` also handles `since:2026-04-01` and `before:2026-04-10` into the corresponding `start` / `end` endpoints; combining `since:` and `before:` produces both endpoints.
+- [x] **A4** — `parseChatInput` also handles `since:2026-04-01` and `before:2026-04-10` into the corresponding `start` / `end` endpoints; combining `since:` and `before:` produces both endpoints.
   - Evidence: `tests/core/domain/chatInputParser.test.ts::A4_since_before(vitest)`
 
 ### Phase B: Store filtering (contract + SQLite)
 
-- [ ] **B1** — With `NodeFilter.pathRegex` set to `^Daily/`, `searchContentVectors` returns only rows whose `notes.path` matches; rows under `Work/` and `Research/` are absent. Contract suite runs against any adapter; integration test runs against real `better-sqlite3`.
+- [x] **B1** — With `NodeFilter.pathRegex` set to `^Daily/`, `searchContentVectors` returns only rows whose `notes.path` matches; rows under `Work/` and `Research/` are absent. Contract suite runs against any adapter; integration test runs against real `better-sqlite3`.
   - Detailed: verifies S5 — a single `pathGlob` scopes the candidate set; `**` / `*` / `?` glob-to-regex semantics preserved end-to-end.
   - Evidence (contract): `tests/contract/document-store.filters.contract.ts::B1_single_glob(vitest)`
   - Evidence (integration): `tests/sidecar/adapters/SqliteDocumentStore.filters.test.ts::B1_single_glob_sqlite(vitest)`
 
-- [ ] **B2** — With `NodeFilter.pathRegex` encoding a union of `Daily/**` and `Journal/**`, a note matching either glob is returned; a note matching neither is excluded. (S6.)
+- [x] **B2** — With `NodeFilter.pathRegex` encoding a union of `Daily/**` and `Journal/**`, a note matching either glob is returned; a note matching neither is excluded. (S6.)
   - Evidence (contract): `tests/contract/document-store.filters.contract.ts::B2_union_globs(vitest)`
   - Evidence (integration): `tests/sidecar/adapters/SqliteDocumentStore.filters.test.ts::B2_union_globs_sqlite(vitest)`
 
-- [ ] **B3** — With `NodeFilter.dateRange = { start: '2026-02-01', end: '2026-02-28' }`, `searchContentVectors` returns only rows whose `note_meta.note_date` lies inclusively within the range; `2026-01-31` and `2026-03-01` are excluded. (S7.)
+- [x] **B3** — With `NodeFilter.dateRange = { start: '2026-02-01', end: '2026-02-28' }`, `searchContentVectors` returns only rows whose `note_meta.note_date` lies inclusively within the range; `2026-01-31` and `2026-03-01` are excluded. (S7.)
   - Evidence (contract): `tests/contract/document-store.filters.contract.ts::B3_dateRange_inclusive(vitest)`
   - Evidence (integration): `tests/sidecar/adapters/SqliteDocumentStore.filters.test.ts::B3_dateRange_inclusive_sqlite(vitest)`
 
-- [ ] **B4** — With `NodeFilter.dateRange` set, rows whose `note_meta.note_date IS NULL` are **excluded** from the candidate set, even if they would otherwise match the query semantically. (S8.)
+- [x] **B4** — With `NodeFilter.dateRange` set, rows whose `note_meta.note_date IS NULL` are **excluded** from the candidate set, even if they would otherwise match the query semantically. (S8.)
   - Evidence (contract): `tests/contract/document-store.filters.contract.ts::B4_null_note_date_excluded(vitest)`
   - Evidence (integration): `tests/sidecar/adapters/SqliteDocumentStore.filters.test.ts::B4_null_note_date_excluded_sqlite(vitest)`
 
-- [ ] **B5** — With both `pathRegex` and `dateRange` set, only rows satisfying **both** predicates are returned (AND-intersection). A `Daily/2026-02-14.md` passes; `Journal/2026-02-14.md` fails path; `Daily/2026-04-01.md` fails date. (S10.)
+- [x] **B5** — With both `pathRegex` and `dateRange` set, only rows satisfying **both** predicates are returned (AND-intersection). A `Daily/2026-02-14.md` passes; `Journal/2026-02-14.md` fails path; `Daily/2026-04-01.md` fails date. (S10.)
   - Evidence (contract): `tests/contract/document-store.filters.contract.ts::B5_intersection(vitest)`
   - Evidence (integration): `tests/sidecar/adapters/SqliteDocumentStore.filters.test.ts::B5_intersection_sqlite(vitest)`
 
-- [ ] **B6** — **Indexer round-trip:** upserting a `NoteMeta` with a parsed `noteDate` for a `Daily/**/*.md` path persists it in `note_meta.note_date`; a note whose basename does not match `dailyNoteDatePattern` persists `NULL`; `getNoteMeta` returns the stored value unchanged. (S9 population side.)
+- [x] **B6** — **Indexer round-trip:** upserting a `NoteMeta` with a parsed `noteDate` for a `Daily/**/*.md` path persists it in `note_meta.note_date`; a note whose basename does not match `dailyNoteDatePattern` persists `NULL`; `getNoteMeta` returns the stored value unchanged. (S9 population side.)
   - Evidence (contract): `tests/contract/document-store.filters.contract.ts::B6_note_date_round_trip(vitest)`
   - Evidence (integration): `tests/sidecar/adapters/SqliteDocumentStore.filters.test.ts::B6_note_date_round_trip_sqlite(vitest)`
 
 ### Phase C: Workflow integration
 
-- [ ] **C1** — `SearchWorkflow` threads `pathGlobs` / `dateRange` from the request into `NodeFilter` for **both** Phase 1 (`searchSummaryVectors`) and Phase 2 (`searchContentVectors`). A spy on the fake store asserts both calls saw the filter. (S5+S7 at the workflow level.)
+- [x] **C1** — `SearchWorkflow` threads `pathGlobs` / `dateRange` from the request into `NodeFilter` for **both** Phase 1 (`searchSummaryVectors`) and Phase 2 (`searchContentVectors`). A spy on the fake store asserts both calls saw the filter. (S5+S7 at the workflow level.)
   - Evidence: `tests/core/workflows/SearchWorkflow.filters.test.ts::C1_propagation_phase1_phase2(vitest)`
 
-- [ ] **C2** — `SearchWorkflow`'s ADR-012 content-only fallback call also carries `pathGlobs` / `dateRange`; "unrestricted" drops only `subtreeRootNodeIds`, not the user filters. (S14.)
+- [x] **C2** — `SearchWorkflow`'s ADR-012 content-only fallback call also carries `pathGlobs` / `dateRange`; "unrestricted" drops only `subtreeRootNodeIds`, not the user filters. (S14.)
   - Evidence: `tests/core/workflows/SearchWorkflow.filters.test.ts::C2_fallback_keeps_filters(vitest)`
 
-- [ ] **C3** — When filters collapse the combined candidate set (Phase 1 ∪ fallback) to zero, `SearchWorkflow` returns `results: []` and the chat path emits the REQ-001 insufficient-evidence response — verified via spy on the insufficient-evidence emitter. (S12.)
+- [x] **C3** — When filters collapse the combined candidate set (Phase 1 ∪ fallback) to zero, `SearchWorkflow` returns `results: []` and the chat path emits the REQ-001 insufficient-evidence response — verified via spy on the insufficient-evidence emitter. (S12.)
   - Evidence: `tests/core/workflows/SearchWorkflow.filters.test.ts::C3_empty_after_filters_triggers_ie(vitest)`
 
-- [ ] **C4** — `ChatWorkflow` accepts `pathGlobs` / `dateRange` in `ChatWorkflowOptions` and forwards them through the shared retrieval helper — the same helper `SearchWorkflow` uses. A spy asserts chat and search receive identical filter objects for identical inputs.
+- [x] **C4** — `ChatWorkflow` accepts `pathGlobs` / `dateRange` in `ChatWorkflowOptions` and forwards them through the shared retrieval helper — the same helper `SearchWorkflow` uses. A spy asserts chat and search receive identical filter objects for identical inputs.
   - Evidence: `tests/core/workflows/ChatWorkflow.filters.test.ts::C4_forwards_filters(vitest)`
 
-- [ ] **C5** — `ChatView` parses input containing `path:Daily/**/*.md last:14d what are the open questions?` and sends a `chat` payload with `pathGlobs = ['Daily/**/*.md']`, `dateRange.start = today - 14d`, and `text = 'what are the open questions?'` (filter tokens stripped). (S11.)
+- [x] **C5** — `ChatView` parses input containing `path:Daily/**/*.md last:14d what are the open questions?` and sends a `chat` payload with `pathGlobs = ['Daily/**/*.md']`, `dateRange.start = today - 14d`, and `text = 'what are the open questions?'` (filter tokens stripped). (S11.)
   - Evidence: `tests/plugin/ui/ChatView.filters.test.ts::C5_chat_input_slash_commands(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `SearchRequest` and `ChatWorkflowOptions` expose `pathGlobs?: string[]` and `dateRange?: { start?: string; end?: string }` per ADR-014 Decision 1; omitting them preserves prior behavior (static + runtime check).
+- [x] **Y1** — **(binding)** `SearchRequest` and `ChatWorkflowOptions` expose `pathGlobs?: string[]` and `dateRange?: { start?: string; end?: string }` per ADR-014 Decision 1; omitting them preserves prior behavior (static + runtime check).
   - Evidence: `tests/core/domain/types.shape.test.ts::Y1_request_shape(vitest)` plus `tsc --noEmit` on `src/core/domain/types.ts`
 
-- [ ] **Y2** — **(binding)** Pure domain helpers (`pathGlob.ts`, `dailyNoteDate.ts`, `chatInputParser.ts`) live in `src/core/domain/` with no forbidden imports (no `sqlite`, no `fs`, no `node:*`).
+- [x] **Y2** — **(binding)** Pure domain helpers (`pathGlob.ts`, `dailyNoteDate.ts`, `chatInputParser.ts`) live in `src/core/domain/` with no forbidden imports (no `sqlite`, no `fs`, no `node:*`).
   - Evidence: `scripts/check-boundaries.mjs(npm run check:boundaries)`
 
-- [ ] **Y3** — **(binding)** Filters are pushed down as SQL predicates **before** ANN scoring in `SqliteDocumentStore` — verified by an integration test against real `better-sqlite3` that asserts out-of-scope rows are absent from `searchSummaryVectors`, `searchContentVectors`, and the unrestricted content-vector call used for the ADR-012 fallback. Covers `pathGlob` + `dateRange` + `NULL note_date` exclusion in one run. (ADR-014 Decision 2/3/6; REQ-004 Constraints §5.)
+- [x] **Y3** — **(binding)** Filters are pushed down as SQL predicates **before** ANN scoring in `SqliteDocumentStore` — verified by an integration test against real `better-sqlite3` that asserts out-of-scope rows are absent from `searchSummaryVectors`, `searchContentVectors`, and the unrestricted content-vector call used for the ADR-012 fallback. Covers `pathGlob` + `dateRange` + `NULL note_date` exclusion in one run. (ADR-014 Decision 2/3/6; REQ-004 Constraints §5.)
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.filters.test.ts::Y3_filters_pushed_down_all_paths(vitest)` — **real SQLite, not mocked**
 
-- [ ] **Y4** — **(binding)** `NULL note_date` rows are excluded whenever `dateRange` is present; verified against real `better-sqlite3` in the integration test above.
+- [x] **Y4** — **(binding)** `NULL note_date` rows are excluded whenever `dateRange` is present; verified against real `better-sqlite3` in the integration test above.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.filters.test.ts::B4_null_note_date_excluded_sqlite(vitest)`
 
-- [ ] **Y5** — **(binding)** Indexing a fixture Daily folder populates `note_meta.note_date` for matching filenames and leaves it `NULL` otherwise — verified against real `better-sqlite3`.
+- [x] **Y5** — **(binding)** Indexing a fixture Daily folder populates `note_meta.note_date` for matching filenames and leaves it `NULL` otherwise — verified against real `better-sqlite3`.
   - Evidence: `tests/sidecar/adapters/SqliteDocumentStore.filters.test.ts::Y5_note_date_populated_by_indexing(vitest)`
 
-- [ ] **Y6** — **(binding)** The `IDocumentStore` **contract test suite** runs against `SqliteDocumentStore` and any future adapter, proving any conforming adapter honors the new `pathRegex` / `pathLike` / `dateRange` / `noteDate` contract.
+- [x] **Y6** — **(binding)** The `IDocumentStore` **contract test suite** runs against `SqliteDocumentStore` and any future adapter, proving any conforming adapter honors the new `pathRegex` / `pathLike` / `dateRange` / `noteDate` contract.
   - Evidence: `tests/contract/document-store.filters.contract.ts(vitest)` executed by `tests/sidecar/adapters/SqliteDocumentStore.contract.test.ts`
 
-- [ ] **Y7** — **(binding)** Zero-result-after-filter paths emit the existing REQ-001 insufficient-evidence response and do not fabricate "answered from vault" chrome; asserted via workflow-level spy.
+- [x] **Y7** — **(binding)** Zero-result-after-filter paths emit the existing REQ-001 insufficient-evidence response and do not fabricate "answered from vault" chrome; asserted via workflow-level spy.
   - Evidence: `tests/core/workflows/SearchWorkflow.filters.test.ts::C3_empty_after_filters_triggers_ie(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** for this story (no shared-types package consumption on the plugin UI side beyond existing imports).
-- [ ] **Z5** — New or modified code includes appropriate logging: at `debug`, per chat/search request log the compact filter shape (`pathGlobs.length`, `dateRange.start`, `dateRange.end`, `fallbackFired`); at `warn`, log glob or date parse failures with the raw token.
-- [ ] **Z6** — `/review-story RET-6` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output).
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A** for this story (no shared-types package consumption on the plugin UI side beyond existing imports).
+- [x] **Z5** — New or modified code includes appropriate logging: at `debug`, per chat/search request log the compact filter shape (`pathGlobs.length`, `dateRange.start`, `dateRange.end`, `fallbackFired`); at `warn`, log glob or date parse failures with the raw token.
+- [x] **Z6** — `/review-story RET-6` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output).
 
 ---
 

@@ -16,17 +16,6 @@ import { getEmbeddingDimension } from '../db/migrate.js';
 
 type SqliteDatabase = InstanceType<typeof Database>;
 
-function pathGlobOrClause(metaAlias: string, globs: string[]): { sql: string; params: string[] } {
-  const parts: string[] = [];
-  const params: string[] = [];
-  for (const raw of globs) {
-    const g = raw.replace(/\\/g, '/').replace(/\*\*/g, '*');
-    parts.push(`(${metaAlias}.vault_path GLOB ?)`);
-    params.push(g);
-  }
-  return { sql: parts.length ? `(${parts.join(' OR ')})` : '(1=1)', params };
-}
-
 function dateRangeClause(
   metaAlias: string,
   dr: { start?: string; end?: string } | undefined,
@@ -82,6 +71,14 @@ export class SqliteDocumentStore implements IDocumentStore {
 
   constructor(private readonly db: SqliteDatabase) {
     this.dimension = getEmbeddingDimension(db);
+    this.db.function('regexp', { deterministic: true }, (pattern: unknown, text: unknown) => {
+      if (typeof pattern !== 'string' || typeof text !== 'string') return 0;
+      try {
+        return new RegExp(pattern).test(text) ? 1 : 0;
+      } catch {
+        return 0;
+      }
+    });
   }
 
   /** SQL `AND …` fragments for shared retrieval filters (excludes `subtreeRootNodeIds`). */
@@ -106,10 +103,14 @@ export class SqliteDocumentStore implements IDocumentStore {
       sql += ` AND EXISTS (SELECT 1 FROM tags t WHERE t.node_id = ${nodeAlias}.id AND lower(t.tag) IN (${lowered.map(() => '?').join(',')}))`;
       params.push(...lowered);
     }
-    if (filter.pathGlobs?.length) {
-      const g = pathGlobOrClause(metaAlias, filter.pathGlobs);
-      sql += ` AND ${g.sql}`;
-      params.push(...g.params);
+    if (filter.pathLikes?.length) {
+      const ph = filter.pathLikes.map(() => `${metaAlias}.vault_path LIKE ?`).join(' OR ');
+      sql += ` AND (${ph})`;
+      params.push(...filter.pathLikes);
+    }
+    if (filter.pathRegex) {
+      sql += ` AND regexp(?, ${metaAlias}.vault_path) = 1`;
+      params.push(filter.pathRegex);
     }
     const dr = dateRangeClause(metaAlias, filter.dateRange);
     if (dr) {
@@ -444,6 +445,7 @@ export class SqliteDocumentStore implements IDocumentStore {
           content_hash: string;
           indexed_at: string;
           node_count: number;
+          note_date: string | null;
         }
       | undefined;
     if (!row) return null;
@@ -453,19 +455,21 @@ export class SqliteDocumentStore implements IDocumentStore {
       contentHash: row.content_hash,
       indexedAt: row.indexed_at,
       nodeCount: row.node_count,
+      noteDate: row.note_date ?? null,
     };
   }
 
   async upsertNoteMeta(meta: NoteMeta): Promise<void> {
     this.db
       .prepare(
-        `INSERT INTO note_meta (note_id, vault_path, content_hash, indexed_at, node_count)
-         VALUES (@note_id, @vault_path, @content_hash, @indexed_at, @node_count)
+        `INSERT INTO note_meta (note_id, vault_path, content_hash, indexed_at, node_count, note_date)
+         VALUES (@note_id, @vault_path, @content_hash, @indexed_at, @node_count, @note_date)
          ON CONFLICT(note_id) DO UPDATE SET
            vault_path = excluded.vault_path,
            content_hash = excluded.content_hash,
            indexed_at = excluded.indexed_at,
-           node_count = excluded.node_count`,
+           node_count = excluded.node_count,
+           note_date = excluded.note_date`,
       )
       .run({
         note_id: meta.noteId,
@@ -473,6 +477,7 @@ export class SqliteDocumentStore implements IDocumentStore {
         content_hash: meta.contentHash,
         indexed_at: meta.indexedAt,
         node_count: meta.nodeCount,
+        note_date: meta.noteDate ?? null,
       });
   }
 

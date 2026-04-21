@@ -6,7 +6,9 @@
  * hash (SHA-256 of summary text) does not match stored `embedding_meta.content_hash`.
  */
 import { chunkNote } from '../domain/chunker.js';
+import { parseDailyNoteDate } from '../domain/dailyNoteDate.js';
 import { hashText } from '../domain/hashText.js';
+import { vaultPathMatchesAnyGlob } from '../domain/pathGlob.js';
 import type { DocumentNode, NoteIndexJob, QueueItem } from '../domain/types.js';
 import type { IChatPort } from '../ports/IChatPort.js';
 import type { IDocumentStore } from '../ports/IDocumentStore.js';
@@ -35,6 +37,24 @@ export function runIdFromJobId(jobId: string): string {
   const i = jobId.indexOf(':');
   if (i <= 0) return 'recovery';
   return jobId.slice(0, i);
+}
+
+const DEFAULT_DAILY_NOTE_GLOBS = ['Daily/**/*.md'] as const;
+
+function stemFromVaultPath(vaultPath: string): string {
+  const base = vaultPath.split('/').pop() ?? vaultPath;
+  const dot = base.lastIndexOf('.');
+  return dot === -1 ? base : base.slice(0, dot);
+}
+
+function resolveNoteDateForJob(job: NoteIndexJob): string | null {
+  const globs =
+    job.dailyNotePathGlobs && job.dailyNotePathGlobs.length > 0
+      ? job.dailyNotePathGlobs
+      : [...DEFAULT_DAILY_NOTE_GLOBS];
+  const pattern = job.dailyNoteDatePattern ?? 'YYYY-MM-DD';
+  if (!vaultPathMatchesAnyGlob(job.vaultPath, globs)) return null;
+  return parseDailyNoteDate(stemFromVaultPath(job.vaultPath), pattern);
 }
 
 function isNonLeaf(nodes: DocumentNode[], nodeId: string): boolean {
@@ -100,6 +120,7 @@ export async function processOneJob(
       contentHash: job.contentHash,
       indexedAt: now,
       nodeCount: parsed.nodes.length,
+      noteDate: resolveNoteDateForJob(job),
     });
     deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'stored' });
 

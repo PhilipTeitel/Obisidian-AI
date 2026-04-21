@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SEARCH_ASSEMBLY } from '@src/core/domain/contextAssembly.js';
+import { compilePathGlobs } from '@src/core/domain/pathGlob.js';
 import type { DocumentNode, NodeFilter } from '@src/core/domain/types.js';
 import type { IDocumentStore } from '@src/core/ports/IDocumentStore.js';
 import type { IEmbeddingPort } from '@src/core/ports/IEmbeddingPort.js';
@@ -296,7 +297,9 @@ describe('SqliteDocumentStore FTS5 (RET-5)', () => {
         DEFAULT_SEARCH_ASSEMBLY,
       );
       const fallback = contentFilters.find((f) => !f?.subtreeRootNodeIds?.length);
-      expect(fallback?.pathGlobs).toEqual(['Daily/*.md']);
+      const compiled = compilePathGlobs(['Daily/*.md']);
+      expect(fallback?.pathRegex).toBe(compiled.pathRegex);
+      expect(fallback?.pathLikes).toEqual(compiled.pathLikes);
     } finally {
       db.close();
     }

@@ -18,6 +18,8 @@ export interface IncrementalIndexInput {
   forceReindex?: boolean;
   /** Optional display titles; default is the last path segment of each file `path`. */
   noteTitlesByPath?: Record<string, string>;
+  dailyNotePathGlobs?: string[];
+  dailyNoteDatePattern?: string;
 }
 
 export interface IncrementalIndexDeps {
@@ -62,6 +64,8 @@ export async function planAndApplyIncrementalIndex(
       noteTitle: noteTitleForPath(path, titles),
       markdown: f.content,
       contentHash: f.hash,
+      dailyNotePathGlobs: input.dailyNotePathGlobs,
+      dailyNoteDatePattern: input.dailyNoteDatePattern,
     };
     await deps.queue.enqueue([job]);
     enqueued += 1;

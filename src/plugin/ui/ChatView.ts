@@ -1,5 +1,7 @@
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { ChatMessage, Source } from '../../core/domain/types.js';
+import { compilePathGlobs } from '../../core/domain/pathGlob.js';
+import { parseChatInput } from '../../core/domain/chatInputParser.js';
 import { buildSearchAssemblyFromSettings } from '../settings/buildSearchAssembly.js';
 import { getOpenAIApiKey } from '../settings/secretSettings.js';
 import type ObsidianAIPlugin from '../main.js';
@@ -115,13 +117,24 @@ export class ChatView extends ItemView {
       showAiNotice('Sidecar is not available.');
       return;
     }
-    const text = this.inputEl.value.trim();
-    if (!text) {
+    const raw = this.inputEl.value.trim();
+    if (!raw) {
       showAiNotice('Enter a message.');
       return;
     }
+    const parsed = parseChatInput(raw);
+    let pathGlobs = parsed.pathGlobs;
+    const dateRange = parsed.dateRange;
+    if (pathGlobs?.length) {
+      try {
+        compilePathGlobs(pathGlobs);
+      } catch {
+        showAiNotice('Invalid path glob; sending query unfiltered.');
+        pathGlobs = undefined;
+      }
+    }
     this.inputEl.value = '';
-    this.messages.push({ role: 'user', content: text });
+    this.messages.push({ role: 'user', content: parsed.text });
     const messagesForRequest = [...this.messages];
     this.renderMessages();
 
@@ -143,6 +156,8 @@ export class ChatView extends ItemView {
           coarseK: ps.chatCoarseK,
           enableHybridSearch: ps.enableHybridSearch,
           search: buildSearchAssemblyFromSettings(ps),
+          pathGlobs,
+          dateRange,
         },
         { signal },
       )) {
