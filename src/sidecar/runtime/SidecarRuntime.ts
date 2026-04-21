@@ -114,9 +114,6 @@ export class SidecarRuntime {
       baseUrl: process.env.OBSIDIAN_AI_CHAT_BASE_URL ?? 'https://api.openai.com/v1',
       model: process.env.OBSIDIAN_AI_CHAT_MODEL ?? 'gpt-4o-mini',
     });
-    // #region agent log
-    fetch('http://127.0.0.1:7279/ingest/93aba0d1-d956-4d96-a52b-680185909f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'14212f'},body:JSON.stringify({sessionId:'14212f',hypothesisId:'H1,H2,H3,H4',location:'SidecarRuntime.ts:getIndexDeps',message:'sidecar embedding config',data:{embedKind,embeddingBaseUrl:process.env.OBSIDIAN_AI_EMBEDDING_BASE_URL,embeddingModel:process.env.OBSIDIAN_AI_EMBEDDING_MODEL,embeddingDimensionEnv:process.env.OBSIDIAN_AI_EMBEDDING_DIMENSION,embeddingDimensionParsed:parsePositiveInt(process.env.OBSIDIAN_AI_EMBEDDING_DIMENSION,1536)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return {
       queue: this.queue!,
       store: this.store!,

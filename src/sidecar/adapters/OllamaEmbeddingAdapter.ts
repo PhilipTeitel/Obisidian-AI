@@ -54,18 +54,10 @@ export class OllamaEmbeddingAdapter implements IEmbeddingPort {
       );
     }
     if (Array.isArray(json.embeddings)) {
-      const out = json.embeddings.map((embedding) => Float32Array.from(embedding));
-      // #region agent log
-      fetch('http://127.0.0.1:7279/ingest/93aba0d1-d956-4d96-a52b-680185909f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'14212f'},body:JSON.stringify({sessionId:'14212f',hypothesisId:'H1,H5',location:'OllamaEmbeddingAdapter.ts:embed',message:'ollama embed response',data:{url,model:this.model,inputCount:texts.length,returnedCount:out.length,firstLen:out[0]?.length,lastLen:out[out.length-1]?.length,shape:'embeddings'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      return out;
+      return json.embeddings.map((embedding) => Float32Array.from(embedding));
     }
     if (Array.isArray(json.embedding)) {
-      const out = [Float32Array.from(json.embedding)];
-      // #region agent log
-      fetch('http://127.0.0.1:7279/ingest/93aba0d1-d956-4d96-a52b-680185909f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'14212f'},body:JSON.stringify({sessionId:'14212f',hypothesisId:'H1,H5',location:'OllamaEmbeddingAdapter.ts:embed',message:'ollama embed response (legacy)',data:{url,model:this.model,inputCount:texts.length,returnedCount:out.length,firstLen:out[0]?.length,shape:'embedding'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-      return out;
+      return [Float32Array.from(json.embedding)];
     }
     throw new Error('Ollama embeddings: response missing embeddings array');
   }
