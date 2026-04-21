@@ -25,7 +25,9 @@ Commands were used to execute the various steps and templates were used to maint
 
 A community Obsidian plugin that brings **semantic search** and **RAG-powered chat** to your vault. Notes are parsed into a **hierarchical tree** (headings → topics → paragraphs → bullets), enriched with **bottom-up LLM summaries**, and indexed with **vector embeddings** so queries find meaning, not just keywords.
 
-Iteration 2 replaces the fragile WASM-in-renderer approach from iteration 1 with a **sidecar architecture**: the plugin `main.js` stays a thin UI client while a local Node.js sidecar process handles SQLite, embeddings, summarization, and search — communicating over a transport-abstracted channel (stdio IPC by default, HTTP opt-in).
+**Iteration 2** replaces the fragile WASM-in-renderer approach from iteration 1 with a **sidecar architecture**: the plugin `main.js` stays a thin UI client while a local Node.js sidecar process handles SQLite, embeddings, summarization, and search — communicating over a transport-abstracted channel (stdio IPC by default, HTTP opt-in).
+
+I**teration 3** improves search by expanding `k` values in addition to a hybrid search using full-text search.  This iteration was also the testing ground for the new versions of the Cursor agents.
 
 ## Table of Contents
 
