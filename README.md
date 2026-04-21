@@ -63,6 +63,9 @@ I**teration 3** improves search by expanding `k` values in addition to a hybrid 
     - [18. Queue Abstraction](#18-queue-abstraction)
     - [19. Idempotent Indexing State Machine](#19-idempotent-indexing-state-machine)
     - [20. Logging and Observability](#20-logging-and-observability)
+    - [21. Source Provenance Contract](#21-source-provenance-contract)
+    - [22. Natural-Language Date Range Resolution](#22-natural-language-date-range-resolution)
+    - [23. User-Text Safety for Full-Text Search](#23-user-text-safety-for-full-text-search)
     - [Project Structure](#project-structure)
   - [Prerequisites](#prerequisites)
   - [Getting Started](#getting-started)
@@ -92,6 +95,7 @@ I**teration 3** improves search by expanding `k` values in addition to a hybrid 
     - [Epic 8: Plugin client, settings, secrets, and vault I/O](#epic-8-plugin-client-settings-secrets-and-vault-io)
     - [Epic 9: Plugin UI, commands, and agent file operations](#epic-9-plugin-ui-commands-and-agent-file-operations)
     - [Epic 10: Testing, authoring guide, and release hardening](#epic-10-testing-authoring-guide-and-release-hardening)
+    - [Epic 11: Chat accuracy and UX bug fixes (REQ-006)](#epic-11-chat-accuracy-and-ux-bug-fixes-req-006)
   - [License](#license)
 
 ---
@@ -103,6 +107,7 @@ I**teration 3** improves search by expanding `k` values in addition to a hybrid 
 - [docs/guides/user-storage-and-uninstall.md](docs/guides/user-storage-and-uninstall.md) — Index DB location, sync risks, uninstall (REQUIREMENTS §8)
 - [docs/guides/chat-behavior-tuning.md](docs/guides/chat-behavior-tuning.md) — Writing effective `chatSystemPrompt` and `vaultOrganizationPrompt` for grounded chat (REQUIREMENTS §6, [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md))
 - [.cursor/plans/obsidian_ai_iteration_2_95fe6b8a.plan.md](.cursor/plans/obsidian_ai_iteration_2_95fe6b8a.plan.md) — Iteration 2 architectural plan and implementation phases
+- [docs/requirements/REQ-006-bug-001-chat-accuracy-ux-search.md](docs/requirements/REQ-006-bug-001-chat-accuracy-ux-search.md) — BUG-001: chat source accuracy, selectable messages, vault-organization time queries, and search-safe prompts (refined from [docs/requests/BUG-001.md](docs/requests/BUG-001.md))
 
 **Architecture decisions (traceability for backlog alignment)**
 
@@ -120,6 +125,9 @@ I**teration 3** improves search by expanding `k` values in addition to a hybrid 
 - [docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md) — Configurable coarse-K, content-only fallback, and hybrid (FTS5 + vector via RRF) retrieval
 - [docs/decisions/ADR-013-structured-note-summaries.md](docs/decisions/ADR-013-structured-note-summaries.md) — Structured rubric for `note` / `topic` / `subtopic` summaries; skip `bullet_group`
 - [docs/decisions/ADR-014-temporal-and-path-filters.md](docs/decisions/ADR-014-temporal-and-path-filters.md) — Optional `pathGlobs` + `dateRange` filters on retrieval
+- [docs/decisions/ADR-015-source-provenance-contract.md](docs/decisions/ADR-015-source-provenance-contract.md) — Sources returned on chat/search equal the notes actually used to produce the reply
+- [docs/decisions/ADR-016-natural-language-date-range-resolution.md](docs/decisions/ADR-016-natural-language-date-range-resolution.md) — Local-time anchor with UTC-offset fallback; rolling N×7 days inclusive of today; open-ended ranges inclusive at both ends
+- [docs/decisions/ADR-017-fts-query-construction.md](docs/decisions/ADR-017-fts-query-construction.md) — Tokenize and sanitize user text before FTS5 `MATCH`; no syntax errors surfaced for ordinary punctuation or backticks
 
 ---
 
@@ -730,6 +738,47 @@ Each note's indexing progress is tracked per-step in the `job_steps` table:
 - **Sensitive data:** API keys, note content, and user PII must **never** appear in logs. Embeddings are logged only as dimensions/counts, not raw vectors. Note paths may appear in `debug` level only.
 - **Operation scopes:** Key operations (`index.full`, `index.incremental`, `search`, `chat`) are logged at `info` with timing metrics (duration, note count, error count).
 
+### 21. Source Provenance Contract
+
+> **ADR:** [ADR-015 — Source provenance contract](docs/decisions/ADR-015-source-provenance-contract.md) (Accepted). Traces to [REQ-006](docs/requirements/REQ-006-bug-001-chat-accuracy-ux-search.md) S1, S2, S7.
+
+The `sources` array returned on every `chat` completion and `search` response equals the set of notes whose content was **actually used** to produce the reply — nothing more, nothing less:
+
+- Every note that contributed to the answer (including aggregation answers where no single note is named inline) appears in `sources`.
+- No note that failed the turn's filtering (`tags`, `pathGlobs`, `dateRange` per [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) may appear in `sources`, regardless of what the retrieval stage produced upstream.
+- The set reflects **post-filter, post-rerank usage**, not the raw coarse-K candidates.
+
+Chat assembly tracks which retrieved nodes were placed into the final context window; only the notes owning those nodes are emitted as sources. On the insufficient-evidence path ([ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md)), `sources` is empty.
+
+### 22. Natural-Language Date Range Resolution
+
+> **ADR:** [ADR-016 — Natural-language date range resolution](docs/decisions/ADR-016-natural-language-date-range-resolution.md) (Accepted). Traces to [REQ-006](docs/requirements/REQ-006-bug-001-chat-accuracy-ux-search.md) S2, S4. Extends [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md).
+
+Chat and search time phrases (`"last 2 weeks"`, `"from March 16 onwards"`, `"this month"`) are resolved server-side in the sidecar into a concrete `dateRange` applied via [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md):
+
+| Rule | Value |
+|------|-------|
+| Anchor for "today" | Machine local time when determinable at runtime |
+| Fallback when local time is unavailable | `timezoneUtcOffsetHours` setting (integer, default `0`) |
+| "Last N weeks" | Rolling `N × 7` days inclusive of today — `[today − (N×7 − 1), today]` |
+| "From X onwards" and other open-ended ranges | Start inclusive, end = today inclusive |
+| Closed explicit ranges | Both endpoints inclusive |
+
+When the user's `vaultOrganizationPrompt` describes a daily-note layout (e.g. `daily/**/YYYY-MM-DD.md`), the chat workflow composes the resolved `dateRange` together with `dailyNotePathGlobs` on the retrieval request. The user prompt is a hint to the product, not a raw query to the LLM — the product does the date math, so an organization prompt that already defines the layout does **not** trigger an "insufficient evidence / please narrow your query" response for a well-formed time phrase.
+
+### 23. User-Text Safety for Full-Text Search
+
+> **ADR:** [ADR-017 — FTS query construction from user text](docs/decisions/ADR-017-fts-query-construction.md) (Accepted). Traces to [REQ-006](docs/requirements/REQ-006-bug-001-chat-accuracy-ux-search.md) S5, S6. Constrains hybrid retrieval ([ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)).
+
+User chat and search text is free-form natural language. It may contain `?`, `!`, `.`, inline `` ` ``, and other characters that are syntactically meaningful in SQLite FTS5 `MATCH` expressions. The hybrid-retrieval leg **must not** forward raw user text into `MATCH`:
+
+1. **Tokenize** the user text with the same tokenizer configured on `nodes_fts` (`unicode61 remove_diacritics 1`); discard punctuation.
+2. **Quote each token as a phrase** (FTS5 `"token"`) to neutralize stray operators (`AND`, `OR`, `NEAR`, `"`, `*`).
+3. **Combine with `OR`** into a conservative disjunction; apply `prefix` matching only if a deliberate future story adds it.
+4. If tokenization yields **zero terms**, skip the BM25 leg and rely on vector retrieval alone. Never surface an FTS syntax error to the user.
+
+This is applied at the adapter boundary (`SqliteDocumentStore.searchFts(...)` / the hybrid search helper), not in user-facing code. Vector retrieval is unaffected — it embeds the raw text.
+
 ### Project Structure
 
 ```
@@ -804,9 +853,20 @@ obsidian-ai-plugin/
 │   │   ├── ADR-011-vault-only-chat-grounding.md          # Accepted
 │   │   ├── ADR-012-hybrid-retrieval-and-coarse-k.md      # Accepted
 │   │   ├── ADR-013-structured-note-summaries.md          # Accepted
-│   │   └── ADR-014-temporal-and-path-filters.md          # Accepted
-│   └── requirements/
-│       └── REQUIREMENTS.md
+│   │   ├── ADR-014-temporal-and-path-filters.md          # Accepted
+│   │   ├── ADR-015-source-provenance-contract.md         # Accepted
+│   │   ├── ADR-016-natural-language-date-range-resolution.md # Accepted
+│   │   └── ADR-017-fts-query-construction.md             # Accepted
+│   ├── requirements/
+│   │   ├── REQUIREMENTS.md
+│   │   ├── REQ-001-grounding-policy.md
+│   │   ├── REQ-002-user-chat-prompts.md
+│   │   ├── REQ-003-recall-tuning.md
+│   │   ├── REQ-004-hybrid-and-filters.md
+│   │   ├── REQ-005-structured-summaries.md
+│   │   └── REQ-006-bug-001-chat-accuracy-ux-search.md
+│   └── requests/
+│       └── BUG-001.md
 ├── styles.css                               # Obsidian theme-aware styles
 ├── manifest.json                            # Obsidian plugin manifest
 ├── package.json
@@ -987,7 +1047,7 @@ The semantic search pane, registered as an Obsidian `ItemView`.
 
 The RAG-powered chat pane, registered as an Obsidian `ItemView`.
 
-- **Message display:** User and assistant messages are visually distinct (alignment, styling). Assistant text is selectable.
+- **Message display:** User and assistant messages are visually distinct (alignment, styling). **All message text — both user and assistant — is selectable** for normal copy/paste via pointer and keyboard, per [REQ-006](docs/requirements/REQ-006-bug-001-chat-accuracy-ux-search.md) S3.
 - **Sources:** Retrieval sources are shown as navigable pills/links beneath assistant messages. Clicking opens the corresponding note.
 - **Copy:** Full assistant reply copy button on each message.
 - **Input:** Multi-line text area at the bottom of the pane with send and cancel affordances.
@@ -1045,8 +1105,8 @@ These messages are sent between the plugin and sidecar over the transport layer.
 | `index/full`        | Plugin → Sidecar | `{ files: [{path, content, hash}], apiKey? }`                                                                                                                     | `{ runId, noteCount }` + progress stream                                                                        |
 | `index/incremental` | Plugin → Sidecar | `{ files: [{path, content, hash}], deletedPaths: string[], apiKey? }`                                                                                             | `{ runId, noteCount }` + progress stream                                                                        |
 | `index/status`      | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ pending, processing, completed, failed, deadLetter, jobs: JobStep[] }`                                       |
-| `search`            | Plugin → Sidecar | `{ query, k?, apiKey?, tags?, coarseK?, enableHybridSearch?, pathGlobs?, dateRange? }` (tag OR / case-insensitive; `pathGlobs` + `dateRange` per [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md); `coarseK` / `enableHybridSearch` per [ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)) | `{ results: SearchResult[] }`                                                                                   |
-| `chat`              | Plugin → Sidecar | `{ messages, apiKey?, context?, timeoutMs?, systemPrompt?, vaultOrganizationPrompt?, groundingPolicyVersion?, coarseK?, enableHybridSearch?, pathGlobs?, dateRange? }` + transport `streamChat(payload, { signal? })` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md), [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md), [ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md), [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[], groundingOutcome: 'answered' \| 'insufficient_evidence', groundingPolicyVersion }`; cancel/timeout via `signal` / `timeoutMs` |
+| `search`            | Plugin → Sidecar | `{ query, k?, apiKey?, tags?, coarseK?, enableHybridSearch?, pathGlobs?, dateRange? }` (tag OR / case-insensitive; `pathGlobs` + `dateRange` per [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md); `coarseK` / `enableHybridSearch` per [ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md); query string sanitized before FTS `MATCH` per [ADR-017](docs/decisions/ADR-017-fts-query-construction.md)) | `{ results: SearchResult[] }` — each result's `noteId` corresponds to the content actually scored by retrieval ([ADR-015](docs/decisions/ADR-015-source-provenance-contract.md))                                                                                 |
+| `chat`              | Plugin → Sidecar | `{ messages, apiKey?, context?, timeoutMs?, systemPrompt?, vaultOrganizationPrompt?, groundingPolicyVersion?, coarseK?, enableHybridSearch?, pathGlobs?, dateRange? }` + transport `streamChat(payload, { signal? })` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md), [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md), [ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md), [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md), [ADR-017](docs/decisions/ADR-017-fts-query-construction.md); natural-language date phrases resolved server-side per [ADR-016](docs/decisions/ADR-016-natural-language-date-range-resolution.md)) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[], groundingOutcome: 'answered' \| 'insufficient_evidence', groundingPolicyVersion }`; `sources` equals the notes whose content was actually used to produce the reply ([ADR-015](docs/decisions/ADR-015-source-provenance-contract.md)); cancel/timeout via `signal` / `timeoutMs` |
 | `chat/clear`        | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ ok: true }`                                                                                                  |
 | `health`            | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ status: 'ok', uptime, dbReady }`                                                                             |
 | `progress`          | Sidecar → Plugin | `{ event: IndexProgressEvent }`                                                                                                                                   | — (push notification)                                                                                           |
@@ -1080,6 +1140,7 @@ When using **HTTP transport**, these map to REST routes (`POST /index/full`, `GE
 | `enableHybridSearch`   | `boolean`                                          | `true`                        | Combine vector ANN with FTS5 BM25 keyword hits via reciprocal rank fusion ([ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md)) |
 | `dailyNotePathGlobs`   | `string[]`                                         | `['Daily/**/*.md']`           | Glob patterns whose matching files are treated as daily notes for `dateRange` filtering ([ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) |
 | `dailyNoteDatePattern` | `string`                                           | `'YYYY-MM-DD'`                | Filename pattern used to extract `note_meta.note_date` from daily notes ([ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md)) |
+| `timezoneUtcOffsetHours` | `number` (integer, −12 to +14)                   | `0`                           | Fallback UTC offset (in hours) used only when the sidecar cannot determine the machine's local time at runtime. Used to resolve natural-language time phrases like "last 2 weeks" and "from March 16 onwards" into a concrete `dateRange` ([ADR-016](docs/decisions/ADR-016-natural-language-date-range-resolution.md) / [REQ-006](docs/requirements/REQ-006-bug-001-chat-accuracy-ux-search.md)) |
 | `matchedContentBudget` | `number`                                           | `0.60`                        | Token budget fraction for matched content    |
 | `siblingContextBudget` | `number`                                           | `0.25`                        | Token budget fraction for sibling context    |
 | `parentSummaryBudget`  | `number`                                           | `0.15`                        | Token budget fraction for parent summaries   |
@@ -1213,6 +1274,19 @@ MVP quality bar (REQUIREMENTS §5 user docs, §8–§9). Guides: [Authoring for 
 | [TST-2](docs/features/TST-2.md) | Complete | `test:integration`: `tests/sidecar` (SQLite + sqlite-vec)           | M    | Pairs with TST-1                                                                       |
 | [DOC-1](docs/features/DOC-1.md) | Complete | Authoring-oriented guide (headings, bullets, tags, links)           | M    | [docs/guides/authoring-for-ai-indexing.md](docs/guides/authoring-for-ai-indexing.md)   |
 | [DOC-2](docs/features/DOC-2.md) | Complete | User docs: DB location, sync warnings, uninstall / reindex recovery | S    | [docs/guides/user-storage-and-uninstall.md](docs/guides/user-storage-and-uninstall.md) |
+
+### Epic 11: Chat accuracy and UX bug fixes (REQ-006)
+
+Fixes surfaced by [BUG-001](docs/requests/BUG-001.md) and refined in [REQ-006](docs/requirements/REQ-006-bug-001-chat-accuracy-ux-search.md): sources must equal the notes actually used to produce a reply ([§21](#21-source-provenance-contract)), chat messages must be selectable, time phrases like "last 2 weeks" and "from March 16 onwards" must resolve correctly when the vault-organization prompt describes a daily-note layout ([§22](#22-natural-language-date-range-resolution)), and user text with `?`, `!`, `.`, or `` ` `` must not produce FTS5 syntax errors ([§23](#23-user-text-safety-for-full-text-search)).
+
+| ID                              | Status      | Story                                                                                 | Size | Notes                                                                                                      |
+| ------------------------------- | ----------- | ------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
+| [BUG-1](docs/features/BUG-1.md) | Not Started | Source provenance contract: sources equal notes actually used for the reply            | M    | Implements REQ-006 S1/S2/S7; creates [ADR-015](docs/decisions/ADR-015-source-provenance-contract.md); tracks per-turn used-note set through `ChatWorkflow` and `SearchWorkflow`; affects `chat` / `search` response assembly |
+| [BUG-2](docs/features/BUG-2.md) | Not Started | ChatView selectable text for both user and assistant messages                          | S    | Implements REQ-006 S3; CSS/markup change in `src/plugin/ui/ChatView.ts` and `styles.css`; keyboard + pointer selection |
+| [BUG-3](docs/features/BUG-3.md) | Not Started | Natural-language date range resolution with local-time anchor and UTC-offset fallback  | M    | Implements REQ-006 S4 (and strengthens S2); creates [ADR-016](docs/decisions/ADR-016-natural-language-date-range-resolution.md); new setting `timezoneUtcOffsetHours`; parses "last N weeks" / "from X onwards" in the sidecar and composes `dateRange` + `pathGlobs` per [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md) |
+| [BUG-4](docs/features/BUG-4.md) | Not Started | FTS query construction: sanitize user text before SQLite FTS5 `MATCH`                  | M    | Implements REQ-006 S5/S6; creates [ADR-017](docs/decisions/ADR-017-fts-query-construction.md); tokenize → quote-as-phrase → OR; zero-token fallback to vector-only; touches hybrid search in `SqliteDocumentStore` |
+
+**Design sections affected (applied inline above):** Requirements log (REQ-006 added); Key Design Decisions §21/§22/§23; UI Components → ChatView; API Contract → Sidecar Message Protocol (`chat`, `search` rows); Plugin Settings (`timezoneUtcOffsetHours`); Project Structure (ADRs + requirements listings).
 
 ---
 
