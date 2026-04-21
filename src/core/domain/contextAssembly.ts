@@ -10,7 +10,7 @@ export const DEFAULT_SEARCH_ASSEMBLY: SearchAssemblyOptions = {
     siblingContext: 0.25,
     parentSummary: 0.15,
   },
-  totalTokenBudget: 512,
+  totalTokenBudget: 1024,
 };
 
 export function validateSearchAssemblyOptions(opts: SearchAssemblyOptions): void {

@@ -4,8 +4,8 @@
 
 export const SUMMARY_RUBRIC_VERSION = 'SUMMARY_RUBRIC_V1';
 
-/** ~256-token char budget after per-field clipping (WKF-4 §9; REQ-005 open question). */
-export const SUMMARY_RUBRIC_MAX_CHARS = 1024;
+/** ~512-token char budget after per-field clipping (WKF-4 §9; REQ-005 open question). */
+export const SUMMARY_RUBRIC_MAX_CHARS = 2048;
 
 /** Section headers in model output (order matters for {@link clipRubricToCaps}). */
 export const SUMMARY_RUBRIC_SECTION_LABELS = [
