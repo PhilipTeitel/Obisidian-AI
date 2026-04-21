@@ -3,7 +3,7 @@
 **Story**: Make the vault-only grounding policy **non-optional** at the message-assembly layer: every chat request built by the sidecar must prepend a built-in grounding system message, and when retrieval produces no usable context the workflow must emit a deterministic **insufficient-evidence** terminal stream (empty `sources`, structured marker) instead of letting the model answer from training data. Replace the conditional early return in [`buildMessagesWithContext`](../../src/sidecar/adapters/chatProviderMessages.ts) and extend `ChatWorkflow` / `ChatView` accordingly.
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -145,6 +145,8 @@ ChatView
 | 3 | `tests/plugin/ui/ChatView.insufficientEvidence.test.ts`                   | DOM test: distinct state + no sources footer on insufficient_evidence outcome.                     |
 | 4 | `tests/contract/IChatPort.contract.ts`                                    | Generic `IChatPort` contract suite: adapters must not reorder / drop / inject system messages.     |
 | 5 | `tests/integration/ChatWorkflow.grounded-provider.integration.test.ts`    | Integration: `ChatWorkflow` wired end-to-end through `buildGroundedMessages` + a faithful `IChatPort` fixture; asserts the fully-assembled messages array (policy first, then user-prompt slots, then context, then history, then user turn). |
+| 6 | `tests/integration/chatWorkflowDeps.ts`                                 | Test-only wiring: `buildGroundedMessages` injected into `ChatWorkflowDeps` (FND-3: not under `tests/core/`). |
+| 7 | `tests/shims/obsidian.ts`                                                 | Vitest/runtime shim + DOM helpers so plugin UI tests resolve `obsidian` (types-only npm package). |
 
 ### Files to MODIFY
 
@@ -156,6 +158,14 @@ ChatView
 | 4 | `src/sidecar/runtime/SidecarRuntime.ts`          | Pass `groundingOutcome` / `groundingPolicyVersion` on `done` event.                                |
 | 5 | `src/plugin/ui/ChatView.ts`                      | Render insufficient-evidence state distinctly; hide sources when `sources.length === 0`.          |
 | 6 | `tests/sidecar/runtime/SidecarRuntime.test.ts`   | Cover terminal shape with new fields.                                                             |
+| 7 | `src/sidecar/stdio/stdioServer.ts`               | NDJSON chat completion line includes `groundingOutcome` + `groundingPolicyVersion`.               |
+| 8 | `src/sidecar/http/httpServer.ts`                 | NDJSON chat completion line includes `groundingOutcome` + `groundingPolicyVersion`.               |
+| 9 | `src/plugin/client/StdioTransportAdapter.ts`     | Parse extended `done` payload from sidecar.                                                       |
+| 10 | `src/plugin/client/HttpTransportAdapter.ts`       | Parse extended `done` payload from sidecar.                                                       |
+| 11 | `vitest.config.ts`                                | `obsidian` → shim alias; include `IChatPort` contract path.                                      |
+| 12 | `package.json`                                   | `happy-dom` devDependency for `ChatView` UI tests.                                                 |
+| 13 | `tests/core/workflows/ChatWorkflow.test.ts` and related workflow tests | Inject `buildGroundedMessages` via `tests/integration/chatWorkflowDeps.ts`; update expectations. |
+| 14 | `tests/sidecar/adapters/OpenAIChatAdapter.test.ts`, `OllamaChatAdapter.test.ts` | Expect built-in policy prefix when non-empty `context` is passed to adapters.              |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -168,79 +178,79 @@ ChatView
 
 ### Phase A: Message assembly
 
-- [ ] **A1** — `buildGroundedMessages` prepends the built-in policy system message when `retrievalContext === ''`
+- [x] **A1** — `buildGroundedMessages` prepends the built-in policy system message when `retrievalContext === ''`
   - The first message in the returned array is a `system` role whose content references `GROUNDING_POLICY_V1` (compared by reference to the exported constant, not by literal text).
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.grounding.test.ts::A1_policy_always_present_on_empty_context(vitest)`
 
-- [ ] **A2** — Ordering matches ADR-011 §Decision 2 on every call
+- [x] **A2** — Ordering matches ADR-011 §Decision 2 on every call
   - With `systemPrompt`, `vaultOrganizationPrompt`, and `retrievalContext` all populated, the returned array ordering is: `[policy-system, vaultOrganizationPrompt-system, chatSystemPrompt-system, vault-context-system, ...history, currentUserTurn]`. Optional slots are omitted when their input is empty, but relative order of the remaining messages is preserved.
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.grounding.test.ts::A2_ordering_policy_first_then_user_prompts_then_context(vitest)`
 
 ### Phase B: Insufficient-evidence path
 
-- [ ] **B1** — When `runChatStream` receives zero retrieval hits, `IChatPort.complete` is **not** invoked
+- [x] **B1** — When `runChatStream` receives zero retrieval hits, `IChatPort.complete` is **not** invoked
   - A fake `IChatPort` whose `complete()` increments a counter asserts the counter is `0` after the stream closes.
   - Evidence: `tests/core/workflows/ChatWorkflow.insufficientEvidence.test.ts::B1_no_provider_call_on_zero_hits(vitest)`
 
-- [ ] **B2** — Terminal event carries `sources: []`, `groundingOutcome: 'insufficient_evidence'`, `groundingPolicyVersion: 'v1'`
+- [x] **B2** — Terminal event carries `sources: []`, `groundingOutcome: 'insufficient_evidence'`, `groundingPolicyVersion: 'v1'`
   - The final chunk from the async iterator is a `done` event with exactly `{ sources: [], groundingOutcome: 'insufficient_evidence', groundingPolicyVersion: 'v1' }`. No fabricated sources appear.
   - Evidence: `tests/core/workflows/ChatWorkflow.insufficientEvidence.test.ts::B2_terminal_shape_marks_insufficient_evidence(vitest)`
 
-- [ ] **B3** — When retrieval returns ≥ 1 hit, existing answered flow still fires and terminal carries `groundingOutcome: 'answered'`
+- [x] **B3** — When retrieval returns ≥ 1 hit, existing answered flow still fires and terminal carries `groundingOutcome: 'answered'`
   - With a non-empty search result set, `IChatPort.complete` is invoked exactly once, deltas stream through, and the terminal event carries `{ groundingOutcome: 'answered', groundingPolicyVersion: 'v1', sources: [...] }` with `sources.length >= 1`.
   - Evidence: `tests/core/workflows/ChatWorkflow.insufficientEvidence.test.ts::B3_answered_path_unchanged(vitest)`
 
-- [ ] **B4** — Insufficient-evidence delta names at least one concrete narrowing avenue
+- [x] **B4** — Insufficient-evidence delta names at least one concrete narrowing avenue
   - The concatenated `delta` text on the insufficient-evidence path contains at least one of: "folder", "tag", "date", or "narrow" (case-insensitive). The test references the constant-defined delta copy, not literal wording beyond these anchor keywords, so copy can evolve without breaking the test.
   - Evidence: `tests/core/workflows/ChatWorkflow.insufficientEvidence.test.ts::B4_delta_includes_narrowing_hint(vitest)`
 
 ### Phase C: UI rendering
 
-- [ ] **C1** — `ChatView` renders a distinct state (CSS class + no sources footer) when the terminal carries `groundingOutcome: 'insufficient_evidence'`
+- [x] **C1** — `ChatView` renders a distinct state (CSS class + no sources footer) when the terminal carries `groundingOutcome: 'insufficient_evidence'`
   - DOM assertion: the rendered assistant message node carries the `insufficient-evidence` CSS class; no `.sources-footer` element is rendered; no `.source-pill` nodes are present; normal-answer chrome is absent.
   - Evidence: `tests/plugin/ui/ChatView.insufficientEvidence.test.ts::C1_distinct_state_no_sources_footer(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `buildGroundedMessages` prepends the policy on every call (no conditional early return)
+- [x] **Y1** — **(binding)** `buildGroundedMessages` prepends the policy on every call (no conditional early return)
   - Verified by the unit test pinning A1, and statically by the absence of any `if (retrievalContext === '')` early-return branch in `buildGroundedMessages`.
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.grounding.test.ts::A1_policy_always_present_on_empty_context(vitest)`
 
-- [ ] **Y2** — **(binding)** Provider message ordering matches ADR-011 §Decision 2
+- [x] **Y2** — **(binding)** Provider message ordering matches ADR-011 §Decision 2
   - Verified by the unit test pinning A2.
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.grounding.test.ts::A2_ordering_policy_first_then_user_prompts_then_context(vitest)`
 
-- [ ] **Y3** — **(binding)** Empty retrieval path does not invoke `IChatPort.complete`
+- [x] **Y3** — **(binding)** Empty retrieval path does not invoke `IChatPort.complete`
   - Verified by the zero-call assertion in the B1 unit test (fake port records call count).
   - Evidence: `tests/core/workflows/ChatWorkflow.insufficientEvidence.test.ts::B1_no_provider_call_on_zero_hits(vitest)`
 
-- [ ] **Y4** — **(binding)** `GROUNDING_POLICY_V1` lives in the sidecar adapter module (not `src/core/`) and `GROUNDING_POLICY_VERSION` is logged on every chat request
+- [x] **Y4** — **(binding)** `GROUNDING_POLICY_V1` lives in the sidecar adapter module (not `src/core/`) and `GROUNDING_POLICY_VERSION` is logged on every chat request
   - Static grep: `rg "GROUNDING_POLICY_V1" src/core` returns zero matches; `rg "GROUNDING_POLICY_V1\|GROUNDING_POLICY_VERSION" src/sidecar/adapters/chatProviderMessages.ts` returns at least one match each.
   - Evidence: `rg "GROUNDING_POLICY_V1" src/core` returns zero matches; `rg "GROUNDING_POLICY_VERSION" src/sidecar/adapters/chatProviderMessages.ts` returns ≥ 1 match.
 
-- [ ] **Y5** — **(binding)** `ChatView` renders insufficient-evidence state with a dedicated CSS class and no sources footer
+- [x] **Y5** — **(binding)** `ChatView` renders insufficient-evidence state with a dedicated CSS class and no sources footer
   - Verified by the DOM test pinning C1.
   - Evidence: `tests/plugin/ui/ChatView.insufficientEvidence.test.ts::C1_distinct_state_no_sources_footer(vitest)`
 
-- [ ] **Y6** — **(binding)** `src/core/workflows/ChatWorkflow.ts` has no new imports from `obsidian`, `better-sqlite3`, or `src/sidecar/`
+- [x] **Y6** — **(binding)** `src/core/workflows/ChatWorkflow.ts` has no new imports from `obsidian`, `better-sqlite3`, or `src/sidecar/`
   - Evidence: `scripts/check-source-boundaries.mjs(npm run check:boundaries)`
 
-- [ ] **Y7** — **(binding)** `IChatPort` implementations receive the fully-assembled messages array unchanged (no reordering / drop / injection of system messages upstream of the port)
+- [x] **Y7** — **(binding)** `IChatPort` implementations receive the fully-assembled messages array unchanged (no reordering / drop / injection of system messages upstream of the port)
   - Contract suite exercises both real adapters; integration test asserts the `messages` array captured at the port boundary when called via `ChatWorkflow` matches the expected ADR-011 ordering byte-for-byte against the constants produced by `buildGroundedMessages`.
   - Evidence: `tests/integration/ChatWorkflow.grounded-provider.integration.test.ts::Y7_workflow_passes_full_message_list_to_real_port(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
   - Evidence: `package.json scripts.build(npm run build)`
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
   - Evidence: `package.json scripts.lint(npm run lint)`
-- [ ] **Z3** — No `any` types in any new or modified file
+- [x] **Z3** — No `any` types in any new or modified file
   - Evidence: `rg "\\bany\\b" src/core/domain/types.ts src/core/workflows/ChatWorkflow.ts src/sidecar/adapters/chatProviderMessages.ts src/sidecar/runtime/SidecarRuntime.ts src/plugin/ui/ChatView.ts` returns no true hits (only type-name contexts such as `AnyOf` are allowed)
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias — **N/A for this repo** (Obsidian plugin layout uses `@src/` + local core types; no `shared/` workspace)
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines; `groundingPolicyVersion` is logged on every chat request
+- [x] **Z4** — All client imports from shared use `@shared/types` alias — **N/A for this repo** (Obsidian plugin layout uses `@src/` + local core types; no `shared/` workspace)
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per the implementer's logging guidelines; `groundingPolicyVersion` is logged on every chat request
   - Evidence: `rg "groundingPolicyVersion" src/sidecar/runtime/SidecarRuntime.ts` returns ≥ 1 match in a logger call site
-- [ ] **Z6** — `/review-story CHAT-3` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output)
+- [x] **Z6** — `/review-story CHAT-3` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output)
   - Evidence: `/review-story CHAT-3` output summary line
 
 ---

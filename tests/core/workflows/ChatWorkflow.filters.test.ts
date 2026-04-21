@@ -6,6 +6,7 @@ import type { IEmbeddingPort } from '@src/core/ports/IEmbeddingPort.js';
 import { type ChatWorkflowResult, runChatStream } from '@src/core/workflows/ChatWorkflow.js';
 import { runSearch } from '@src/core/workflows/SearchWorkflow.js';
 import { DEFAULT_SEARCH_ASSEMBLY } from '@src/core/domain/contextAssembly.js';
+import { chatWorkflowDeps } from '../../integration/chatWorkflowDeps.js';
 import { SearchTestStore } from './searchTestStore.js';
 
 function fakeEmbed(): IEmbeddingPort {
@@ -53,7 +54,7 @@ describe('ChatWorkflow filters (RET-6)', () => {
     };
     await drainChatStream(
       runChatStream(
-        { store: chatStore, embedder, chat },
+        chatWorkflowDeps(chatStore, embedder, chat),
         [{ role: 'user', content: 'hello' }] as ChatMessage[],
         {
           search: DEFAULT_SEARCH_ASSEMBLY,

@@ -1,9 +1,9 @@
 import type {
   ChatStreamChunk,
+  GroundingOutcome,
   HealthResponse,
   SidecarRequest,
   SidecarResponse,
-  Source,
 } from '../../core/domain/types.js';
 import type { ISidecarTransport } from '../../core/ports/ISidecarTransport.js';
 
@@ -117,12 +117,19 @@ export class HttpTransportAdapter implements ISidecarTransport {
         chunk?: ChatStreamChunk;
         done?: boolean;
         sources?: Source[];
+        groundingOutcome?: GroundingOutcome;
+        groundingPolicyVersion?: string;
       };
       if (msg.type === 'chat' && msg.chunk) {
         yield msg.chunk;
       }
-      if (msg.type === 'chat' && msg.done && msg.sources) {
-        yield { type: 'done', sources: msg.sources };
+      if (msg.type === 'chat' && msg.done) {
+        yield {
+          type: 'done',
+          sources: msg.sources ?? [],
+          groundingOutcome: msg.groundingOutcome ?? 'answered',
+          groundingPolicyVersion: msg.groundingPolicyVersion ?? 'v1',
+        };
         return;
       }
     }

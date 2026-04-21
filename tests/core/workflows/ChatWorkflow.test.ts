@@ -4,6 +4,7 @@ import type { ChatMessage } from '@src/core/domain/types.js';
 import type { ChatCompletionOptions, IChatPort } from '@src/core/ports/IChatPort.js';
 import type { IEmbeddingPort } from '@src/core/ports/IEmbeddingPort.js';
 import { type ChatWorkflowResult, runChatStream } from '@src/core/workflows/ChatWorkflow.js';
+import { chatWorkflowDeps } from '../../integration/chatWorkflowDeps.js';
 import { SearchTestStore } from './searchTestStore.js';
 
 class SpyEmbedder implements IEmbeddingPort {
@@ -73,7 +74,7 @@ describe('ChatWorkflow', () => {
       { role: 'assistant', content: 'mid' },
       { role: 'user', content: '  Q2  ' },
     ];
-    const gen = runChatStream({ store, embedder, chat }, messages, {
+    const gen = runChatStream(chatWorkflowDeps(store, embedder, chat), messages, {
       search: DEFAULT_SEARCH_ASSEMBLY,
     });
     await drainChatStream(gen);
@@ -85,7 +86,7 @@ describe('ChatWorkflow', () => {
     const embedder = new SpyEmbedder();
     const chat = new RecordingChatPort();
     const gen = runChatStream(
-      { store, embedder, chat },
+      chatWorkflowDeps(store, embedder, chat),
       [{ role: 'assistant', content: 'only assistant' }],
       { search: DEFAULT_SEARCH_ASSEMBLY },
     );
@@ -97,20 +98,22 @@ describe('ChatWorkflow', () => {
     const embedder = new SpyEmbedder();
     const chat = new RecordingChatPort();
     const messages: ChatMessage[] = [{ role: 'user', content: 'q' }];
-    const gen = runChatStream({ store, embedder, chat }, messages, {
+    const gen = runChatStream(chatWorkflowDeps(store, embedder, chat), messages, {
       search: DEFAULT_SEARCH_ASSEMBLY,
     });
     await drainChatStream(gen);
-    expect(chat.lastCall?.messages).toEqual(messages);
-    expect(chat.lastCall?.context.length).toBeGreaterThan(0);
-    expect(chat.lastCall?.context).toContain('**Matched content:**');
+    expect(chat.lastCall?.context).toBe('');
+    expect(chat.lastCall?.messages[0]?.role).toBe('system');
+    expect(chat.lastCall?.messages[0]?.content).toContain('[grounding_policy_version=v1]');
+    const vaultCtx = chat.lastCall?.messages.find((m) => m.content.includes('**Matched content:**'));
+    expect(vaultCtx?.role).toBe('system');
   });
 
   it('B2_streams_deltas', async () => {
     const store = new SearchTestStore();
     const embedder = new SpyEmbedder();
     const chat = new RecordingChatPort();
-    const gen = runChatStream({ store, embedder, chat }, [{ role: 'user', content: 'q' }], {
+    const gen = runChatStream(chatWorkflowDeps(store, embedder, chat), [{ role: 'user', content: 'q' }], {
       search: DEFAULT_SEARCH_ASSEMBLY,
     });
     const { deltas } = await drainChatStream(gen);
@@ -121,13 +124,14 @@ describe('ChatWorkflow', () => {
     const store = new SearchTestStore();
     const embedder = new SpyEmbedder();
     const chat = new NeverYieldChat();
-    const gen = runChatStream({ store, embedder, chat }, [{ role: 'user', content: 'q' }], {
+    const gen = runChatStream(chatWorkflowDeps(store, embedder, chat), [{ role: 'user', content: 'q' }], {
       search: DEFAULT_SEARCH_ASSEMBLY,
       completion: { timeoutMs: 150 },
     });
     const { deltas, result } = await drainChatStream(gen);
     expect(deltas).toEqual([]);
     expect(result.sources).toHaveLength(1);
+    expect(result.groundingOutcome).toBe('answered');
   });
 
   it('C1_abort_stops_deltas', async () => {
@@ -135,7 +139,7 @@ describe('ChatWorkflow', () => {
     const embedder = new SpyEmbedder();
     const ac = new AbortController();
     const chat = new StallAfterFirstChat();
-    const gen = runChatStream({ store, embedder, chat }, [{ role: 'user', content: 'q' }], {
+    const gen = runChatStream(chatWorkflowDeps(store, embedder, chat), [{ role: 'user', content: 'q' }], {
       search: DEFAULT_SEARCH_ASSEMBLY,
       completion: { signal: ac.signal },
     });
@@ -147,6 +151,7 @@ describe('ChatWorkflow', () => {
     expect(second.done).toBe(true);
     if (second.done) {
       expect(second.value.sources).toHaveLength(1);
+      expect(second.value.groundingOutcome).toBe('answered');
     }
   });
 
@@ -154,11 +159,12 @@ describe('ChatWorkflow', () => {
     const store = new SearchTestStore();
     const embedder = new SpyEmbedder();
     const chat = new RecordingChatPort();
-    const gen = runChatStream({ store, embedder, chat }, [{ role: 'user', content: 'q' }], {
+    const gen = runChatStream(chatWorkflowDeps(store, embedder, chat), [{ role: 'user', content: 'q' }], {
       search: DEFAULT_SEARCH_ASSEMBLY,
     });
     const { result } = await drainChatStream(gen);
     expect(result.sources).toHaveLength(1);
+    expect(result.groundingOutcome).toBe('answered');
     expect(result.sources[0]).toMatchObject({
       notePath: 'proj/plan.md',
       nodeId: 'leaf',

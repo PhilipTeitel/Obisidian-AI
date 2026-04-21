@@ -1,5 +1,11 @@
 import { DEFAULT_SEARCH_ASSEMBLY, validateSearchAssemblyOptions } from '../domain/contextAssembly.js';
-import type { ChatMessage, SearchAssemblyOptions, Source } from '../domain/types.js';
+import type {
+  ChatMessage,
+  GroundingContext,
+  GroundingOutcome,
+  SearchAssemblyOptions,
+  Source,
+} from '../domain/types.js';
 import type { ChatCompletionOptions, IChatPort } from '../ports/IChatPort.js';
 import type { SearchWorkflowDeps } from './SearchWorkflow.js';
 import { withChatCompletionControls } from './chatStreamGuard.js';
@@ -10,6 +16,8 @@ import { DEFAULT_SEARCH_K, runSearch } from './SearchWorkflow.js';
  */
 export interface ChatWorkflowDeps extends SearchWorkflowDeps {
   chat: IChatPort;
+  /** Injected from sidecar so core stays free of `src/sidecar` imports (CHAT-3 Y6). */
+  buildGroundedMessages: (messages: ChatMessage[], grounding: GroundingContext) => ChatMessage[];
 }
 
 export interface ChatWorkflowOptions {
@@ -23,11 +31,23 @@ export interface ChatWorkflowOptions {
   enableHybridSearch?: boolean;
   /** ADR-009: passed through to chat streaming guard + `IChatPort.complete`. */
   completion?: ChatCompletionOptions;
+  /** CHAT-3 / ADR-011 reserved slots (settings UI CHAT-4). */
+  systemPrompt?: string;
+  vaultOrganizationPrompt?: string;
 }
 
 export interface ChatWorkflowResult {
   sources: Source[];
+  groundingOutcome: GroundingOutcome;
+  /** Must match `GROUNDING_POLICY_VERSION` in sidecar `chatProviderMessages.ts`. */
+  groundingPolicyVersion: string;
 }
+
+/** Product-owned copy for zero-hit path (CHAT-3 B4); not model-generated. */
+export const INSUFFICIENT_EVIDENCE_STREAM_MESSAGE =
+  "I couldn't find notes in your vault that answer this. Try narrowing your search with a folder path, a tag, or a date range — then ask again.";
+
+const GROUNDING_POLICY_WIRE_VERSION = 'v1';
 
 function lastUserContent(messages: ChatMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -71,10 +91,23 @@ export async function* runChatStream(
     searchAssembly,
   );
 
-  const context =
-    searchRes.results.length > 0 ? searchRes.results.map((r) => r.snippet).join('\n\n---\n\n') : '';
+  if (searchRes.results.length === 0) {
+    yield INSUFFICIENT_EVIDENCE_STREAM_MESSAGE;
+    return {
+      sources: [],
+      groundingOutcome: 'insufficient_evidence',
+      groundingPolicyVersion: GROUNDING_POLICY_WIRE_VERSION,
+    };
+  }
 
-  const stream = deps.chat.complete(messages, context, options.apiKey, options.completion);
+  const context = searchRes.results.map((r) => r.snippet).join('\n\n---\n\n');
+  const assembled = deps.buildGroundedMessages(messages, {
+    retrievalContext: context,
+    systemPrompt: options.systemPrompt,
+    vaultOrganizationPrompt: options.vaultOrganizationPrompt,
+  });
+
+  const stream = deps.chat.complete(assembled, '', options.apiKey, options.completion);
   for await (const delta of withChatCompletionControls(stream, options.completion)) {
     yield delta;
   }
@@ -84,5 +117,9 @@ export async function* runChatStream(
     nodeId: r.nodeId,
   }));
 
-  return { sources };
+  return {
+    sources,
+    groundingOutcome: 'answered',
+    groundingPolicyVersion: GROUNDING_POLICY_WIRE_VERSION,
+  };
 }

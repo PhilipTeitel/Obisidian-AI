@@ -1,5 +1,5 @@
 import { ItemView, WorkspaceLeaf } from 'obsidian';
-import type { ChatMessage, Source } from '../../core/domain/types.js';
+import type { ChatMessage, GroundingOutcome, Source } from '../../core/domain/types.js';
 import { compilePathGlobs } from '../../core/domain/pathGlob.js';
 import { parseChatInput } from '../../core/domain/chatInputParser.js';
 import { buildSearchAssemblyFromSettings } from '../settings/buildSearchAssembly.js';
@@ -8,8 +8,10 @@ import type ObsidianAIPlugin from '../main.js';
 import { showAiNotice } from './showAiNotice.js';
 import { VIEW_TYPE_CHAT } from './viewIds.js';
 
+type ChatTurn = ChatMessage & { groundingOutcome?: GroundingOutcome };
+
 export class ChatView extends ItemView {
-  private messages: ChatMessage[] = [];
+  private messages: ChatTurn[] = [];
   private listEl!: HTMLDivElement;
   private inputEl!: HTMLTextAreaElement;
   private abort: AbortController | null = null;
@@ -85,7 +87,10 @@ export class ChatView extends ItemView {
   private renderMessages(extraAssistant?: string): void {
     this.listEl.empty();
     for (const m of this.messages) {
-      const row = this.listEl.createDiv({ cls: `obsidian-ai-chat-msg obsidian-ai-chat-${m.role}` });
+      const isInsufficient =
+        m.role === 'assistant' && m.groundingOutcome === 'insufficient_evidence';
+      const cls = `obsidian-ai-chat-msg obsidian-ai-chat-${m.role}${isInsufficient ? ' insufficient-evidence' : ''}`;
+      const row = this.listEl.createDiv({ cls });
       row.createEl('strong', { text: `${m.role}: ` });
       row.createSpan({ text: m.content });
     }
@@ -96,12 +101,17 @@ export class ChatView extends ItemView {
     }
   }
 
-  private renderSources(sources: Source[]): void {
+  private renderSources(sources: Source[], groundingOutcome: GroundingOutcome): void {
+    if (groundingOutcome === 'insufficient_evidence' && sources.length === 0) {
+      return;
+    }
     if (sources.length === 0) return;
-    const wrap = this.listEl.createDiv({ cls: 'obsidian-ai-chat-sources' });
+    const wrap = this.listEl.createDiv({
+      cls: 'obsidian-ai-chat-sources obsidian-ai-chat-sources-footer sources-footer',
+    });
     wrap.createEl('div', { text: 'Sources:', cls: 'obsidian-ai-chat-sources-title' });
     for (const s of sources) {
-      const line = wrap.createDiv();
+      const line = wrap.createDiv({ cls: 'source-pill' });
       const a = line.createEl('a', { text: s.notePath });
       a.addEventListener('click', (ev) => {
         ev.preventDefault();
@@ -165,9 +175,13 @@ export class ChatView extends ItemView {
           assistantAcc += chunk.delta;
           this.renderMessages(assistantAcc);
         } else if (chunk.type === 'done') {
-          this.messages.push({ role: 'assistant', content: assistantAcc });
+          this.messages.push({
+            role: 'assistant',
+            content: assistantAcc,
+            groundingOutcome: chunk.groundingOutcome,
+          });
           this.renderMessages();
-          this.renderSources(chunk.sources);
+          this.renderSources(chunk.sources, chunk.groundingOutcome);
         }
       }
     } catch (e) {

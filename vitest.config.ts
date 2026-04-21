@@ -8,10 +8,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@src': path.join(root, 'src'),
+      obsidian: path.join(root, 'tests/shims/obsidian.ts'),
     },
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts', 'tests/contract/document-store.contract.ts'],
+    include: [
+      'tests/**/*.test.ts',
+      'tests/contract/document-store.contract.ts',
+      'tests/contract/IChatPort.contract.ts',
+    ],
   },
 });

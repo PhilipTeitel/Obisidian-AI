@@ -5,6 +5,7 @@ import type { IEmbeddingPort } from '@src/core/ports/IEmbeddingPort.js';
 import type { IChatPort } from '@src/core/ports/IChatPort.js';
 import { type ChatWorkflowResult, runChatStream } from '@src/core/workflows/ChatWorkflow.js';
 import { runSearch } from '@src/core/workflows/SearchWorkflow.js';
+import { chatWorkflowDeps } from '../../integration/chatWorkflowDeps.js';
 import { SearchTestStore } from './searchTestStore.js';
 
 function fakeEmbed(): IEmbeddingPort {
@@ -88,20 +89,21 @@ describe('SearchWorkflow filters (RET-6)', () => {
       },
     );
     expect(res.results).toEqual([]);
-    let context = 'unset';
+    let completeCalls = 0;
     const chat: IChatPort = {
-      async *complete(_m, ctx: string) {
-        context = ctx;
+      async *complete() {
+        completeCalls += 1;
         yield '';
       },
     };
-    await drainChatStream(
+    const wfResult = await drainChatStream(
       runChatStream(
-        { store, embedder, chat },
+        chatWorkflowDeps(store, embedder, chat),
         [{ role: 'user', content: 'nothing' }] as ChatMessage[],
         { pathGlobs: ['Daily/**/*.md'] },
       ),
     );
-    expect(context).toBe('');
+    expect(completeCalls).toBe(0);
+    expect(wfResult.groundingOutcome).toBe('insufficient_evidence');
   });
 });

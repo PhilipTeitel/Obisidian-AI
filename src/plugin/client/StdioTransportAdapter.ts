@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { Writable } from 'node:stream';
 import * as readline from 'node:readline';
-import type { ChatStreamChunk, SidecarRequest, SidecarResponse } from '../../core/domain/types.js';
+import type {
+  ChatStreamChunk,
+  GroundingOutcome,
+  SidecarRequest,
+  SidecarResponse,
+} from '../../core/domain/types.js';
 import type { ISidecarTransport } from '../../core/ports/ISidecarTransport.js';
 
 type Pending = {
@@ -123,7 +128,13 @@ export class StdioTransportAdapter implements ISidecarTransport {
         }
         if (msg.id === id && msg.type === 'chat' && msg.done === true) {
           type Source = import('../../core/domain/types.js').Source;
-          yield { type: 'done', sources: (msg.sources as Source[]) ?? [] };
+          yield {
+            type: 'done',
+            sources: (msg.sources as Source[]) ?? [],
+            groundingOutcome: (msg.groundingOutcome as GroundingOutcome) ?? 'answered',
+            groundingPolicyVersion:
+              typeof msg.groundingPolicyVersion === 'string' ? msg.groundingPolicyVersion : 'v1',
+          };
           return;
         }
       }

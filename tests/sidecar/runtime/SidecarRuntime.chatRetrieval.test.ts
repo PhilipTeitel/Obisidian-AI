@@ -41,7 +41,7 @@ describe('SidecarRuntime chat retrieval (RET-4)', () => {
       optionsPassed = opts;
       return (async function* () {
         yield '';
-        return { sources: [] };
+        return { sources: [], groundingOutcome: 'answered', groundingPolicyVersion: 'v1' };
       })();
     });
     const runtime = new SidecarRuntime({ log, progress });
@@ -65,7 +65,7 @@ describe('SidecarRuntime chat retrieval (RET-4)', () => {
       chatOpts = opts;
       return (async function* () {
         yield '';
-        return { sources: [] };
+        return { sources: [], groundingOutcome: 'answered', groundingPolicyVersion: 'v1' };
       })();
     });
     const runtime = new SidecarRuntime({ log, progress });
@@ -89,7 +89,7 @@ describe('SidecarRuntime chat retrieval (RET-4)', () => {
       optionsPassed = opts;
       return (async function* () {
         yield '';
-        return { sources: [] };
+        return { sources: [], groundingOutcome: 'answered', groundingPolicyVersion: 'v1' };
       })();
     });
     const runtime = new SidecarRuntime({ log, progress });
@@ -109,7 +109,7 @@ describe('SidecarRuntime chat retrieval (RET-4)', () => {
       optionsPassed = opts;
       return (async function* () {
         yield '';
-        return { sources: [] };
+        return { sources: [], groundingOutcome: 'answered', groundingPolicyVersion: 'v1' };
       })();
     });
     const runtime = new SidecarRuntime({ log, progress });
@@ -130,7 +130,7 @@ describe('SidecarRuntime chat retrieval (RET-4)', () => {
       coarseKs.push(opts.coarseK ?? -1);
       return (async function* () {
         yield '';
-        return { sources: [] };
+        return { sources: [], groundingOutcome: 'answered', groundingPolicyVersion: 'v1' };
       })();
     });
     const runtime = new SidecarRuntime({ log, progress });

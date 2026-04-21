@@ -12,6 +12,7 @@ import { processOneJob } from '../../core/workflows/IndexWorkflow.js';
 import { runChatStream, type ChatWorkflowResult } from '../../core/workflows/ChatWorkflow.js';
 import { runSearch } from '../../core/workflows/SearchWorkflow.js';
 import { openDatabase } from '../db/open.js';
+import { buildGroundedMessages, GROUNDING_POLICY_VERSION } from '../adapters/chatProviderMessages.js';
 import { createChatPort } from '../adapters/createChatPort.js';
 import { createEmbeddingPort } from '../adapters/createEmbeddingPort.js';
 import { InProcessQueue } from '../adapters/InProcessQueue.js';
@@ -142,7 +143,7 @@ export class SidecarRuntime {
       baseUrl: process.env.OBSIDIAN_AI_CHAT_BASE_URL ?? 'https://api.openai.com/v1',
       model: process.env.OBSIDIAN_AI_CHAT_MODEL ?? 'gpt-4o-mini',
     });
-    return { ...search, chat };
+    return { ...search, chat, buildGroundedMessages };
   }
 
   async drainIndexQueue(apiKey?: string): Promise<void> {
@@ -312,6 +313,8 @@ export class SidecarRuntime {
       'sidecar.chat.filters',
     );
     const deps = this.getChatWorkflowDeps();
+    const policyVer = payload.groundingPolicyVersion ?? GROUNDING_POLICY_VERSION;
+    this.log.debug({ groundingPolicyVersion: policyVer }, 'sidecar.chat.request');
     const stream = runChatStream(deps, payload.messages, {
       search: payload.search,
       apiKey: payload.apiKey,
@@ -321,6 +324,8 @@ export class SidecarRuntime {
       pathGlobs: payload.pathGlobs,
       dateRange: payload.dateRange,
       tags: undefined,
+      systemPrompt: payload.systemPrompt,
+      vaultOrganizationPrompt: payload.vaultOrganizationPrompt,
       completion: {
         signal: options?.signal,
         timeoutMs: payload.timeoutMs,
@@ -330,7 +335,14 @@ export class SidecarRuntime {
     while (!(out = await stream.next()).done) {
       yield { type: 'delta', delta: out.value };
     }
-    this.log.info({ op: 'chat', ms: Date.now() - t0 }, 'sidecar.chat.done');
+    this.log.info(
+      {
+        op: 'chat',
+        ms: Date.now() - t0,
+        groundingPolicyVersion: out.value.groundingPolicyVersion,
+      },
+      'sidecar.chat.done',
+    );
     return out.value;
   }
 }

@@ -285,9 +285,27 @@ export interface Source {
   nodeId?: string;
 }
 
+/** Terminal chat outcome (ADR-011 / CHAT-3). */
+export type GroundingOutcome = 'answered' | 'insufficient_evidence';
+
+/** Inputs for vault-only message assembly; policy text lives in sidecar (CHAT-3 Y4). */
+export interface GroundingContext {
+  /** Reserved: chat system / persona (settings UI in CHAT-4). */
+  systemPrompt?: string;
+  /** Reserved: vault organization hints (CHAT-4). */
+  vaultOrganizationPrompt?: string;
+  /** Assembled retrieval text; may be empty (insufficient-evidence path skips the model). */
+  retrievalContext: string;
+}
+
 export type ChatStreamChunk =
   | { type: 'delta'; delta: string }
-  | { type: 'done'; sources: Source[] };
+  | {
+      type: 'done';
+      sources: Source[];
+      groundingOutcome: GroundingOutcome;
+      groundingPolicyVersion: string;
+    };
 
 export interface HealthResponse {
   status: 'ok';
@@ -323,6 +341,11 @@ export type SidecarRequest =
         enableHybridSearch?: boolean;
         pathGlobs?: string[];
         dateRange?: { start?: string; end?: string };
+        /** CHAT-3 / ADR-011: optional persona slot; ordering enforced in `buildGroundedMessages`. */
+        systemPrompt?: string;
+        vaultOrganizationPrompt?: string;
+        /** Logged sidecar-side; optional on wire (CHAT-4 may set). */
+        groundingPolicyVersion?: string;
       };
     }
   | { type: 'chat/clear'; payload?: Record<string, never> }

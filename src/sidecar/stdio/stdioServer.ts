@@ -74,6 +74,8 @@ export async function dispatchStdioLine(
         type: 'chat',
         done: true,
         sources: step.value.sources,
+        groundingOutcome: step.value.groundingOutcome,
+        groundingPolicyVersion: step.value.groundingPolicyVersion,
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

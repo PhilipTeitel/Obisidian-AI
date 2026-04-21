@@ -5,6 +5,7 @@ import type { IChatPort } from '@src/core/ports/IChatPort.js';
 import type { IEmbeddingPort } from '@src/core/ports/IEmbeddingPort.js';
 import { type ChatWorkflowResult, runChatStream } from '@src/core/workflows/ChatWorkflow.js';
 import { runSearch } from '@src/core/workflows/SearchWorkflow.js';
+import { chatWorkflowDeps } from '../../integration/chatWorkflowDeps.js';
 import { SearchTestStore } from './searchTestStore.js';
 
 class StubChat implements IChatPort {
@@ -46,7 +47,7 @@ describe('ChatWorkflow RET-4 parity', () => {
     const store2 = new SearchTestStore();
     await drainChatStream(
       runChatStream(
-        { store: store2, embedder: embed(), chat: new StubChat() },
+        chatWorkflowDeps(store2, embed(), new StubChat()),
         [{ role: 'user', content: 'q' }] as ChatMessage[],
         { search: DEFAULT_SEARCH_ASSEMBLY, coarseK: 40, k: 10 },
       ),
@@ -59,20 +60,22 @@ describe('ChatWorkflow RET-4 parity', () => {
     const store = new SearchTestStore();
     store.summaryHits = [];
     store.contentHits = [];
-    let context = 'unset';
+    let completeCalls = 0;
     const chatSpy: IChatPort = {
-      async *complete(_m, ctx: string) {
-        context = ctx;
+      async *complete() {
+        completeCalls += 1;
         yield '';
       },
     };
-    await drainChatStream(
+    const result = await drainChatStream(
       runChatStream(
-        { store, embedder: embed(), chat: chatSpy },
+        chatWorkflowDeps(store, embed(), chatSpy),
         [{ role: 'user', content: 'q' }],
         { search: DEFAULT_SEARCH_ASSEMBLY },
       ),
     );
-    expect(context).toBe('');
+    expect(completeCalls).toBe(0);
+    expect(result.groundingOutcome).toBe('insufficient_evidence');
+    expect(result.sources).toEqual([]);
   });
 });

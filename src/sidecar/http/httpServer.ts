@@ -156,7 +156,15 @@ async function handleHttp(
         res.write(`${JSON.stringify({ type: 'chat', chunk: step.value })}\n`);
         step = await gen.next();
       }
-      res.write(`${JSON.stringify({ type: 'chat', done: true, sources: step.value.sources })}\n`);
+      res.write(
+        `${JSON.stringify({
+          type: 'chat',
+          done: true,
+          sources: step.value.sources,
+          groundingOutcome: step.value.groundingOutcome,
+          groundingPolicyVersion: step.value.groundingPolicyVersion,
+        })}\n`,
+      );
       res.end();
       return;
     }

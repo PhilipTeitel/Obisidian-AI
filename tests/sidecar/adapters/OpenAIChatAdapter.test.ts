@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenAIChatAdapter } from '@src/sidecar/adapters/OpenAIChatAdapter.js';
-import { VAULT_CONTEXT_PREFIX } from '@src/sidecar/adapters/chatProviderMessages.js';
+import {
+  GROUNDING_POLICY_V1,
+  VAULT_CONTEXT_PREFIX,
+} from '@src/sidecar/adapters/chatProviderMessages.js';
 
 function sseResponse(lines: string[]): Response {
   const enc = new TextEncoder();
@@ -57,10 +60,11 @@ describe('OpenAIChatAdapter', () => {
       const body = JSON.parse(init!.body as string) as {
         messages: Array<{ role: string; content: string }>;
       };
-      expect(body.messages).toHaveLength(2);
+      expect(body.messages).toHaveLength(3);
       expect(body.messages[0].role).toBe('system');
-      expect(body.messages[0].content).toBe(`${VAULT_CONTEXT_PREFIX}V`);
-      expect(body.messages[1]).toEqual({ role: 'user', content: 'Q' });
+      expect(body.messages[0].content).toBe(GROUNDING_POLICY_V1);
+      expect(body.messages[1].content).toBe(`${VAULT_CONTEXT_PREFIX}V`);
+      expect(body.messages[2]).toEqual({ role: 'user', content: 'Q' });
       return sseResponse(['data: [DONE]\n\n']);
     });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -80,6 +84,7 @@ describe('OpenAIChatAdapter', () => {
         messages: Array<{ role: string; content: string }>;
       };
       expect(body.messages).toEqual([
+        { role: 'system', content: GROUNDING_POLICY_V1 },
         { role: 'system', content: 'S' },
         { role: 'user', content: 'body' },
       ]);

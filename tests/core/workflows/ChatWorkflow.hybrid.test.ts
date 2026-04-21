@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { IChatPort } from '@src/core/ports/IChatPort.js';
 import type { IEmbeddingPort } from '@src/core/ports/IEmbeddingPort.js';
 import { runChatStream } from '@src/core/workflows/ChatWorkflow.js';
+import { chatWorkflowDeps } from '../../integration/chatWorkflowDeps.js';
 import { SearchTestStore } from './searchTestStore.js';
 
 function fakeEmbed(): IEmbeddingPort {
@@ -22,7 +23,7 @@ describe('ChatWorkflow hybrid (RET-5)', () => {
       },
     };
     const gen = runChatStream(
-      { store, embedder, chat: noopChat },
+      chatWorkflowDeps(store, embedder, noopChat),
       [{ role: 'user', content: 'hello' }],
       { enableHybridSearch: true, coarseK: 8 },
     );

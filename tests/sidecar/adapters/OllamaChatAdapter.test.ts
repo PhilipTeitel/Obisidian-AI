@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OllamaChatAdapter } from '@src/sidecar/adapters/OllamaChatAdapter.js';
-import { VAULT_CONTEXT_PREFIX } from '@src/sidecar/adapters/chatProviderMessages.js';
+import {
+  GROUNDING_POLICY_V1,
+  VAULT_CONTEXT_PREFIX,
+} from '@src/sidecar/adapters/chatProviderMessages.js';
 
 function ndjsonResponse(lines: string[]): Response {
   const enc = new TextEncoder();
@@ -62,8 +65,9 @@ describe('OllamaChatAdapter', () => {
       // B2-style
       const msgs1 = body.messages;
       expect(msgs1[0].role).toBe('system');
-      expect(msgs1[0].content).toBe(`${VAULT_CONTEXT_PREFIX}V`);
-      expect(msgs1[1]).toEqual({ role: 'user', content: 'Q' });
+      expect(msgs1[0].content).toBe(GROUNDING_POLICY_V1);
+      expect(msgs1[1].content).toBe(`${VAULT_CONTEXT_PREFIX}V`);
+      expect(msgs1[2]).toEqual({ role: 'user', content: 'Q' });
 
       return ndjsonResponse([
         JSON.stringify({ message: { role: 'assistant', content: '' }, done: true }),
@@ -84,6 +88,7 @@ describe('OllamaChatAdapter', () => {
         messages: Array<{ role: string; content: string }>;
       };
       expect(body.messages).toEqual([
+        { role: 'system', content: GROUNDING_POLICY_V1 },
         { role: 'system', content: 'S' },
         { role: 'user', content: 'body' },
       ]);
