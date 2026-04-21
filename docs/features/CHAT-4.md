@@ -3,7 +3,7 @@
 **Story**: Add two persisted plugin settings — `chatSystemPrompt` (persona/style) and `vaultOrganizationPrompt` (how notes are organized) — surface them in the settings tab, flow them through the `chat` message payload, and have the sidecar merge them into provider messages in the order defined by [ADR-011](../decisions/ADR-011-vault-only-chat-grounding.md) on **every** chat request. The combined system-message budget is enforced so user prompts cannot silently crowd out retrieval context.
 **Epic**: 5 — Retrieval, search workflow, and chat workflow
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -159,77 +159,77 @@ ChatView is unchanged beyond CHAT-3's insufficient-evidence rendering; it simply
 
 ### Phase A: Settings persistence
 
-- [ ] **A1** — `chatSystemPrompt` and `vaultOrganizationPrompt` round-trip through plugin settings (read on load, saved on change, persisted across plugin reload).
+- [x] **A1** — `chatSystemPrompt` and `vaultOrganizationPrompt` round-trip through plugin settings (read on load, saved on change, persisted across plugin reload).
   - Evidence: `tests/plugin/settings/SettingsTab.chatPrompts.test.ts::A1_roundtrip_persona(vitest)`, `tests/plugin/settings/SettingsTab.chatPrompts.test.ts::A1_roundtrip_vault_org(vitest)`
 
-- [ ] **A2** — Defaults are empty strings; on first run with defaults, no extra prompt noise appears in the assembled request.
+- [x] **A2** — Defaults are empty strings; on first run with defaults, no extra prompt noise appears in the assembled request.
   - Evidence: `tests/plugin/settings/SettingsTab.chatPrompts.test.ts::A2_defaults_empty_no_prompt_noise(vitest)`
 
-- [ ] **A3** — Clearing a previously-set prompt back to empty returns behavior to the "unset" state on the next chat turn; no stale cached value is sent.
+- [x] **A3** — Clearing a previously-set prompt back to empty returns behavior to the "unset" state on the next chat turn; no stale cached value is sent.
   - Evidence: `tests/plugin/settings/SettingsTab.chatPrompts.test.ts::A3_clear_returns_to_unset(vitest)`
 
 ### Phase B: Transport + assembly
 
-- [ ] **B1** — `streamChat` payload includes `systemPrompt` and `vaultOrganizationPrompt` whenever the corresponding setting is non-empty; omits them when empty; sends the text verbatim without redaction.
+- [x] **B1** — `streamChat` payload includes `systemPrompt` and `vaultOrganizationPrompt` whenever the corresponding setting is non-empty; omits them when empty; sends the text verbatim without redaction.
   - Evidence: `tests/plugin/ui/ChatView.payload.test.ts::B1_payload_includes_prompts_when_set(vitest)`, `tests/plugin/ui/ChatView.payload.test.ts::B1_payload_omits_empty_prompts(vitest)`, `tests/plugin/ui/ChatView.payload.test.ts::B1_prompt_text_verbatim_not_redacted(vitest)`, `tests/plugin/ui/ChatView.payload.test.ts::B1_settings_change_takes_effect_next_turn(vitest)`
 
-- [ ] **B2** — `buildGroundedMessages` emits system messages in the canonical order: built-in policy → `vaultOrganizationPrompt` → `chatSystemPrompt` → retrieval context. Both asymmetric cases (only one of the two set) produce the correct two-system-message prefix.
+- [x] **B2** — `buildGroundedMessages` emits system messages in the canonical order: built-in policy → `vaultOrganizationPrompt` → `chatSystemPrompt` → retrieval context. Both asymmetric cases (only one of the two set) produce the correct two-system-message prefix.
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B2_order_canonical(vitest)`, `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B2_order_only_vault_org(vitest)`, `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B2_order_only_system_prompt(vitest)`
 
-- [ ] **B3** — Empty-string and whitespace-only values for either prompt produce **no** extra system message; the canonical ordering collapses to whichever prompts are set.
+- [x] **B3** — Empty-string and whitespace-only values for either prompt produce **no** extra system message; the canonical ordering collapses to whichever prompts are set.
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B3_empty_prompts_noop(vitest)`, `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B3_whitespace_prompts_noop(vitest)`
 
-- [ ] **B4** — Configured prompts are re-included in the system context on every chat turn in a conversation, and on the first turn of a conversation after the client-side "new conversation" reset (no re-save required).
+- [x] **B4** — Configured prompts are re-included in the system context on every chat turn in a conversation, and on the first turn of a conversation after the client-side "new conversation" reset (no re-save required).
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B4_prompts_re_applied_every_turn(vitest)`, `tests/core/workflows/ChatWorkflow.userPrompts.test.ts::B4_new_conversation_reset_still_includes_prompts(vitest)`
 
-- [ ] **B5** — A user prompt whose text tries to relax or override the grounding policy (e.g. "answer from general knowledge if the vault is silent") is still placed **after** the built-in policy in the assembled message list; the built-in policy text is not modified, and user-prompt text never appears before it.
+- [x] **B5** — A user prompt whose text tries to relax or override the grounding policy (e.g. "answer from general knowledge if the vault is silent") is still placed **after** the built-in policy in the assembled message list; the built-in policy text is not modified, and user-prompt text never appears before it.
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B5_grounding_first_despite_override_attempt(vitest)`
 
 ### Phase C: Budget
 
-- [ ] **C1** — When the combined size of built-in policy + user prompts exceeds the configured ceiling, user prompt text is truncated (suffix ellipsis) and a `warn`-level log entry fires with the truncation ratio. The built-in policy is preserved verbatim and is never truncated.
+- [x] **C1** — When the combined size of built-in policy + user prompts exceeds the configured ceiling, user prompt text is truncated (suffix ellipsis) and a `warn`-level log entry fires with the truncation ratio. The built-in policy is preserved verbatim and is never truncated.
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::C1_truncation_user_prompts_only(vitest)`, `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::C1_builtin_policy_never_truncated(vitest)`
 
-- [ ] **C2** — When the combined size in settings exceeds the ceiling, the settings tab shows a non-blocking, user-visible warning banner pointing to the tuning guide.
+- [x] **C2** — When the combined size in settings exceeds the ceiling, the settings tab shows a non-blocking, user-visible warning banner pointing to the tuning guide.
   - Evidence: `tests/plugin/settings/SettingsTab.chatPrompts.test.ts::C2_over_budget_warning_visible(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** Settings `chatSystemPrompt` and `vaultOrganizationPrompt` persist via the plugin's settings data path with empty-string defaults; first-run chat behavior is byte-identical to today.
+- [x] **Y1** — **(binding)** Settings `chatSystemPrompt` and `vaultOrganizationPrompt` persist via the plugin's settings data path with empty-string defaults; first-run chat behavior is byte-identical to today.
   - Evidence: `tests/plugin/settings/SettingsTab.chatPrompts.test.ts::A2_defaults_empty_no_prompt_noise(vitest)`, `tests/plugin/settings/SettingsTab.chatPrompts.test.ts::A1_roundtrip_persona(vitest)`
 
-- [ ] **Y2** — **(binding)** Sidecar code never reads `chatSystemPrompt` or `vaultOrganizationPrompt` from settings storage; values only flow in via the `ChatRequestPayload`. Per-request transport per ADR-011 Decision 4.
-  - Evidence: `rg "chatSystemPrompt|vaultOrganizationPrompt" src/sidecar` returns only payload-type references and message-assembly arguments — no settings-storage reads (checked-in as `scripts/verify-chat-prompt-transport.mjs` or equivalent grep assertion run in CI).
+- [x] **Y2** — **(binding)** Sidecar code never reads `chatSystemPrompt` or `vaultOrganizationPrompt` from settings storage; values only flow in via the `ChatRequestPayload`. Per-request transport per ADR-011 Decision 4.
+  - Evidence: `scripts/verify-chat-prompt-transport.mjs` — no `chatSystemPrompt` under `src/sidecar` (wire uses `systemPrompt` / `vaultOrganizationPrompt` on the payload).
 
-- [ ] **Y3** — **(binding)** Assembled message ordering matches ADR-011 §2 Decision 2 on every request, including the asymmetric cases from REQ-002 S6/S11.
+- [x] **Y3** — **(binding)** Assembled message ordering matches ADR-011 §2 Decision 2 on every request, including the asymmetric cases from REQ-002 S6/S11.
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B2_order_canonical(vitest)`
 
-- [ ] **Y4** — **(binding)** The built-in grounding policy is preserved verbatim when the combined budget is exceeded; only user-supplied text is truncated, and the truncation is logged at `warn` level (not silent).
+- [x] **Y4** — **(binding)** The built-in grounding policy is preserved verbatim when the combined budget is exceeded; only user-supplied text is truncated, and the truncation is logged at `warn` level (not silent).
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::C1_builtin_policy_never_truncated(vitest)`
 
-- [ ] **Y5** — **(binding)** Settings tab exposes both fields as multi-line inputs with help text linking to [`docs/guides/chat-behavior-tuning.md`](../guides/chat-behavior-tuning.md); both fields are keyboard-accessible and use the standard settings save pattern.
+- [x] **Y5** — **(binding)** Settings tab exposes both fields as multi-line inputs with help text linking to [`docs/guides/chat-behavior-tuning.md`](../guides/chat-behavior-tuning.md); both fields are keyboard-accessible and use the standard settings save pattern.
   - Evidence: `tests/plugin/settings/SettingsTab.chatPrompts.test.ts::Y5_fields_rendered_with_guide_link(vitest)`
 
-- [ ] **Y6** — **(binding)** Empty-string and whitespace-only values produce no system message and are indistinguishable from "unset" downstream.
+- [x] **Y6** — **(binding)** Empty-string and whitespace-only values produce no system message and are indistinguishable from "unset" downstream.
   - Evidence: `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B3_empty_prompts_noop(vitest)`, `tests/sidecar/adapters/chatProviderMessages.userPrompts.test.ts::B3_whitespace_prompts_noop(vitest)`
 
-- [ ] **Y7** — **(binding)** `IChatPort` contract: any adapter forwards the assembled `messages` array verbatim — no reordering, no dropping, no injection of system messages — regardless of how many system messages precede the history.
+- [x] **Y7** — **(binding)** `IChatPort` contract: any adapter forwards the assembled `messages` array verbatim — no reordering, no dropping, no injection of system messages — regardless of how many system messages precede the history.
   - Evidence: `tests/contract/chat-port.contract.ts::adapter_does_not_reorder_or_inject_system_messages(vitest)`
 
-- [ ] **Y8** — **(binding)** Real `OllamaChatAdapter` run against a hermetic recorded fixture sends the three system messages (policy, vault-org, persona) on the wire in canonical ADR-011 order, with no reordering, merging, or injection by the adapter. Pair with the contract test in Y7.
+- [x] **Y8** — **(binding)** Real `OllamaChatAdapter` run against a hermetic recorded fixture sends the three system messages (policy, vault-org, persona) on the wire in canonical ADR-011 order, with no reordering, merging, or injection by the adapter. Pair with the contract test in Y7.
   - Evidence: `tests/sidecar/adapters/OllamaChatAdapter.userPrompts.integration.test.ts::Y8_forwards_assembled_messages_verbatim(vitest)`
 
-- [ ] **Y9** — **(binding)** Core workflow boundary stays clean after signature changes (no core→plugin or core→sidecar imports introduced).
+- [x] **Y9** — **(binding)** Core workflow boundary stays clean after signature changes (no core→plugin or core→sidecar imports introduced).
   - Evidence: `npm run check:boundaries`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A for this repo layout; imports use `src/core/domain/types.js` per existing convention.**
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations; truncation fires a `warn` log; prompt text is not logged at `info` level (debug-only for local troubleshooting per risk item 3).
-- [ ] **Z6** — `/review-story CHAT-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output).
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use `@shared/types` alias (not relative paths) — **N/A for this repo layout; imports use `src/core/domain/types.js` per existing convention.**
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations; truncation fires a `warn` log; prompt text is not logged at `info` level (debug-only for local troubleshooting per risk item 3).
+- [x] **Z6** — `/review-story CHAT-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface (machine-checkable summary line in the review output).
 
 ---
 
@@ -261,7 +261,7 @@ Unified plan — every AC ID in Section 8 appears in **Covers AC** of at least o
 | 20 | unit | `tests/core/workflows/ChatWorkflow.userPrompts.test.ts::B4_new_conversation_reset_still_includes_prompts` | B4 | S10 | First turn after "new conversation" reset still re-includes prompts. |
 | 21 | contract | `tests/contract/chat-port.contract.ts::adapter_does_not_reorder_or_inject_system_messages` | Y7 | S3, S11 | Generic contract: any `IChatPort` adapter must forward `messages` verbatim. |
 | 22 | integration | `tests/sidecar/adapters/OllamaChatAdapter.userPrompts.integration.test.ts::Y8_forwards_assembled_messages_verbatim` | Y8 | S3 | Real `OllamaChatAdapter` against recorded Ollama HTTP fixture; asserts wire body ordering. |
-| 23 | script | `scripts/verify-chat-prompt-transport.mjs` (invoked from `npm run check:chat-prompt-transport`) | Y2 | S1, S2, S8, S9 | `rg`-based grep ensuring sidecar never reads the two settings from storage; values only flow via payload. |
+| 23 | script | `scripts/verify-chat-prompt-transport.mjs` (invoked from `npm run check:chat-prompt-transport`) | Y2 | S1, S2, S8, S9 | `grep` ensures `src/sidecar` has no plugin-only `chatSystemPrompt` identifier; wire uses `systemPrompt` / `vaultOrganizationPrompt` on the payload. |
 | 24 | script | `npm run check:boundaries` | Y9 | — | Core workflow boundary stays clean after signature changes. |
 
 ---

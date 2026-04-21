@@ -23,6 +23,10 @@ export interface ObsidianAISettings {
   searchResultCount: number;
   /** Phase-1 summary ANN limit (RET-4); persisted integer in [1, 256]. */
   chatCoarseK: number;
+  /** Persona / tone for vault-only chat; empty = unset (CHAT-4). */
+  chatSystemPrompt: string;
+  /** Folder conventions, tags, daily-note patterns for retrieval intent (CHAT-4). */
+  vaultOrganizationPrompt: string;
   /** Hybrid BM25 + vector coarse fusion (RET-5 / ADR-012); default on. */
   enableHybridSearch: boolean;
   /** Globs for daily-note paths; used when indexing to populate `note_meta.note_date` (RET-6). */

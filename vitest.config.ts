@@ -17,6 +17,7 @@ export default defineConfig({
       'tests/**/*.test.ts',
       'tests/contract/document-store.contract.ts',
       'tests/contract/IChatPort.contract.ts',
+      'tests/contract/chat-port.contract.ts',
     ],
   },
 });

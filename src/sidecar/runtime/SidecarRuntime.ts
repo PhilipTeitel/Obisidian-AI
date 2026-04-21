@@ -9,7 +9,7 @@ import type {
 import { planAndApplyIncrementalIndex } from '../../core/workflows/IncrementalIndexPlanner.js';
 import type { IndexWorkflowDeps } from '../../core/workflows/IndexWorkflow.js';
 import { processOneJob } from '../../core/workflows/IndexWorkflow.js';
-import { runChatStream, type ChatWorkflowResult } from '../../core/workflows/ChatWorkflow.js';
+import { runChatStream, type ChatWorkflowDeps, type ChatWorkflowResult } from '../../core/workflows/ChatWorkflow.js';
 import { runSearch } from '../../core/workflows/SearchWorkflow.js';
 import { openDatabase } from '../db/open.js';
 import { buildGroundedMessages, GROUNDING_POLICY_VERSION } from '../adapters/chatProviderMessages.js';
@@ -114,6 +114,9 @@ export class SidecarRuntime {
       baseUrl: process.env.OBSIDIAN_AI_CHAT_BASE_URL ?? 'https://api.openai.com/v1',
       model: process.env.OBSIDIAN_AI_CHAT_MODEL ?? 'gpt-4o-mini',
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7279/ingest/93aba0d1-d956-4d96-a52b-680185909f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'14212f'},body:JSON.stringify({sessionId:'14212f',hypothesisId:'H1,H2,H3,H4',location:'SidecarRuntime.ts:getIndexDeps',message:'sidecar embedding config',data:{embedKind,embeddingBaseUrl:process.env.OBSIDIAN_AI_EMBEDDING_BASE_URL,embeddingModel:process.env.OBSIDIAN_AI_EMBEDDING_MODEL,embeddingDimensionEnv:process.env.OBSIDIAN_AI_EMBEDDING_DIMENSION,embeddingDimensionParsed:parsePositiveInt(process.env.OBSIDIAN_AI_EMBEDDING_DIMENSION,1536)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     return {
       queue: this.queue!,
       store: this.store!,
@@ -136,14 +139,21 @@ export class SidecarRuntime {
     return { store: this.store!, embedder: embed, log: this.log };
   }
 
-  private getChatWorkflowDeps() {
+  private getChatWorkflowDeps(): ChatWorkflowDeps {
     const search = this.getSearchDeps();
     const chatKind = parseProvider(process.env.OBSIDIAN_AI_CHAT_PROVIDER, 'openai');
     const chat = createChatPort(chatKind, {
       baseUrl: process.env.OBSIDIAN_AI_CHAT_BASE_URL ?? 'https://api.openai.com/v1',
       model: process.env.OBSIDIAN_AI_CHAT_MODEL ?? 'gpt-4o-mini',
     });
-    return { ...search, chat, buildGroundedMessages };
+    return {
+      ...search,
+      chat,
+      buildGroundedMessages,
+      onUserPromptTruncation: (ratio: number) => {
+        this.log.warn({ userPromptTruncationRatio: ratio }, 'chat.user_prompts_truncated');
+      },
+    };
   }
 
   async drainIndexQueue(apiKey?: string): Promise<void> {

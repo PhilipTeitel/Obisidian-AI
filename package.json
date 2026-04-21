@@ -22,6 +22,7 @@
     "verify:plugin-bundle": "node scripts/verify-plugin-bundle.mjs",
     "verify:stack": "node scripts/verify-stack.mjs",
     "check:boundaries": "node scripts/check-source-boundaries.mjs",
+    "check:chat-prompt-transport": "node scripts/verify-chat-prompt-transport.mjs",
     "verify:core-imports": "node scripts/check-core-imports.mjs",
     "smoke:sidecar": "node dist/sidecar/server.cjs",
     "dev": "node scripts/dev.mjs",

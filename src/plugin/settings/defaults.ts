@@ -22,6 +22,8 @@ export const DEFAULT_SETTINGS: ObsidianAISettings = {
   logLevel: 'info',
   searchResultCount: 20,
   chatCoarseK: DEFAULT_CHAT_COARSE_K,
+  chatSystemPrompt: '',
+  vaultOrganizationPrompt: '',
   enableHybridSearch: DEFAULT_ENABLE_HYBRID_SEARCH,
   dailyNotePathGlobs: ['Daily/**/*.md'],
   dailyNoteDatePattern: 'YYYY-MM-DD',

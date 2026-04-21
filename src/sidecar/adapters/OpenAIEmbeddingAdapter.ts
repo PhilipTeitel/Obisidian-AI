@@ -83,6 +83,10 @@ export class OpenAIEmbeddingAdapter implements IEmbeddingPort {
       throw new Error('OpenAI embeddings: response missing data array');
     }
     const sorted = [...json.data].sort((a, b) => a.index - b.index);
-    return sorted.map((d) => Float32Array.from(d.embedding));
+    const out = sorted.map((d) => Float32Array.from(d.embedding));
+    // #region agent log
+    fetch('http://127.0.0.1:7279/ingest/93aba0d1-d956-4d96-a52b-680185909f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'14212f'},body:JSON.stringify({sessionId:'14212f',hypothesisId:'H2,H5',location:'OpenAIEmbeddingAdapter.ts:embedOneBatch',message:'openai embed response',data:{url,model:this.model,inputCount:texts.length,returnedCount:out.length,firstLen:out[0]?.length,lastLen:out[out.length-1]?.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return out;
   }
 }

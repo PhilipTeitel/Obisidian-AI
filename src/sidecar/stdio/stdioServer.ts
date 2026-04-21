@@ -56,7 +56,7 @@ export async function dispatchStdioLine(
     }
     try {
       const gen = runtime.handleChatStream(
-        payload as Extract<SidecarRequest, { type: 'chat' }>['payload'],
+        payload as unknown as Extract<SidecarRequest, { type: 'chat' }>['payload'],
         {},
       );
       let step = await gen.next();

@@ -4,6 +4,7 @@ import type {
   HealthResponse,
   SidecarRequest,
   SidecarResponse,
+  Source,
 } from '../../core/domain/types.js';
 import type { ISidecarTransport } from '../../core/ports/ISidecarTransport.js';
 

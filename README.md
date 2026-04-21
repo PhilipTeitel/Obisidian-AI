@@ -1143,7 +1143,7 @@ Three-phase search ([ADR-003](docs/decisions/ADR-003-phased-retrieval-strategy.m
 | [CHAT-1](docs/features/CHAT-1.md) | Complete | `ChatWorkflow`: retrieve → assemble context → stream completion → sources | L    | Vault-only retrieval path; conversation history in payload                                                         |
 | [CHAT-2](docs/features/CHAT-2.md) | Complete | Chat cancel/timeout behavior end-to-end                                   | S    | [ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md); configurable timeout; cancel through transport |
 | [CHAT-3](docs/features/CHAT-3.md) | Complete | Always-on grounding policy + insufficient-evidence response               | M    | [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md); built-in policy every request; distinct UI state   |
-| [CHAT-4](docs/features/CHAT-4.md) | Planned  | User chat system prompt + vault-organization prompt                       | M    | [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md); two new settings; ordered merge into messages      |
+| [CHAT-4](docs/features/CHAT-4.md) | Complete | User chat system prompt + vault-organization prompt                       | M    | [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md); two new settings; ordered merge into messages      |
 
 ### Epic 6: Provider adapters
 

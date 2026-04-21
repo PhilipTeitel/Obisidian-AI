@@ -72,6 +72,11 @@ function assertEmbeddingBatch(
       `${label} embeddings: provider returned ${vectors.length} vectors for ${ids.length} inputs`,
     );
   }
+  // #region agent log
+  const _lens = vectors.map((v) => v.length);
+  const _uniqLens = Array.from(new Set(_lens));
+  fetch('http://127.0.0.1:7279/ingest/93aba0d1-d956-4d96-a52b-680185909f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'14212f'},body:JSON.stringify({sessionId:'14212f',hypothesisId:'H1,H2,H3,H4,H5',location:'IndexWorkflow.ts:assertEmbeddingBatch',message:'embedding batch dims before assert',data:{label,expectedDimension,vectorCount:vectors.length,idsCount:ids.length,uniqueLengths:_uniqLens,firstLen:_lens[0],lastLen:_lens[_lens.length-1]},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   for (let i = 0; i < vectors.length; i++) {
     const vector = vectors[i];
     if (vector.length !== expectedDimension) {

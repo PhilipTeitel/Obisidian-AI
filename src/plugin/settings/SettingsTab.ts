@@ -1,4 +1,8 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import {
+  COMBINED_SYSTEM_PROMPT_TOKEN_BUDGET,
+  estimateCombinedBuiltinAndUserPromptTokens,
+} from '../../core/domain/chatUserPromptBudget.js';
 import { normalizeChatCoarseKFromUserInput } from './chatCoarseK.js';
 import { getOpenAIApiKey, setOpenAIApiKey } from './secretSettings.js';
 import type { ObsidianAISettings } from './types.js';
@@ -239,6 +243,75 @@ export class ObsidianAISettingTab extends PluginSettingTab {
           await this.aiPlugin.saveSettings();
         }),
     );
+
+    containerEl.createEl('h3', { text: 'Chat grounding' });
+
+    const budgetWarnEl = containerEl.createDiv({ cls: 'mod-warning' });
+    budgetWarnEl.style.display = 'none';
+
+    const refreshBudgetBanner = (): void => {
+      const over =
+        estimateCombinedBuiltinAndUserPromptTokens(s.vaultOrganizationPrompt, s.chatSystemPrompt) >
+        COMBINED_SYSTEM_PROMPT_TOKEN_BUDGET;
+      if (!over) {
+        budgetWarnEl.style.display = 'none';
+        budgetWarnEl.empty();
+        return;
+      }
+      budgetWarnEl.style.display = 'block';
+      budgetWarnEl.empty();
+      budgetWarnEl.appendText(
+        'Combined system prompts exceed the budget; user prompts will be truncated at request time. ',
+      );
+      budgetWarnEl.createEl('a', {
+        text: 'Chat behavior tuning guide',
+        href: './docs/guides/chat-behavior-tuning.md',
+      });
+    };
+    refreshBudgetBanner();
+
+    let promptDebounce: ReturnType<typeof setTimeout> | null = null;
+    const schedulePromptSave = (): void => {
+      if (promptDebounce) clearTimeout(promptDebounce);
+      promptDebounce = setTimeout(() => {
+        promptDebounce = null;
+        void this.aiPlugin.saveSettings().then(() => refreshBudgetBanner());
+      }, 400);
+    };
+
+    const tuningGuideHref = './docs/guides/chat-behavior-tuning.md';
+
+    const vaultOrgSetting = new Setting(containerEl).setName('Vault organization prompt');
+    vaultOrgSetting.descEl.appendText(
+      'Describe folders, daily notes, tags, and headings so retrieval matches your intent. ',
+    );
+    vaultOrgSetting.descEl.createEl('a', {
+      text: 'Chat behavior tuning guide',
+      href: tuningGuideHref,
+    });
+    vaultOrgSetting.addTextArea((ta) => {
+      ta.setPlaceholder('e.g. daily notes in Daily/YYYY-MM-DD.md, job-search tag #job-search');
+      ta.setValue(s.vaultOrganizationPrompt).onChange((v) => {
+        s.vaultOrganizationPrompt = v;
+        refreshBudgetBanner();
+        schedulePromptSave();
+      });
+    });
+
+    const chatSysSetting = new Setting(containerEl).setName('Chat system prompt');
+    chatSysSetting.descEl.appendText('Persona, tone, and style (vault-only answers still apply). ');
+    chatSysSetting.descEl.createEl('a', {
+      text: 'Chat behavior tuning guide',
+      href: tuningGuideHref,
+    });
+    chatSysSetting.addTextArea((ta) => {
+      ta.setPlaceholder('e.g. concise bullets, friendly tone');
+      ta.setValue(s.chatSystemPrompt).onChange((v) => {
+        s.chatSystemPrompt = v;
+        refreshBudgetBanner();
+        schedulePromptSave();
+      });
+    });
 
     containerEl.createEl('h3', { text: 'Retrieval' });
 

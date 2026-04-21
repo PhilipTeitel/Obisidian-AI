@@ -1,5 +1,10 @@
 import { ItemView, WorkspaceLeaf } from 'obsidian';
-import type { ChatMessage, GroundingOutcome, Source } from '../../core/domain/types.js';
+import {
+  CHAT_GROUNDING_POLICY_WIRE_VERSION,
+  type ChatMessage,
+  type GroundingOutcome,
+  type Source,
+} from '../../core/domain/types.js';
 import { compilePathGlobs } from '../../core/domain/pathGlob.js';
 import { parseChatInput } from '../../core/domain/chatInputParser.js';
 import { buildSearchAssemblyFromSettings } from '../settings/buildSearchAssembly.js';
@@ -157,6 +162,8 @@ export class ChatView extends ItemView {
     let assistantAcc = '';
     try {
       const ps = this.plugin.settings;
+      const vaultOrg = ps.vaultOrganizationPrompt.trim();
+      const chatSys = ps.chatSystemPrompt.trim();
       for await (const chunk of transport.streamChat(
         {
           messages: messagesForRequest,
@@ -168,6 +175,9 @@ export class ChatView extends ItemView {
           search: buildSearchAssemblyFromSettings(ps),
           pathGlobs,
           dateRange,
+          ...(vaultOrg !== '' ? { vaultOrganizationPrompt: vaultOrg } : {}),
+          ...(chatSys !== '' ? { systemPrompt: chatSys } : {}),
+          groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
         },
         { signal },
       )) {

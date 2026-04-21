@@ -288,11 +288,20 @@ export interface Source {
 /** Terminal chat outcome (ADR-011 / CHAT-3). */
 export type GroundingOutcome = 'answered' | 'insufficient_evidence';
 
+/** Wire version echoed on chat terminal events; keep in sync with sidecar `GROUNDING_POLICY_VERSION`. */
+export const CHAT_GROUNDING_POLICY_WIRE_VERSION = 'v1';
+
+/** Hooks for message assembly (CHAT-4); logging stays out of pure core except via injected callbacks. */
+export interface BuildGroundedMessagesHooks {
+  /** Share of estimated user-prompt tokens removed to satisfy the combined system-message budget (0–1). */
+  onUserPromptTruncated?: (ratio: number) => void;
+}
+
 /** Inputs for vault-only message assembly; policy text lives in sidecar (CHAT-3 Y4). */
 export interface GroundingContext {
-  /** Reserved: chat system / persona (settings UI in CHAT-4). */
+  /** Persona / style from plugin settings (`chatSystemPrompt`), per request (CHAT-4). */
   systemPrompt?: string;
-  /** Reserved: vault organization hints (CHAT-4). */
+  /** Vault organization hints from plugin settings, per request (CHAT-4). */
   vaultOrganizationPrompt?: string;
   /** Assembled retrieval text; may be empty (insufficient-evidence path skips the model). */
   retrievalContext: string;
@@ -318,36 +327,39 @@ export interface OkResponse {
   ok: true;
 }
 
+/**
+ * Client → sidecar `chat` request body (ADR-011 Decision 4, README API Contract).
+ * User prompts use wire names `systemPrompt` / `vaultOrganizationPrompt` (plugin settings: `chatSystemPrompt` / `vaultOrganizationPrompt`).
+ */
+export interface ChatRequestPayload {
+  messages: ChatMessage[];
+  context?: string;
+  apiKey?: string;
+  /** Wall-clock budget for the stream (maps to `IChatPort` / workflow; ADR-009). */
+  timeoutMs?: number;
+  /** Phase-1 coarse-K (RET-4); defaults in workflow when omitted. */
+  coarseK?: number;
+  /** Final search `k` for retrieval (defaults in ChatWorkflow when omitted). */
+  k?: number;
+  /** Assembly budgets from plugin settings (RET-2 / RET-4). */
+  search?: SearchAssemblyOptions;
+  enableHybridSearch?: boolean;
+  pathGlobs?: string[];
+  dateRange?: { start?: string; end?: string };
+  /** Persona from plugin `chatSystemPrompt`; ordering enforced in `buildGroundedMessages`. */
+  systemPrompt?: string;
+  vaultOrganizationPrompt?: string;
+  /** Echoed for logging / copy tuning (ADR-011). */
+  groundingPolicyVersion?: string;
+}
+
 /** Discriminated client → sidecar requests (NDJSON `type` / HTTP route names). */
 export type SidecarRequest =
   | { type: 'index/full'; payload: IndexFullRequest }
   | { type: 'index/incremental'; payload: IndexIncrementalRequest }
   | { type: 'index/status'; payload?: Record<string, never> }
   | { type: 'search'; payload: SearchRequest }
-  | {
-      type: 'chat';
-      payload: {
-        messages: ChatMessage[];
-        context?: string;
-        apiKey?: string;
-        /** Wall-clock budget for the stream (maps to `IChatPort` / workflow; ADR-009). */
-        timeoutMs?: number;
-        /** Phase-1 coarse-K (RET-4); defaults in workflow when omitted. */
-        coarseK?: number;
-        /** Final search `k` for retrieval (defaults in ChatWorkflow when omitted). */
-        k?: number;
-        /** Assembly budgets from plugin settings (RET-2 / RET-4). */
-        search?: SearchAssemblyOptions;
-        enableHybridSearch?: boolean;
-        pathGlobs?: string[];
-        dateRange?: { start?: string; end?: string };
-        /** CHAT-3 / ADR-011: optional persona slot; ordering enforced in `buildGroundedMessages`. */
-        systemPrompt?: string;
-        vaultOrganizationPrompt?: string;
-        /** Logged sidecar-side; optional on wire (CHAT-4 may set). */
-        groundingPolicyVersion?: string;
-      };
-    }
+  | { type: 'chat'; payload: ChatRequestPayload }
   | { type: 'chat/clear'; payload?: Record<string, never> }
   | { type: 'health'; payload?: Record<string, never> };
 

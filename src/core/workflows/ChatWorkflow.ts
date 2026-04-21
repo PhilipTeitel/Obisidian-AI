@@ -1,11 +1,13 @@
 import { DEFAULT_SEARCH_ASSEMBLY, validateSearchAssemblyOptions } from '../domain/contextAssembly.js';
 import type {
+  BuildGroundedMessagesHooks,
   ChatMessage,
   GroundingContext,
   GroundingOutcome,
   SearchAssemblyOptions,
   Source,
 } from '../domain/types.js';
+import { CHAT_GROUNDING_POLICY_WIRE_VERSION } from '../domain/types.js';
 import type { ChatCompletionOptions, IChatPort } from '../ports/IChatPort.js';
 import type { SearchWorkflowDeps } from './SearchWorkflow.js';
 import { withChatCompletionControls } from './chatStreamGuard.js';
@@ -17,7 +19,13 @@ import { DEFAULT_SEARCH_K, runSearch } from './SearchWorkflow.js';
 export interface ChatWorkflowDeps extends SearchWorkflowDeps {
   chat: IChatPort;
   /** Injected from sidecar so core stays free of `src/sidecar` imports (CHAT-3 Y6). */
-  buildGroundedMessages: (messages: ChatMessage[], grounding: GroundingContext) => ChatMessage[];
+  buildGroundedMessages: (
+    messages: ChatMessage[],
+    grounding: GroundingContext,
+    hooks?: BuildGroundedMessagesHooks,
+  ) => ChatMessage[];
+  /** Sidecar wires `pino.warn` for user-prompt truncation (CHAT-4). */
+  onUserPromptTruncation?: (ratio: number) => void;
 }
 
 export interface ChatWorkflowOptions {
@@ -46,8 +54,6 @@ export interface ChatWorkflowResult {
 /** Product-owned copy for zero-hit path (CHAT-3 B4); not model-generated. */
 export const INSUFFICIENT_EVIDENCE_STREAM_MESSAGE =
   "I couldn't find notes in your vault that answer this. Try narrowing your search with a folder path, a tag, or a date range — then ask again.";
-
-const GROUNDING_POLICY_WIRE_VERSION = 'v1';
 
 function lastUserContent(messages: ChatMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -96,16 +102,24 @@ export async function* runChatStream(
     return {
       sources: [],
       groundingOutcome: 'insufficient_evidence',
-      groundingPolicyVersion: GROUNDING_POLICY_WIRE_VERSION,
+      groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
     };
   }
 
   const context = searchRes.results.map((r) => r.snippet).join('\n\n---\n\n');
-  const assembled = deps.buildGroundedMessages(messages, {
-    retrievalContext: context,
-    systemPrompt: options.systemPrompt,
-    vaultOrganizationPrompt: options.vaultOrganizationPrompt,
-  });
+  const hooks =
+    deps.onUserPromptTruncation !== undefined
+      ? { onUserPromptTruncated: deps.onUserPromptTruncation }
+      : undefined;
+  const assembled = deps.buildGroundedMessages(
+    messages,
+    {
+      retrievalContext: context,
+      systemPrompt: options.systemPrompt,
+      vaultOrganizationPrompt: options.vaultOrganizationPrompt,
+    },
+    hooks,
+  );
 
   const stream = deps.chat.complete(assembled, '', options.apiKey, options.completion);
   for await (const delta of withChatCompletionControls(stream, options.completion)) {
@@ -120,6 +134,6 @@ export async function* runChatStream(
   return {
     sources,
     groundingOutcome: 'answered',
-    groundingPolicyVersion: GROUNDING_POLICY_WIRE_VERSION,
+    groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
   };
 }

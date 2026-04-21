@@ -14,5 +14,7 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.embeddingDimension).toBe(1536);
     expect(DEFAULT_SETTINGS.sidecarInspector).toBe(false);
     expect(DEFAULT_SETTINGS.transport).toBe('stdio');
+    expect(DEFAULT_SETTINGS.chatSystemPrompt).toBe('');
+    expect(DEFAULT_SETTINGS.vaultOrganizationPrompt).toBe('');
   });
 });
