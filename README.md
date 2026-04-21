@@ -2,14 +2,22 @@
 
 ## Preface
 
-This project represents 2 things. The first is AI capabilities in Obsidian. There are multiple iterations each experimenting with implementations, architectures, stacks, etc. The second is to practice using Cursor's subagent features. It was built using the following subagents:
+This project represents 2 things. The first is AI capabilities in Obsidian. There are multiple iterations each experimenting with implementations, architectures, stacks, etc. The second is to practice using Cursor's agent features. It was built using the following agents:
 
 - Architect
+  - Refines requirements to produce architecture design records and Gherkin scenarios.
   - Build the high-level design document. It doesn't write the code, only makes sure the project is properly spec'd to be built correctly and cleanly. A template is used to assure completeness.
   - Create user stories. Uses a template to spec everything out sufficiently so that the code meets the requirements. The critical piece is the acceptance criteria.
-- Implementer - Writes the actual code. It must follow the spec EXACTLY and generate evidence that the code meets the criteria. If any ambiguities are found, it is instructed to stop and ask how to proceed.
-- QA - Runs all tests to verify acceptance criteria are met and no regressions are added
-- Documenter - Updates the documentation with any changes precipitated by the latest work.
+- Implementer 
+  - Writes the actual code. It must follow the spec EXACTLY and generate evidence that the code meets the criteria. If any ambiguities are found, it is instructed to stop and ask how to proceed.
+- QA 
+  - Reviews implemented code to verify that each test associated with the acceptance criteria pass.  Any failed tests are returned to the implementer for resolution.
+  - Runs all regression tests
+- Documenter 
+  - Updates the documentation with any changes precipitated by the latest work.
+  - Updates project status.
+- Auditor
+  - Performs security, reliability, database, performance and test coverage audits
 
 Commands were used to execute the various steps and templates were used to maintain consistency.
 
@@ -29,6 +37,7 @@ Iteration 2 replaces the fragile WASM-in-renderer approach from iteration 1 with
   - [High-Level Architecture](#high-level-architecture)
     - [Data Flow: Vault → Index](#data-flow-vault--index)
     - [Data Flow: Search Query](#data-flow-search-query)
+    - [Data Flow: Chat Query](#data-flow-chat-query)
     - [Indexing State Machine](#indexing-state-machine)
   - [Technical Stack](#technical-stack)
   - [Key Design Decisions](#key-design-decisions)
