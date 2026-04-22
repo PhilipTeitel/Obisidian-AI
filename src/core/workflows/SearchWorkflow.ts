@@ -8,6 +8,7 @@ import { fuseRankings } from '../domain/rrf.js';
 import type {
   DocumentNode,
   NodeFilter,
+  NoteMeta,
   SearchAssemblyOptions,
   SearchRequest,
   SearchResponse,
@@ -53,6 +54,7 @@ export interface SearchWorkflowDeps {
   log?: {
     debug: (obj: Record<string, unknown>, msg?: string) => void;
     warn?: (obj: Record<string, unknown>, msg?: string) => void;
+    info?: (obj: Record<string, unknown>, msg?: string) => void;
   };
 }
 
@@ -112,6 +114,49 @@ function coarseUserFilterFromRequest(
     f.dateRange = req.dateRange;
   }
   return f;
+}
+
+function noteMetaMatchesDateFilter(
+  meta: NoteMeta,
+  dr: { start?: string; end?: string } | undefined,
+): boolean {
+  if (!dr) return true;
+  const hasStart = dr.start !== undefined && dr.start !== '';
+  const hasEnd = dr.end !== undefined && dr.end !== '';
+  if (!hasStart && !hasEnd) return true;
+  const d = meta.noteDate;
+  if (d == null || d === '') return false;
+  if (hasStart && d < dr.start!) return false;
+  if (hasEnd && d > dr.end!) return false;
+  return true;
+}
+
+function vaultPathMatchesRegex(vaultPath: string, pathRegex: string | undefined): boolean {
+  if (!pathRegex) return true;
+  try {
+    return new RegExp(pathRegex).test(vaultPath);
+  } catch {
+    return false;
+  }
+}
+
+async function searchHitSurvivesPostRetrievalFilters(
+  deps: SearchWorkflowDeps,
+  req: SearchRequest,
+  coarseUserFilter: NodeFilter,
+  node: DocumentNode,
+  meta: NoteMeta,
+): Promise<boolean> {
+  if (!vaultPathMatchesRegex(meta.vaultPath, coarseUserFilter.pathRegex)) {
+    return false;
+  }
+  if (!noteMetaMatchesDateFilter(meta, coarseUserFilter.dateRange)) {
+    return false;
+  }
+  if (req.tags?.length) {
+    return deps.store.noteMatchesTagFilter(node.noteId, req.tags);
+  }
+  return true;
 }
 
 function mergeHitsByNode(a: VectorMatch[], b: VectorMatch[]): Map<string, number> {
@@ -232,6 +277,9 @@ export async function runSearch(
     const meta = await deps.store.getNoteMeta(node.noteId);
     if (!meta) {
       console.warn('[SearchWorkflow] missing note_meta', { noteId: node.noteId });
+      continue;
+    }
+    if (!(await searchHitSurvivesPostRetrievalFilters(deps, req, coarseUserFilter, node, meta))) {
       continue;
     }
     const snippet = await buildSnippet(deps.store, node, meta.vaultPath, resolvedAssembly);

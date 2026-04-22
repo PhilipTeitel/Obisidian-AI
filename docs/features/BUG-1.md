@@ -3,7 +3,7 @@
 **Story**: Make the `sources` list returned on every `chat` completion and `search` response equal the set of notes whose content was actually used to produce the reply — bidirectionally, no more and no less — including the aggregation case. This fixes the BUG-001 / REQ-006 reports that `sources` contains notes outside the filtering criteria or omits notes the reply drew from.
 **Epic**: 11 — Chat accuracy and UX bug fixes (REQ-006)
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -143,72 +143,72 @@ ChatView
 
 ### Phase A: Used-node tracking in ChatWorkflow
 
-- [ ] **A1** — `runChatStream` records a `UsedNodeRecord` each time a `SearchResult` snippet is stitched into `context`
+- [x] **A1** — `runChatStream` records a `UsedNodeRecord` each time a `SearchResult` snippet is stitched into `context`
   - When every result fits the budget: one record per result; `sources.length === new Set(results.map(r => r.notePath)).size`.
   - Evidence: `tests/core/workflows/ChatWorkflow.sources.test.ts::A1_one_record_per_stitched_snippet(vitest)`
 
-- [ ] **A2** — Records are deduped per `notePath` on the way to `Source[]`, preserving first-insertion order
+- [x] **A2** — Records are deduped per `notePath` on the way to `Source[]`, preserving first-insertion order
   - Two results from the same note → one `Source` entry at the first result's position.
   - Evidence: `tests/core/workflows/ChatWorkflow.sources.test.ts::A2_dedup_preserves_insertion_order(vitest)`
 
-- [ ] **A3** — Aggregation replies still list every contributing note
+- [x] **A3** — Aggregation replies still list every contributing note
   - With three `SearchResult` entries stitched into context (representing three job-search notes) and the reply being "I found 3 activities", `sources.length === 3`.
   - Evidence: `tests/core/workflows/ChatWorkflow.sources.test.ts::A3_aggregation_lists_all_contributors(vitest)` — covers S7.
 
-- [ ] **A4** — Snippets dropped by context-assembly budget do not appear in `sources`
+- [x] **A4** — Snippets dropped by context-assembly budget do not appear in `sources`
   - When the token budget forces the last result's snippet to be dropped before it reaches `context`, its note must not appear in `sources`.
   - Evidence: `tests/core/workflows/ChatWorkflow.sources.test.ts::A4_budget_drop_excludes_source(vitest)`
 
-- [ ] **A5** — Insufficient-evidence path emits `sources: []`
+- [x] **A5** — Insufficient-evidence path emits `sources: []`
   - `searchRes.results.length === 0` → `sources: []`, `groundingOutcome: 'insufficient_evidence'`.
   - Evidence: `tests/core/workflows/ChatWorkflow.sources.test.ts::A5_insufficient_evidence_empty_sources(vitest)`
 
 ### Phase B: Filter parity in SearchWorkflow
 
-- [ ] **B1** — `SearchResponse.results` excludes any hit whose note fails the effective `pathGlobs` filter
+- [x] **B1** — `SearchResponse.results` excludes any hit whose note fails the effective `pathGlobs` filter
   - With `pathGlobs: ['daily/**']`, a retrieved hit whose note lives under `projects/` must not appear in `results`.
   - Evidence: `tests/core/workflows/SearchWorkflow.sources.test.ts::B1_path_glob_filter_excludes(vitest)` — covers S1.
 
-- [ ] **B2** — `SearchResponse.results` excludes any hit whose note fails the effective `dateRange` filter
+- [x] **B2** — `SearchResponse.results` excludes any hit whose note fails the effective `dateRange` filter
   - With `dateRange: { start: '2026-03-16', end: '2026-04-21' }`, a retrieved note with `note_date: '2026-02-14'` must not appear in `results`.
   - Evidence: `tests/core/workflows/SearchWorkflow.sources.test.ts::B2_date_range_filter_excludes(vitest)` — covers S2.
 
-- [ ] **B3** — `SearchResponse.results` excludes any hit whose node fails the effective `tags` filter
+- [x] **B3** — `SearchResponse.results` excludes any hit whose node fails the effective `tags` filter
   - `tags: ['jobhunt']` must exclude nodes without that tag.
   - Evidence: `tests/core/workflows/SearchWorkflow.sources.test.ts::B3_tags_filter_excludes(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** End-to-end chat stream: every `Source` in the final `done` message is a note whose snippet is observable in the assembled `context`, and vice versa
+- [x] **Y1** — **(binding)** End-to-end chat stream: every `Source` in the final `done` message is a note whose snippet is observable in the assembled `context`, and vice versa
   - Assert bidirectional equality against a real `ChatWorkflow` run with a recorded provider stream; no mocking of the provenance bookkeeping.
   - Evidence: `tests/integration/chat-stream-sources.integration.test.ts::Y1_bidirectional_equality_real_stream(vitest)` — covers S1 end-to-end.
 
-- [ ] **Y2** — **(binding)** Aggregation replies list every contributing note in `sources`
+- [x] **Y2** — **(binding)** Aggregation replies list every contributing note in `sources`
   - Integration test with three same-epoch daily notes and an aggregation-style prompt; assert `sources` is exactly the three note paths.
   - Evidence: `tests/integration/chat-stream-sources.integration.test.ts::Y2_aggregation_all_contributors(vitest)` — covers S7.
 
-- [ ] **Y3** — **(binding)** Filter-excluded notes never appear in `sources`
+- [x] **Y3** — **(binding)** Filter-excluded notes never appear in `sources`
   - With `pathGlobs: ['daily/**']` applied, assert no `Source` entry has a `notePath` outside `daily/**`, even when the raw retrieval stage emitted such candidates upstream.
   - Evidence: `tests/integration/chat-stream-sources.integration.test.ts::Y3_filter_excluded_never_in_sources(vitest)` — covers S1 "not meeting filtering criteria".
 
-- [ ] **Y4** — **(binding)** Insufficient-evidence path emits `sources: []`
+- [x] **Y4** — **(binding)** Insufficient-evidence path emits `sources: []`
   - Evidence: `tests/integration/chat-stream-sources.integration.test.ts::Y4_insufficient_evidence_empty(vitest)`.
 
-- [ ] **Y5** — **(binding)** Deduplication preserves first-insertion order
+- [x] **Y5** — **(binding)** Deduplication preserves first-insertion order
   - Two results from the same note in positions 1 and 3 → `sources[0] === that note path`; no duplicate.
   - Evidence: `tests/core/workflows/ChatWorkflow.sources.test.ts::A2_dedup_preserves_insertion_order(vitest)` (shared with A2).
 
-- [ ] **Y6** — **(binding)** `SearchResponse.results` parity: any filter-excluded hit is absent from `results`
+- [x] **Y6** — **(binding)** `SearchResponse.results` parity: any filter-excluded hit is absent from `results`
   - Evidence: `tests/core/workflows/SearchWorkflow.sources.test.ts::B1_path_glob_filter_excludes(vitest)`, `B2_date_range_filter_excludes`, `B3_tags_filter_excludes`.
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — All client imports from shared use the project's configured alias (not relative paths) where applicable
-- [ ] **Z5** — New or modified code includes appropriate logging for errors and significant operations per [§20 Logging and Observability](../../README.md#20-logging-and-observability) (debug-level trace when a snippet is dropped by budget; info-level count on chat completion)
-- [ ] **Z6** — `/review-story BUG-1` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — All client imports from shared use the project's configured alias (not relative paths) where applicable
+- [x] **Z5** — New or modified code includes appropriate logging for errors and significant operations per [§20 Logging and Observability](../../README.md#20-logging-and-observability) (debug-level trace when a snippet is dropped by budget; info-level count on chat completion)
+- [x] **Z6** — `/review-story BUG-1` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
 
 ---
 

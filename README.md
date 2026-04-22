@@ -1,4 +1,4 @@
-# Obsidian AI Plugin — Iteration 2
+# Obsidian AI Plugin — Iteration 3
 
 ## Preface
 
@@ -31,7 +31,7 @@ I**teration 3** improves search by expanding `k` values in addition to a hybrid 
 
 ## Table of Contents
 
-- [Obsidian AI Plugin — Iteration 2](#obsidian-ai-plugin--iteration-2)
+- [Obsidian AI Plugin — Iteration 3](#obsidian-ai-plugin--iteration-3)
   - [Preface](#preface)
   - [Purpose](#purpose)
   - [Table of Contents](#table-of-contents)
@@ -1281,8 +1281,8 @@ Fixes surfaced by [BUG-001](docs/requests/BUG-001.md) and refined in [REQ-006](d
 
 | ID                              | Status      | Story                                                                                 | Size | Notes                                                                                                      |
 | ------------------------------- | ----------- | ------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
-| [BUG-1](docs/features/BUG-1.md) | Not Started | Source provenance contract: sources equal notes actually used for the reply            | M    | Implements REQ-006 S1/S2/S7; creates [ADR-015](docs/decisions/ADR-015-source-provenance-contract.md); tracks per-turn used-note set through `ChatWorkflow` and `SearchWorkflow`; affects `chat` / `search` response assembly |
-| [BUG-2](docs/features/BUG-2.md) | Not Started | ChatView selectable text for both user and assistant messages                          | S    | Implements REQ-006 S3; CSS/markup change in `src/plugin/ui/ChatView.ts` and `styles.css`; keyboard + pointer selection |
+| [BUG-1](docs/features/BUG-1.md) | Complete | Source provenance contract: sources equal notes actually used for the reply            | M    | Implements REQ-006 S1/S2/S7; creates [ADR-015](docs/decisions/ADR-015-source-provenance-contract.md); tracks per-turn used-note set through `ChatWorkflow` and `SearchWorkflow`; affects `chat` / `search` response assembly |
+| [BUG-2](docs/features/BUG-2.md) | Complete | ChatView selectable text for both user and assistant messages                          | S    | Implements REQ-006 S3; CSS/markup in `src/plugin/ui/ChatView.ts` and `styles.css`; `tests/plugin/ui/ChatView.selection.test.ts` |
 | [BUG-3](docs/features/BUG-3.md) | Not Started | Natural-language date range resolution with local-time anchor and UTC-offset fallback  | M    | Implements REQ-006 S4 (and strengthens S2); creates [ADR-016](docs/decisions/ADR-016-natural-language-date-range-resolution.md); new setting `timezoneUtcOffsetHours`; parses "last N weeks" / "from X onwards" in the sidecar and composes `dateRange` + `pathGlobs` per [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md) |
 | [BUG-4](docs/features/BUG-4.md) | Not Started | FTS query construction: sanitize user text before SQLite FTS5 `MATCH`                  | M    | Implements REQ-006 S5/S6; creates [ADR-017](docs/decisions/ADR-017-fts-query-construction.md); tokenize → quote-as-phrase → OR; zero-token fallback to vector-only; touches hybrid search in `SqliteDocumentStore` |
 

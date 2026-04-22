@@ -13,13 +13,19 @@ import type ObsidianAIPlugin from '../main.js';
 import { showAiNotice } from './showAiNotice.js';
 import { VIEW_TYPE_CHAT } from './viewIds.js';
 
-type ChatTurn = ChatMessage & { groundingOutcome?: GroundingOutcome };
+type ChatTurn = ChatMessage & {
+  groundingOutcome?: GroundingOutcome;
+  /** Set on assistant messages after a completed stream (local UI; not in wire `ChatMessage`). */
+  sources?: Source[];
+};
 
 export class ChatView extends ItemView {
   private messages: ChatTurn[] = [];
   private listEl!: HTMLDivElement;
   private inputEl!: HTMLTextAreaElement;
   private abort: AbortController | null = null;
+  /** In-flight streaming assistant turn; only the body is updated on each delta. */
+  private streamingAssistantTurnEl: HTMLDivElement | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -89,31 +95,12 @@ export class ChatView extends ItemView {
     this.renderMessages();
   }
 
-  private renderMessages(extraAssistant?: string): void {
-    this.listEl.empty();
-    for (const m of this.messages) {
-      const isInsufficient =
-        m.role === 'assistant' && m.groundingOutcome === 'insufficient_evidence';
-      const cls = `obsidian-ai-chat-msg obsidian-ai-chat-${m.role}${isInsufficient ? ' insufficient-evidence' : ''}`;
-      const row = this.listEl.createDiv({ cls });
-      row.createEl('strong', { text: `${m.role}: ` });
-      row.createSpan({ text: m.content });
-    }
-    if (extraAssistant !== undefined && extraAssistant.length > 0) {
-      const row = this.listEl.createDiv({ cls: 'obsidian-ai-chat-msg obsidian-ai-chat-assistant' });
-      row.createEl('strong', { text: 'assistant: ' });
-      row.createSpan({ text: extraAssistant });
-    }
+  private shouldShowSources(sources: Source[] | undefined): boolean {
+    return sources !== undefined && sources.length > 0;
   }
 
-  private renderSources(sources: Source[], groundingOutcome: GroundingOutcome): void {
-    if (groundingOutcome === 'insufficient_evidence' && sources.length === 0) {
-      return;
-    }
-    if (sources.length === 0) return;
-    const wrap = this.listEl.createDiv({
-      cls: 'obsidian-ai-chat-sources obsidian-ai-chat-sources-footer sources-footer',
-    });
+  private appendSourcesChips(turn: HTMLDivElement, sources: Source[]): void {
+    const wrap = turn.createDiv({ cls: 'obsidian-ai-chat-sources' });
     wrap.createEl('div', { text: 'Sources:', cls: 'obsidian-ai-chat-sources-title' });
     for (const s of sources) {
       const line = wrap.createDiv({ cls: 'source-pill' });
@@ -123,6 +110,49 @@ export class ChatView extends ItemView {
         void this.app.workspace.openLinkText(s.notePath, '', false);
       });
       if (s.nodeId) line.createSpan({ text: ` (${s.nodeId})` });
+    }
+  }
+
+  private appendMessageTurn(m: ChatTurn): void {
+    const isAssistant = m.role === 'assistant';
+    const isInsufficient = isAssistant && m.groundingOutcome === 'insufficient_evidence';
+    const turnCls = ['obsidian-ai-chat-turn', m.role, isInsufficient ? 'insufficient-evidence' : '']
+      .filter(Boolean)
+      .join(' ');
+    const turn = this.listEl.createDiv({ cls: turnCls });
+    turn.createSpan({ cls: 'obsidian-ai-chat-role-label', text: `${m.role}: ` });
+    const body = turn.createDiv({ cls: 'obsidian-ai-chat-body' });
+    body.textContent = m.content;
+    if (isAssistant && this.shouldShowSources(m.sources) && m.sources) {
+      this.appendSourcesChips(turn, m.sources);
+    }
+  }
+
+  private createStreamingAssistantTurnAtEnd(): HTMLDivElement {
+    const turn = this.listEl.createDiv({ cls: 'obsidian-ai-chat-turn assistant' });
+    turn.createSpan({ cls: 'obsidian-ai-chat-role-label', text: 'assistant: ' });
+    turn.createDiv({ cls: 'obsidian-ai-chat-body' });
+    return turn;
+  }
+
+  private renderMessages(extraAssistant?: string): void {
+    if (extraAssistant === undefined) {
+      this.listEl.empty();
+      this.streamingAssistantTurnEl = null;
+      for (const m of this.messages) {
+        this.appendMessageTurn(m);
+      }
+      return;
+    }
+    if (extraAssistant.length === 0) {
+      return;
+    }
+    if (!this.streamingAssistantTurnEl) {
+      this.streamingAssistantTurnEl = this.createStreamingAssistantTurnAtEnd();
+    }
+    const body = this.streamingAssistantTurnEl.querySelector<HTMLDivElement>('.obsidian-ai-chat-body');
+    if (body) {
+      body.textContent = extraAssistant;
     }
   }
 
@@ -189,9 +219,9 @@ export class ChatView extends ItemView {
             role: 'assistant',
             content: assistantAcc,
             groundingOutcome: chunk.groundingOutcome,
+            sources: chunk.sources,
           });
           this.renderMessages();
-          this.renderSources(chunk.sources, chunk.groundingOutcome);
         }
       }
     } catch (e) {

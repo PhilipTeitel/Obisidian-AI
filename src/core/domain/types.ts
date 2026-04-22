@@ -278,6 +278,19 @@ export interface SearchAssemblyOptions {
   budget: ContextBudgetConfig;
   /** Token budget for the three tier bodies (headings/labels are added outside this budget). */
   totalTokenBudget: number;
+  /**
+   * Max estimated tokens for the combined chat retrieval string (multi-snippet stitch).
+   * When omitted, `contextAssembly.resolveChatStitchMaxTokens` uses max(512, totalTokenBudget × 8).
+   */
+  chatStitchMaxTokens?: number;
+}
+
+/** Internal bookkeeping: nodes whose snippets were stitched into chat retrieval context (BUG-1 / ADR-015). */
+export interface UsedNodeRecord {
+  nodeId: string;
+  notePath: string;
+  /** Order in which the node first entered the stitched context. */
+  insertionOrder: number;
 }
 
 export interface Source {

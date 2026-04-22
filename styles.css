@@ -1,1 +1,246 @@
-/* Obsidian AI — theme hooks added in later stories */
+/* Obsidian AI — theme variables for light/dark; plugin views inherit Obsidian’s surface. */
+
+/* --- Semantic search (README SearchView) --- */
+
+.obsidian-ai-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.obsidian-ai-search-row input[type='text'] {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.obsidian-ai-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 52rem;
+}
+
+.obsidian-ai-search-card {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--background-modifier-border, rgba(120, 120, 120, 0.35));
+  border-radius: var(--radius-m, 8px);
+  background: var(
+    --background-secondary,
+    var(--background-primary, var(--background-primary-alt, rgba(0, 0, 0, 0.04)))
+  );
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.obsidian-ai-search-card:hover {
+  border-color: var(
+    --interactive-hover,
+    var(--background-modifier-border-hover, var(--background-modifier-border))
+  );
+}
+
+.obsidian-ai-search-title {
+  font-weight: 600;
+  font-size: 0.95em;
+  color: var(--text-normal, inherit);
+  margin: 0 0 0.2rem 0;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.obsidian-ai-search-path {
+  font-size: 0.8em;
+  line-height: 1.4;
+  margin-bottom: 0.35rem;
+  color: var(--text-muted, var(--text-faint, inherit));
+  word-break: break-all;
+}
+
+.obsidian-ai-search-path a {
+  color: var(--text-accent, var(--link-color, var(--interactive-accent, #0969da)));
+  text-decoration: none;
+}
+
+.obsidian-ai-search-path a:hover {
+  text-decoration: underline;
+}
+
+.obsidian-ai-search-meta {
+  font-size: 0.75em;
+  line-height: 1.4;
+  color: var(--text-muted, var(--text-faint, inherit));
+  margin-bottom: 0.3rem;
+}
+
+.obsidian-ai-search-meta:last-of-type {
+  margin-bottom: 0.4rem;
+}
+
+.obsidian-ai-search-snippet {
+  font-size: 0.9em;
+  line-height: 1.5;
+  color: var(--text-normal, inherit);
+  margin: 0;
+  padding: 0.4rem 0 0 0;
+  border-top: 1px solid var(--background-modifier-border, rgba(120, 120, 120, 0.25));
+  -webkit-user-select: text;
+  user-select: text;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- RAG chat (README ChatView) --- */
+
+.obsidian-ai-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0.75rem 0;
+  min-height: 2rem;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.obsidian-ai-chat-turn {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: min(92%, 40rem);
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-m, 10px);
+  border: 1px solid var(--background-modifier-border, rgba(120, 120, 120, 0.35));
+  background: var(--background-secondary, rgba(0, 0, 0, 0.05));
+  -webkit-user-select: text;
+  user-select: text;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
+}
+
+.obsidian-ai-chat-turn.user {
+  align-self: flex-end;
+  margin-left: 2rem;
+  background: var(
+    --background-modifier-form-field,
+    var(--background-modifier-hover, var(--background-secondary, rgba(0, 0, 0, 0.08)))
+  );
+  border-color: var(--background-modifier-border, rgba(120, 120, 120, 0.4));
+}
+
+.obsidian-ai-chat-turn.assistant {
+  align-self: flex-start;
+  margin-right: 1rem;
+  background: var(--background-primary, var(--background-secondary, rgba(0, 0, 0, 0.04)));
+  border-color: var(--background-modifier-border, rgba(120, 120, 120, 0.3));
+}
+
+.obsidian-ai-chat-turn.assistant.insufficient-evidence {
+  border-color: var(
+    --color-orange,
+    var(--text-warning, var(--color-yellow, rgba(200, 120, 0, 0.6)))
+  );
+  background: var(
+    --background-modifier-error-hover,
+    color-mix(in srgb, var(--color-orange, #c58000) 12%, var(--background-primary) 88%)
+  );
+}
+
+@supports not (background: color-mix(in srgb, red 10%, white)) {
+  .obsidian-ai-chat-turn.assistant.insufficient-evidence {
+    background: var(--background-secondary, rgba(0, 0, 0, 0.06));
+  }
+}
+
+.obsidian-ai-chat-role-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, var(--text-faint, inherit));
+  margin-bottom: 0.3rem;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.obsidian-ai-chat-body {
+  font-size: 0.95em;
+  line-height: 1.5;
+  color: var(--text-normal, inherit);
+  white-space: pre-wrap;
+  word-break: break-word;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.obsidian-ai-chat-sources {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--background-modifier-border, rgba(120, 120, 120, 0.35));
+  -webkit-user-select: none;
+  user-select: none;
+  font-size: 0.8em;
+  color: var(--text-muted, inherit);
+}
+
+.obsidian-ai-chat-sources-title {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text-normal, inherit);
+}
+
+.obsidian-ai-chat-sources .source-pill {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.35rem;
+  margin: 0.2rem 0.35rem 0.1rem 0;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-s, 4px);
+  background: var(--background-modifier-hover, rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--background-modifier-border, rgba(120, 120, 120, 0.25));
+}
+
+.obsidian-ai-chat-sources .source-pill a {
+  color: var(--text-accent, var(--link-color, var(--interactive-accent, #0969da)));
+  text-decoration: none;
+  font-size: 0.95em;
+}
+
+.obsidian-ai-chat-sources .source-pill a:hover {
+  text-decoration: underline;
+}
+
+.obsidian-ai-chat-input-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--background-modifier-border, rgba(120, 120, 120, 0.25));
+}
+
+.obsidian-ai-chat-input-row > textarea {
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: 3.2rem;
+  resize: vertical;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-s, 6px);
+  border: 1px solid var(--background-modifier-border, rgba(120, 120, 120, 0.4));
+  background: var(--background-primary, var(--background-secondary, transparent));
+  color: var(--text-normal, inherit);
+}
+
+.obsidian-ai-chat-input-row > div:last-child {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.obsidian-ai-chat-input-row > div:last-child button {
+  white-space: nowrap;
+}

@@ -3,7 +3,7 @@
 **Story**: Make every chat message in the ChatView — both user and assistant bubbles — selectable with pointer and keyboard so normal copy/paste works. Fixes BUG-001 / [REQ-006 S3](../requirements/REQ-006-bug-001-chat-accuracy-ux-search.md).
 **Epic**: 11 — Chat accuracy and UX bug fixes (REQ-006)
 **Size**: Small
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -29,12 +29,12 @@ This story is intentionally **UI-only**: no workflow, retrieval, or API changes.
 
 ## 3. Definition of Ready (DoR)
 
-- [ ] No binding ADR is required (text selection is not an integration boundary). This is explicitly declared in Section 2.
-- [ ] README §UI Components ChatView says "All message text — both user and assistant — is selectable" (updated with REQ-006 design-section patch).
-- [ ] Section 4 lists the two styling constraints (user + assistant text selectable, no ancestor blocks it).
-- [ ] Section 4b is marked **not applicable** with a one-sentence reason.
-- [ ] Section 8a Test Plan covers both UI states with DOM-level assertions; REQ-006 S3 maps to at least one row.
-- [ ] Phase Y contains at least one `(binding)` criterion asserting the computed style or equivalent DOM observable — not just a code grep — so QA can verify in a real Obsidian runtime.
+- [x] No binding ADR is required (text selection is not an integration boundary). This is explicitly declared in Section 2.
+- [x] README §UI Components ChatView says "All message text — both user and assistant — is selectable" (updated with REQ-006 design-section patch).
+- [x] Section 4 lists the two styling constraints (user + assistant text selectable, no ancestor blocks it).
+- [x] Section 4b is marked **not applicable** with a one-sentence reason.
+- [x] Section 8a Test Plan covers both UI states with DOM-level assertions; REQ-006 S3 maps to at least one row.
+- [x] Phase Y contains at least one `(binding)` criterion asserting the computed style or equivalent DOM observable — not just a code grep — so QA can verify in a real Obsidian runtime.
 
 ---
 
@@ -121,50 +121,50 @@ ChatView
 
 ### Phase A: Selectable rendering
 
-- [ ] **A1** — User message bodies render inside `.obsidian-ai-chat-body`
+- [x] **A1** — User message bodies render inside `.obsidian-ai-chat-body`
   - After `renderMessages`, every `.obsidian-ai-chat-turn.user` has exactly one `.obsidian-ai-chat-body` child containing the user prompt text.
   - Evidence: `tests/plugin/ui/ChatView.selection.test.ts::A1_user_body_rendered(vitest)`
 
-- [ ] **A2** — Assistant message bodies render inside `.obsidian-ai-chat-body`
+- [x] **A2** — Assistant message bodies render inside `.obsidian-ai-chat-body`
   - After a streamed reply completes, the assistant turn has exactly one `.obsidian-ai-chat-body` child containing the concatenated deltas.
   - Evidence: `tests/plugin/ui/ChatView.selection.test.ts::A2_assistant_body_rendered(vitest)`
 
-- [ ] **A3** — Role labels and source chips are not part of the body
+- [x] **A3** — Role labels and source chips are not part of the body
   - `.obsidian-ai-chat-role-label` and `.obsidian-ai-chat-sources` are siblings of `.obsidian-ai-chat-body`, not descendants.
   - Evidence: `tests/plugin/ui/ChatView.selection.test.ts::A3_chrome_outside_body(vitest)`
 
-- [ ] **A4** — Streaming appends into the existing body element without recreating the turn
+- [x] **A4** — Streaming appends into the existing body element without recreating the turn
   - Between two delta appends, the `.obsidian-ai-chat-turn.assistant` node reference is stable (same DOM node).
   - Evidence: `tests/plugin/ui/ChatView.selection.test.ts::A4_streaming_preserves_node(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** User message bodies have `getComputedStyle.userSelect === 'text'`
+- [x] **Y1** — **(binding)** User message bodies have `getComputedStyle.userSelect === 'text'`
   - Evidence: `tests/plugin/ui/ChatView.selection.test.ts::Y1_user_body_computed_style(vitest)` — covers S3 (user selection).
 
-- [ ] **Y2** — **(binding)** Assistant message bodies have `getComputedStyle.userSelect === 'text'`
+- [x] **Y2** — **(binding)** Assistant message bodies have `getComputedStyle.userSelect === 'text'`
   - Evidence: `tests/plugin/ui/ChatView.selection.test.ts::Y2_assistant_body_computed_style(vitest)` — covers S3 (assistant selection).
 
-- [ ] **Y3** — **(binding)** No ancestor in the chat pane hierarchy sets `user-select: none` that would override the body rule
+- [x] **Y3** — **(binding)** No ancestor in the chat pane hierarchy sets `user-select: none` that would override the body rule
   - Walk up from a body element to the chat pane root; no computed `user-select: none` anywhere in the path.
   - Evidence: `tests/plugin/ui/ChatView.selection.test.ts::Y3_no_ancestor_blocks_selection(vitest)`
 
-- [ ] **Y4** — **(binding)** Source chips and role labels are non-selectable
+- [x] **Y4** — **(binding)** Source chips and role labels are non-selectable
   - `.obsidian-ai-chat-sources` and `.obsidian-ai-chat-role-label` resolve to `user-select: none`.
   - Evidence: `tests/plugin/ui/ChatView.selection.test.ts::Y4_chrome_not_selectable(vitest)`
 
-- [ ] **Y5** — **(binding)** Streaming delta append does not clear an existing selection in a completed previous bubble
+- [x] **Y5** — **(binding)** Streaming delta append does not clear an existing selection in a completed previous bubble
   - Assert: given two completed assistant bubbles and a third in-progress, selecting text in the first is preserved across a delta append to the third (selection range comparison before/after).
   - Evidence: `tests/plugin/ui/ChatView.selection.test.ts::Y5_streaming_preserves_selection(vitest)` — covers S3 copy/paste expectation under live streaming.
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — No relative imports where the project alias applies
-- [ ] **Z5** — No logging changes needed (pure rendering change; existing ChatView logs unchanged)
-- [ ] **Z6** — `/review-story BUG-2` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — No relative imports where the project alias applies
+- [x] **Z5** — No logging changes needed (pure rendering change; existing ChatView logs unchanged)
+- [x] **Z6** — `/review-story BUG-2` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
 
 ---
 

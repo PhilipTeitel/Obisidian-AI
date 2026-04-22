@@ -347,6 +347,7 @@ export class SidecarRuntime {
         op: 'chat',
         ms: Date.now() - t0,
         groundingPolicyVersion: out.value.groundingPolicyVersion,
+        sourceCount: out.value.sources.length,
       },
       'sidecar.chat.done',
     );

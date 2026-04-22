@@ -1,4 +1,9 @@
-import { DEFAULT_SEARCH_ASSEMBLY, validateSearchAssemblyOptions } from '../domain/contextAssembly.js';
+import {
+  DEFAULT_SEARCH_ASSEMBLY,
+  resolveChatStitchMaxTokens,
+  stitchRetrievalSnippetsForChat,
+  validateSearchAssemblyOptions,
+} from '../domain/contextAssembly.js';
 import type {
   BuildGroundedMessagesHooks,
   ChatMessage,
@@ -6,6 +11,7 @@ import type {
   GroundingOutcome,
   SearchAssemblyOptions,
   Source,
+  UsedNodeRecord,
 } from '../domain/types.js';
 import { CHAT_GROUNDING_POLICY_WIRE_VERSION } from '../domain/types.js';
 import type { ChatCompletionOptions, IChatPort } from '../ports/IChatPort.js';
@@ -54,6 +60,17 @@ export interface ChatWorkflowResult {
 /** Product-owned copy for zero-hit path (CHAT-3 B4); not model-generated. */
 export const INSUFFICIENT_EVIDENCE_STREAM_MESSAGE =
   "I couldn't find notes in your vault that answer this. Try narrowing your search with a folder path, a tag, or a date range — then ask again.";
+
+function usedNodeRecordsToSources(records: UsedNodeRecord[]): Source[] {
+  const seenPath = new Set<string>();
+  const out: Source[] = [];
+  for (const r of records) {
+    if (seenPath.has(r.notePath)) continue;
+    seenPath.add(r.notePath);
+    out.push({ notePath: r.notePath, nodeId: r.nodeId });
+  }
+  return out;
+}
 
 function lastUserContent(messages: ChatMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -106,7 +123,14 @@ export async function* runChatStream(
     };
   }
 
-  const context = searchRes.results.map((r) => r.snippet).join('\n\n---\n\n');
+  const stitchBudget = resolveChatStitchMaxTokens(searchAssembly);
+  const stitched = stitchRetrievalSnippetsForChat(searchRes.results, {
+    maxTotalTokens: stitchBudget,
+  });
+  for (const nodeId of stitched.droppedNodeIds) {
+    deps.log?.debug({ nodeId, stitchBudget }, 'chat.retrieval_snippet_dropped_budget');
+  }
+  const context = stitched.context;
   const hooks =
     deps.onUserPromptTruncation !== undefined
       ? { onUserPromptTruncated: deps.onUserPromptTruncation }
@@ -126,10 +150,8 @@ export async function* runChatStream(
     yield delta;
   }
 
-  const sources: Source[] = searchRes.results.map((r) => ({
-    notePath: r.notePath,
-    nodeId: r.nodeId,
-  }));
+  const sources = usedNodeRecordsToSources(stitched.usedRecords);
+  deps.log?.info?.({ sourceCount: sources.length }, 'chat.completion_sources');
 
   return {
     sources,

@@ -1,5 +1,5 @@
 import { estimateTokens } from './tokenEstimator.js';
-import type { SearchAssemblyOptions } from './types.js';
+import type { SearchAssemblyOptions, SearchResult, UsedNodeRecord } from './types.js';
 
 const SUM_TOLERANCE = 1e-6;
 
@@ -28,6 +28,63 @@ export function validateSearchAssemblyOptions(opts: SearchAssemblyOptions): void
   if (Math.abs(sum - 1) > SUM_TOLERANCE) {
     throw new Error(`Context budget fractions must sum to 1.0 (±${SUM_TOLERANCE}), got ${sum}`);
   }
+  if (opts.chatStitchMaxTokens !== undefined) {
+    if (opts.chatStitchMaxTokens <= 0 || !Number.isFinite(opts.chatStitchMaxTokens)) {
+      throw new Error('SearchAssemblyOptions.chatStitchMaxTokens must be a positive finite number when set');
+    }
+  }
+}
+
+/** Same separator `ChatWorkflow` uses between ranked snippets (legacy `join` behavior). */
+export const CHAT_RETRIEVAL_SNIPPET_SEPARATOR = '\n\n---\n\n';
+
+export function resolveChatStitchMaxTokens(assembly: SearchAssemblyOptions): number {
+  const explicit = assembly.chatStitchMaxTokens;
+  if (explicit !== undefined) return explicit;
+  return Math.max(512, Math.floor(assembly.totalTokenBudget * 8));
+}
+
+export interface StitchRetrievalSnippetsResult {
+  context: string;
+  usedRecords: UsedNodeRecord[];
+  /** Node ids excluded because the snippet did not fit the stitch budget (and all lower-ranked hits after the first exclusion). */
+  droppedNodeIds: string[];
+}
+
+/**
+ * Stitch ranked search snippets into the chat retrieval string, respecting a hard token ceiling.
+ * When a snippet does not fit, it and all lower-ranked results are omitted (prefix of the ranking only).
+ */
+export function stitchRetrievalSnippetsForChat(
+  results: SearchResult[],
+  options: { maxTotalTokens: number; separator?: string },
+): StitchRetrievalSnippetsResult {
+  const separator = options.separator ?? CHAT_RETRIEVAL_SNIPPET_SEPARATOR;
+  let context = '';
+  const usedRecords: UsedNodeRecord[] = [];
+  const droppedNodeIds: string[] = [];
+  let insertion = 0;
+  let stop = false;
+  for (const r of results) {
+    if (stop) {
+      droppedNodeIds.push(r.nodeId);
+      continue;
+    }
+    const piece = (context.length > 0 ? separator : '') + r.snippet;
+    const candidate = context + piece;
+    if (estimateTokens(candidate) <= options.maxTotalTokens) {
+      context = candidate;
+      usedRecords.push({
+        nodeId: r.nodeId,
+        notePath: r.notePath,
+        insertionOrder: insertion++,
+      });
+    } else {
+      droppedNodeIds.push(r.nodeId);
+      stop = true;
+    }
+  }
+  return { context, usedRecords, droppedNodeIds };
 }
 
 function truncateToMaxTokens(text: string, maxTokens: number): string {

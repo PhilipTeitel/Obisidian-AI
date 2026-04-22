@@ -38,6 +38,8 @@ export class SearchTestStore implements IDocumentStore {
   keywordHits: VectorMatch[] = [];
   lastKeywordFilter: NodeFilter | undefined;
   keywordFilters: (NodeFilter | undefined)[] = [];
+  /** When set, overrides `noteMatchesTagFilter` for a note id (tests only). */
+  tagFilterByNoteId = new Map<string, boolean>();
 
   constructor() {
     this.nodes.set(
@@ -129,7 +131,10 @@ export class SearchTestStore implements IDocumentStore {
 
   async upsertNoteMeta(): Promise<void> {}
 
-  async noteMatchesTagFilter(): Promise<boolean> {
+  async noteMatchesTagFilter(noteId: string, tagsAny: string[]): Promise<boolean> {
+    if (tagsAny.length === 0) return true;
+    const o = this.tagFilterByNoteId.get(noteId);
+    if (o !== undefined) return o;
     return true;
   }
 }

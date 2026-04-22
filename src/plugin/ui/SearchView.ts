@@ -6,14 +6,11 @@ import type ObsidianAIPlugin from '../main.js';
 import { showAiNotice } from './showAiNotice.js';
 import { VIEW_TYPE_SEARCH } from './viewIds.js';
 
-const SNIPPET_STYLE_ID = 'obsidian-ai-search-snippet-style';
-
-function ensureSnippetUserSelectStyle(): void {
-  if (document.getElementById(SNIPPET_STYLE_ID)) return;
-  const s = document.createElement('style');
-  s.id = SNIPPET_STYLE_ID;
-  s.textContent = `.obsidian-ai-search-snippet { user-select: text; -webkit-user-select: text; }`;
-  document.head.appendChild(s);
+/** Display name for a vault path (README: note title + path). */
+function noteTitleFromPath(notePath: string): string {
+  const t = notePath.replace(/\/+$/, '');
+  const seg = t.split('/').pop();
+  return seg !== undefined && seg.length > 0 ? seg : notePath;
 }
 
 export class SearchView extends ItemView {
@@ -47,7 +44,6 @@ export class SearchView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
-    ensureSnippetUserSelectStyle();
     const root = this.contentEl;
     root.empty();
     root.createEl('h4', { text: 'Semantic search' });
@@ -119,6 +115,7 @@ export class SearchView extends ItemView {
     }
     for (const r of results) {
       const card = this.resultsEl.createDiv({ cls: 'obsidian-ai-search-card' });
+      card.createEl('div', { text: noteTitleFromPath(r.notePath), cls: 'obsidian-ai-search-title' });
       const pathEl = card.createEl('div', { cls: 'obsidian-ai-search-path' });
       const link = pathEl.createEl('a', { text: r.notePath });
       link.addEventListener('click', (ev) => {
