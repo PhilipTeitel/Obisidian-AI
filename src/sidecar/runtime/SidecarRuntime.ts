@@ -9,6 +9,10 @@ import type {
 import { planAndApplyIncrementalIndex } from '../../core/workflows/IncrementalIndexPlanner.js';
 import type { IndexWorkflowDeps } from '../../core/workflows/IndexWorkflow.js';
 import { processOneJob } from '../../core/workflows/IndexWorkflow.js';
+import {
+  clampUtcOffsetHoursForResolver,
+  type ResolverClock,
+} from '../../core/domain/dateRangeResolver.js';
 import { runChatStream, type ChatWorkflowDeps, type ChatWorkflowResult } from '../../core/workflows/ChatWorkflow.js';
 import { runSearch } from '../../core/workflows/SearchWorkflow.js';
 import { openDatabase } from '../db/open.js';
@@ -322,6 +326,20 @@ export class SidecarRuntime {
     const deps = this.getChatWorkflowDeps();
     const policyVer = payload.groundingPolicyVersion ?? GROUNDING_POLICY_VERSION;
     this.log.debug({ groundingPolicyVersion: policyVer }, 'sidecar.chat.request');
+    const utcRaw = payload.timezoneUtcOffsetHours ?? 0;
+    const utc = clampUtcOffsetHoursForResolver(utcRaw);
+    const utcNum = Number(utcRaw);
+    if (Number.isFinite(utcNum) && clampUtcOffsetHoursForResolver(utcNum) !== utcNum) {
+      this.log.debug({ requested: utcRaw, clamped: utc }, 'chat.timezone_offset_normalized');
+    }
+    const resolverClock: ResolverClock = {
+      now: () => new Date(),
+      timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+    const ianaTz = resolverClock.timeZone();
+    if (ianaTz === undefined || ianaTz === '') {
+      this.log.debug({ utcOffsetHoursFallback: utc }, 'chat.date_anchor_using_utc_offset_fallback');
+    }
     const stream = runChatStream(deps, payload.messages, {
       search: payload.search,
       apiKey: payload.apiKey,
@@ -333,6 +351,9 @@ export class SidecarRuntime {
       tags: undefined,
       systemPrompt: payload.systemPrompt,
       vaultOrganizationPrompt: payload.vaultOrganizationPrompt,
+      resolverClock,
+      timezoneUtcOffsetHours: utc,
+      dailyNotePathGlobs: payload.dailyNotePathGlobs,
       completion: {
         signal: options?.signal,
         timeoutMs: payload.timeoutMs,

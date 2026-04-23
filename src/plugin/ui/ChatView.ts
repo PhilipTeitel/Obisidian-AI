@@ -205,6 +205,8 @@ export class ChatView extends ItemView {
           search: buildSearchAssemblyFromSettings(ps),
           pathGlobs,
           dateRange,
+          timezoneUtcOffsetHours: ps.timezoneUtcOffsetHours,
+          dailyNotePathGlobs: ps.dailyNotePathGlobs,
           ...(vaultOrg !== '' ? { vaultOrganizationPrompt: vaultOrg } : {}),
           ...(chatSys !== '' ? { systemPrompt: chatSys } : {}),
           groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,

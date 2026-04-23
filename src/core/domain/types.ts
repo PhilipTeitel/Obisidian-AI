@@ -364,6 +364,10 @@ export interface ChatRequestPayload {
   vaultOrganizationPrompt?: string;
   /** Echoed for logging / copy tuning (ADR-011). */
   groundingPolicyVersion?: string;
+  /** BUG-3 / ADR-016: integer UTC offset (−12..+14) when local TZ is undetectable in the sidecar. */
+  timezoneUtcOffsetHours?: number;
+  /** BUG-3: daily-note globs from settings; paired with resolved NL date range for retrieval. */
+  dailyNotePathGlobs?: string[];
 }
 
 /** Discriminated client → sidecar requests (NDJSON `type` / HTTP route names). */

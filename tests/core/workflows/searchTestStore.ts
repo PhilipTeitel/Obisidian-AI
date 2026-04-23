@@ -37,6 +37,8 @@ export class SearchTestStore implements IDocumentStore {
   lastSummaryFilter: NodeFilter | undefined;
   keywordHits: VectorMatch[] = [];
   lastKeywordFilter: NodeFilter | undefined;
+  /** Last full-text query passed to `searchContentKeyword` (BM25 / hybrid). */
+  lastKeywordQuery: string | undefined;
   keywordFilters: (NodeFilter | undefined)[] = [];
   /** When set, overrides `noteMatchesTagFilter` for a note id (tests only). */
   tagFilterByNoteId = new Map<string, boolean>();
@@ -99,8 +101,9 @@ export class SearchTestStore implements IDocumentStore {
     return this.summaryHits.slice(0, k);
   }
 
-  async searchContentKeyword(_q: string, k: number, filter?: NodeFilter): Promise<VectorMatch[]> {
+  async searchContentKeyword(q: string, k: number, filter?: NodeFilter): Promise<VectorMatch[]> {
     this.callLog.push('searchContentKeyword');
+    this.lastKeywordQuery = q;
     this.lastKeywordFilter = filter;
     this.keywordFilters.push(filter);
     return this.keywordHits.slice(0, k);

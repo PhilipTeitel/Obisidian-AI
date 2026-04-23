@@ -19,6 +19,7 @@ import * as summaryWorkflow from '@src/core/workflows/SummaryWorkflow.js';
 import {
   indexJobId,
   processOneJob,
+  resolveNoteDateForIndexJob,
   resumeInterruptedJobs,
 } from '@src/core/workflows/IndexWorkflow.js';
 
@@ -496,6 +497,46 @@ describe('IndexWorkflow', () => {
     };
     const copy = JSON.parse(JSON.stringify(job)) as NoteIndexJob;
     expect(copy).toEqual(job);
+  });
+});
+
+describe('resolveNoteDateForIndexJob (daily path segments)', () => {
+  const globs = ['daily/**/*.md'];
+
+  it('uses_filename_stem_when_ISO', () => {
+    expect(
+      resolveNoteDateForIndexJob({
+        vaultPath: 'daily/2026-04-16.md',
+        dailyNotePathGlobs: globs,
+      }),
+    ).toBe('2026-04-16');
+  });
+
+  it('uses_parent_folder_when_filename_is_not_ISO', () => {
+    expect(
+      resolveNoteDateForIndexJob({
+        vaultPath: 'daily/2026-04-16/journal.md',
+        dailyNotePathGlobs: globs,
+      }),
+    ).toBe('2026-04-16');
+  });
+
+  it('returns_null_when_no_ISO_segment_in_path', () => {
+    expect(
+      resolveNoteDateForIndexJob({
+        vaultPath: 'daily/scratch/notes.md',
+        dailyNotePathGlobs: globs,
+      }),
+    ).toBeNull();
+  });
+
+  it('returns_null_outside_daily_globs', () => {
+    expect(
+      resolveNoteDateForIndexJob({
+        vaultPath: 'other/2026-04-16.md',
+        dailyNotePathGlobs: globs,
+      }),
+    ).toBeNull();
   });
 });
 

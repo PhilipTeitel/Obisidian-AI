@@ -1,7 +1,11 @@
 /**
  * Compile vault path globs (`**`, `*`, `?`) to a union regex plus per-glob SQL LIKE patterns (ADR-014 / RET-6).
  * Separators are normalized to `/` before matching.
+ *
+ * **Case:** Vault folder names vary in casing (`Daily/` vs `daily/`). Use {@link VAULT_PATH_GLOB_REGEX_FLAGS}
+ * whenever compiling {@link CompiledPathGlob.regex} or {@link CompiledPathGlobs.pathRegex} into a `RegExp`.
  */
+export const VAULT_PATH_GLOB_REGEX_FLAGS = 'i';
 
 function escapeRegexChar(c: string): string {
   return /[\\^$+?.()|[\]{}]/.test(c) ? `\\${c}` : c;
@@ -41,8 +45,9 @@ function compileGlobLike(normalized: string): string {
   let out = '';
   while (i < normalized.length) {
     if (normalized[i] === '*' && normalized[i + 1] === '*') {
+      /** Double-star slash star may match zero directory segments; use SQL `%` not `%/%`. */
       if (normalized[i + 2] === '/' && normalized[i + 3] === '*') {
-        out += '%/%';
+        out += '%';
         i += 4;
         continue;
       }
@@ -117,6 +122,6 @@ export function vaultPathMatchesAnyGlob(vaultPath: string, globs: string[]): boo
   const norm = vaultPath.replace(/\\/g, '/');
   return globs.some((g) => {
     const { regex } = compilePathGlob(g);
-    return new RegExp(regex).test(norm);
+    return new RegExp(regex, VAULT_PATH_GLOB_REGEX_FLAGS).test(norm);
   });
 }

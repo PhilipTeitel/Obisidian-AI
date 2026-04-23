@@ -47,14 +47,36 @@ function stemFromVaultPath(vaultPath: string): string {
   return dot === -1 ? base : base.slice(0, dot);
 }
 
-function resolveNoteDateForJob(job: NoteIndexJob): string | null {
+export type NoteDateIndexJobFields = Pick<
+  NoteIndexJob,
+  'vaultPath' | 'dailyNotePathGlobs' | 'dailyNoteDatePattern'
+>;
+
+/**
+ * Derives `note_meta.note_date` for indexing (ADR-014). Filename stem is tried first; if it does
+ * not match `dailyNoteDatePattern`, parent path segments are scanned right-to-left so
+ * `daily/2026-04-16/journal.md` still gets `2026-04-16`.
+ */
+export function resolveNoteDateForIndexJob(job: NoteDateIndexJobFields): string | null {
   const globs =
     job.dailyNotePathGlobs && job.dailyNotePathGlobs.length > 0
       ? job.dailyNotePathGlobs
       : [...DEFAULT_DAILY_NOTE_GLOBS];
   const pattern = job.dailyNoteDatePattern ?? 'YYYY-MM-DD';
   if (!vaultPathMatchesAnyGlob(job.vaultPath, globs)) return null;
-  return parseDailyNoteDate(stemFromVaultPath(job.vaultPath), pattern);
+  const stem = stemFromVaultPath(job.vaultPath);
+  const fromStem = parseDailyNoteDate(stem, pattern);
+  if (fromStem) return fromStem;
+
+  const norm = job.vaultPath.replace(/\\/g, '/');
+  const parts = norm.split('/').filter(Boolean);
+  if (parts.length < 2) return null;
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const token = stemFromVaultPath(parts[i]!);
+    const d = parseDailyNoteDate(token, pattern);
+    if (d) return d;
+  }
+  return null;
 }
 
 function isNonLeaf(nodes: DocumentNode[], nodeId: string): boolean {
@@ -120,7 +142,7 @@ export async function processOneJob(
       contentHash: job.contentHash,
       indexedAt: now,
       nodeCount: parsed.nodes.length,
-      noteDate: resolveNoteDateForJob(job),
+      noteDate: resolveNoteDateForIndexJob(job),
     });
     deps.jobSteps.transitionStep({ jobId: jid, runId, to: 'stored' });
 

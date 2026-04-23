@@ -10,6 +10,7 @@ import type {
   VectorType,
 } from '../../core/domain/types.js';
 import { sanitizeFtsQuery } from '../../core/domain/fts-sanitize.js';
+import { VAULT_PATH_GLOB_REGEX_FLAGS } from '../../core/domain/pathGlob.js';
 import type { IDocumentStore } from '../../core/ports/IDocumentStore.js';
 import Database from 'better-sqlite3';
 import { getEmbeddingDimension } from '../db/migrate.js';
@@ -74,7 +75,7 @@ export class SqliteDocumentStore implements IDocumentStore {
     this.db.function('regexp', { deterministic: true }, (pattern: unknown, text: unknown) => {
       if (typeof pattern !== 'string' || typeof text !== 'string') return 0;
       try {
-        return new RegExp(pattern).test(text) ? 1 : 0;
+        return new RegExp(pattern, VAULT_PATH_GLOB_REGEX_FLAGS).test(text) ? 1 : 0;
       } catch {
         return 0;
       }

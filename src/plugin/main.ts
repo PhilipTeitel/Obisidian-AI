@@ -2,6 +2,7 @@ import { Plugin } from 'obsidian';
 import { getCoreLabel } from '../core/index.js';
 import { registerCommands } from './commands/registerCommands.js';
 import { SidecarLifecycle } from './client/SidecarLifecycle.js';
+import { clampUtcOffsetHoursForResolver } from '../core/domain/dateRangeResolver.js';
 import { DEFAULT_SETTINGS } from './settings/defaults.js';
 import { ObsidianAISettingTab } from './settings/SettingsTab.js';
 import type { ObsidianAISettings } from './settings/types.js';
@@ -50,6 +51,9 @@ export default class ObsidianAIPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const data = (await this.loadData()) as Partial<ObsidianAISettings> | null;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
+    this.settings.timezoneUtcOffsetHours = clampUtcOffsetHoursForResolver(
+      this.settings.timezoneUtcOffsetHours,
+    );
   }
 
   async saveSettings(): Promise<void> {

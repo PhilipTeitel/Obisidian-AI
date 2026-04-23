@@ -8,6 +8,7 @@ import {
   runB4NullNoteDateExcludedContract,
   runB5IntersectionContract,
   runB6NoteDateRoundTripContract,
+  runB7CompiledGlobDirectChildContract,
 } from '../../contract/document-store.filters.contract.js';
 
 const DIM = 4;
@@ -52,6 +53,13 @@ describe('SqliteDocumentStore contract — filter suite (RET-6 Y6)', () => {
         await runB6NoteDateRoundTripContract(s6);
       } finally {
         db6.close();
+      }
+      const db7 = openMigratedMemoryDb({ embeddingDimension: DIM });
+      const s7 = new SqliteDocumentStore(db7);
+      try {
+        await runB7CompiledGlobDirectChildContract(s7);
+      } finally {
+        db7.close();
       }
       expect(true).toBe(true);
     } finally {

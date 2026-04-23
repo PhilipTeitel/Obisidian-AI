@@ -3,6 +3,11 @@ import {
   COMBINED_SYSTEM_PROMPT_TOKEN_BUDGET,
   estimateCombinedBuiltinAndUserPromptTokens,
 } from '../../core/domain/chatUserPromptBudget.js';
+import {
+  UTC_OFFSET_HOURS_MAX,
+  UTC_OFFSET_HOURS_MIN,
+  clampUtcOffsetHoursForResolver,
+} from '../../core/domain/dateRangeResolver.js';
 import { normalizeChatCoarseKFromUserInput } from './chatCoarseK.js';
 import { getOpenAIApiKey, setOpenAIApiKey } from './secretSettings.js';
 import type { ObsidianAISettings } from './types.js';
@@ -45,7 +50,7 @@ export class ObsidianAISettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Enable sidecar inspector')
       .setDesc(
-        'Launch the sidecar with `--inspect=0` so you can attach a Node debugger. The inspector URL is printed by the sidecar on stderr; reload the plugin after changing.',
+        `Launch the sidecar with Node inspector on port 62127 (same as .vscode/launch.json attach). Attach the debugger after the sidecar starts; reload the plugin after changing.`,
       )
       .addToggle((t) =>
         t.setValue(s.sidecarInspector).onChange(async (v) => {
@@ -67,6 +72,53 @@ export class ObsidianAISettingTab extends PluginSettingTab {
             await this.aiPlugin.saveSettings();
           }),
       );
+
+    containerEl.createEl('h3', { text: 'Time and locale' });
+
+    const tzWarnEl = containerEl.createDiv({ cls: 'obsidian-ai-tz-offset-warn' });
+    tzWarnEl.style.minHeight = '1.25em';
+
+    let tzDebounce: ReturnType<typeof setTimeout> | null = null;
+    new Setting(containerEl)
+      .setName('Timezone UTC offset (hours)')
+      .setDesc(
+        `Whole-hour offset (${UTC_OFFSET_HOURS_MIN}–${UTC_OFFSET_HOURS_MAX}) used only when the sidecar cannot read a local IANA timezone. Default 0.`,
+      )
+      .addText((t) => {
+        t.setValue(String(s.timezoneUtcOffsetHours));
+        const commit = async () => {
+          const raw = t.inputEl.value.trim();
+          const parsed = parseInt(raw, 10);
+          let warning: string | null = null;
+          if (raw === '') {
+            s.timezoneUtcOffsetHours = 0;
+            t.setValue('0');
+          } else if (!Number.isFinite(parsed)) {
+            warning = 'Enter an integer; previous value kept.';
+            t.setValue(String(s.timezoneUtcOffsetHours));
+          } else {
+            const clamped = clampUtcOffsetHoursForResolver(parsed);
+            if (clamped !== parsed) {
+              warning = `Clamped to ${clamped} (allowed range ${UTC_OFFSET_HOURS_MIN}–${UTC_OFFSET_HOURS_MAX}).`;
+            }
+            s.timezoneUtcOffsetHours = clamped;
+            t.setValue(String(clamped));
+          }
+          tzWarnEl.classList.toggle('mod-warning', Boolean(warning));
+          tzWarnEl.textContent = warning ?? '';
+          await this.aiPlugin.saveSettings();
+        };
+        t.inputEl.addEventListener('blur', () => {
+          void commit();
+        });
+        t.onChange(() => {
+          if (tzDebounce) clearTimeout(tzDebounce);
+          tzDebounce = setTimeout(() => {
+            tzDebounce = null;
+            void commit();
+          }, 400);
+        });
+      });
 
     new Setting(containerEl)
       .setName('Indexed folders')

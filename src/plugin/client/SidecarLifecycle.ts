@@ -27,6 +27,9 @@ export function vaultDefaultDbPath(vault: Vault): string {
 
 const NODE_EXE = process.platform === 'win32' ? 'node.exe' : 'node';
 
+/** Must match `.vscode/launch.json` attach `port` (random `--inspect=0` breaks breakpoint binding). */
+const SIDECAR_INSPECT_PORT = 62127;
+
 function isExecutableFile(filePath: string): boolean {
   try {
     fs.accessSync(filePath, fs.constants.X_OK);
@@ -345,7 +348,9 @@ export class SidecarLifecycle {
   async start(): Promise<ISidecarTransport> {
     const script = this.sidecarScriptPath();
     const node = resolveSidecarNodeExecutable(this.host.settings);
-    const args = this.host.settings.sidecarInspector ? ['--inspect=0', script] : [script];
+    const args = this.host.settings.sidecarInspector
+      ? [`--inspect=${SIDECAR_INSPECT_PORT}`, script]
+      : [script];
     console.log('Obsidian AI: spawning sidecar', {
       node,
       args,

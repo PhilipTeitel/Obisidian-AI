@@ -3,7 +3,7 @@ import {
   DEFAULT_SEARCH_ASSEMBLY,
   validateSearchAssemblyOptions,
 } from '../domain/contextAssembly.js';
-import { compilePathGlobs } from '../domain/pathGlob.js';
+import { compilePathGlobs, VAULT_PATH_GLOB_REGEX_FLAGS } from '../domain/pathGlob.js';
 import { fuseRankings } from '../domain/rrf.js';
 import type {
   DocumentNode,
@@ -134,7 +134,7 @@ function noteMetaMatchesDateFilter(
 function vaultPathMatchesRegex(vaultPath: string, pathRegex: string | undefined): boolean {
   if (!pathRegex) return true;
   try {
-    return new RegExp(pathRegex).test(vaultPath);
+    return new RegExp(pathRegex, VAULT_PATH_GLOB_REGEX_FLAGS).test(vaultPath);
   } catch {
     return false;
   }

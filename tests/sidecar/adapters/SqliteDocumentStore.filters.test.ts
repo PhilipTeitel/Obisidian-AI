@@ -26,6 +26,7 @@ import {
   runB4NullNoteDateExcludedContract,
   runB5IntersectionContract,
   runB6NoteDateRoundTripContract,
+  runB7CompiledGlobDirectChildContract,
 } from '../../contract/document-store.filters.contract.js';
 import { runSearch } from '@src/core/workflows/SearchWorkflow.js';
 import { DEFAULT_SEARCH_ASSEMBLY } from '@src/core/domain/contextAssembly.js';
@@ -104,6 +105,16 @@ function leafNode(id: string, noteId: string): DocumentNode {
 describe('SqliteDocumentStore filters integration (RET-6)', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('B7_compiled_glob_direct_child_under_daily_sqlite', async () => {
+    const db = openRet6Db();
+    const store = new SqliteDocumentStore(db);
+    try {
+      await runB7CompiledGlobDirectChildContract(store);
+    } finally {
+      db.close();
+    }
   });
 
   it('B1_single_glob_sqlite', async () => {

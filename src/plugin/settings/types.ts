@@ -16,7 +16,7 @@ export interface ObsidianAISettings {
   dbPath: string;
   /** Absolute path to the `node` binary for the sidecar. Empty = auto-detect (often fails when Obsidian starts from the Dock). */
   nodeExecutablePath: string;
-  /** Launch the sidecar with `--inspect=0` so a Node debugger can attach. Reload plugin after changing. */
+  /** Launch the sidecar with Node `--inspect` on port 62127 (see SidecarLifecycle). Reload plugin after changing. */
   sidecarInspector: boolean;
   transport: 'stdio' | 'http';
   logLevel: 'debug' | 'info' | 'warn' | 'error';
@@ -29,6 +29,8 @@ export interface ObsidianAISettings {
   vaultOrganizationPrompt: string;
   /** Hybrid BM25 + vector coarse fusion (RET-5 / ADR-012); default on. */
   enableHybridSearch: boolean;
+  /** BUG-3 / ADR-016: fallback civil date when IANA TZ is unavailable in the sidecar (−12..+14). */
+  timezoneUtcOffsetHours: number;
   /** Globs for daily-note paths; used when indexing to populate `note_meta.note_date` (RET-6). */
   dailyNotePathGlobs: string[];
   /** Basename pattern for daily-note dates: `YYYY`, `MM`, `DD` tokens (RET-6). */

@@ -4,6 +4,12 @@ import {
   stitchRetrievalSnippetsForChat,
   validateSearchAssemblyOptions,
 } from '../domain/contextAssembly.js';
+import {
+  clampUtcOffsetHoursForResolver,
+  resolveDateRangeFromPrompt,
+  type ResolverClock,
+  type ResolverMatch,
+} from '../domain/dateRangeResolver.js';
 import type {
   BuildGroundedMessagesHooks,
   ChatMessage,
@@ -48,6 +54,10 @@ export interface ChatWorkflowOptions {
   /** CHAT-3 / ADR-011 reserved slots (settings UI CHAT-4). */
   systemPrompt?: string;
   vaultOrganizationPrompt?: string;
+  /** BUG-3 / ADR-016: when set, NL date phrases in the last user message constrain retrieval. */
+  resolverClock?: ResolverClock;
+  timezoneUtcOffsetHours?: number;
+  dailyNotePathGlobs?: string[];
 }
 
 export interface ChatWorkflowResult {
@@ -83,6 +93,25 @@ function lastUserContent(messages: ChatMessage[]): string | null {
   return null;
 }
 
+function hasExplicitDateRange(dr?: { start?: string; end?: string }): boolean {
+  return dr !== undefined && (dr.start !== undefined || dr.end !== undefined);
+}
+
+function mergePathGlobs(a?: string[], b?: string[]): string[] | undefined {
+  const all = [...(a ?? []), ...(b ?? [])];
+  return all.length > 0 ? [...new Set(all)] : undefined;
+}
+
+/** After NL date resolution, keep filters but drop the matched phrase from the embedding/BM25 query (REQ-006 / ADR-016). */
+export function stripMatchedNLDatePhraseForRetrieval(query: string, match: ResolverMatch | null): string {
+  if (match === null) return query;
+  const phrase = match.matchedPhrase.trim();
+  if (phrase.length === 0) return query;
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const next = query.replace(new RegExp(escaped, 'gi'), ' ').replace(/\s+/g, ' ').trim();
+  return next.length > 0 ? next : query;
+}
+
 /**
  * Vault-only RAG: embed + phased ANN + assembly via `runSearch`, then stream `IChatPort.complete`.
  */
@@ -99,15 +128,47 @@ export async function* runChatStream(
   const searchAssembly = options.search ?? DEFAULT_SEARCH_ASSEMBLY;
   validateSearchAssemblyOptions(searchAssembly);
 
+  let pathGlobs = options.pathGlobs;
+  let dateRange = options.dateRange;
+  let nlDateMatch: ResolverMatch | null = null;
+  if (options.resolverClock !== undefined && !hasExplicitDateRange(options.dateRange)) {
+    const match = resolveDateRangeFromPrompt(query, options.resolverClock, {
+      utcOffsetHoursFallback: clampUtcOffsetHoursForResolver(options.timezoneUtcOffsetHours),
+      dailyNotePathGlobs: options.dailyNotePathGlobs,
+    });
+    if (match !== null) {
+      nlDateMatch = match;
+      deps.log?.debug(
+        {
+          matchRuleId: match.matchRuleId,
+          dateRange: match.dateRange,
+          pathGlobs: match.pathGlobs,
+        },
+        'chat.date_range_resolved',
+      );
+      deps.log?.info({ naturalLanguageDateFilterApplied: true }, 'chat.nl_date_filter_applied');
+      pathGlobs = mergePathGlobs(pathGlobs, match.pathGlobs);
+      dateRange = match.dateRange;
+    }
+  }
+
+  const retrievalQuery = stripMatchedNLDatePhraseForRetrieval(query, nlDateMatch);
+  if (retrievalQuery !== query) {
+    deps.log?.debug(
+      { retrievalQueryLen: retrievalQuery.length, matchRuleId: nlDateMatch?.matchRuleId },
+      'chat.retrieval_query_stripped_nl_date',
+    );
+  }
+
   const searchRes = await runSearch(
     deps,
     {
-      query,
+      query: retrievalQuery,
       apiKey: options.apiKey,
       k: options.k ?? DEFAULT_SEARCH_K,
       tags: options.tags,
-      pathGlobs: options.pathGlobs,
-      dateRange: options.dateRange,
+      pathGlobs,
+      dateRange,
       coarseK: options.coarseK,
       enableHybridSearch: options.enableHybridSearch,
     },

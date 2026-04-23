@@ -1,4 +1,5 @@
 import { expect } from 'vitest';
+import { compilePathGlobs } from '@src/core/domain/pathGlob.js';
 import type { DocumentNode } from '@src/core/domain/types.js';
 import type { IDocumentStore } from '@src/core/ports/IDocumentStore.js';
 
@@ -119,6 +120,19 @@ export async function runB5IntersectionContract(store: IDocumentStore): Promise<
   expect(ids.has('ok')).toBe(true);
   expect(ids.has('bad1')).toBe(false);
   expect(ids.has('bad2')).toBe(false);
+}
+
+/** B7 — compiled daily-note glob LIKE must match YYYY-MM-DD.md directly under daily/ (RET-6 prefilter). */
+export async function runB7CompiledGlobDirectChildContract(store: IDocumentStore): Promise<void> {
+  const q = new Float32Array(DIM).fill(0.26);
+  const compiled = compilePathGlobs(['daily/**/*.md']);
+  await seedVec(store, 'leaf', 'nd', 'daily/2026-04-16.md', '2026-04-16', q);
+  const hits = await store.searchContentVectors(q, 8, {
+    pathRegex: compiled.pathRegex,
+    pathLikes: compiled.pathLikes,
+    dateRange: { start: '2026-04-16', end: '2026-04-16' },
+  });
+  expect(hits.map((h) => h.nodeId)).toContain('leaf');
 }
 
 /** B6 — noteDate round-trip (S9). */

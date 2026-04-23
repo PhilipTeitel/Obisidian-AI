@@ -3,7 +3,7 @@
 **Story**: Resolve natural-language time phrases in chat prompts ("last 2 weeks", "from March 16 onwards", "this month") into concrete `{ start, end }` date ranges on the sidecar — anchored in the machine's local time with a configurable UTC-offset fallback — and compose the result with `dailyNotePathGlobs` onto the retrieval request when the user's `vaultOrganizationPrompt` describes a daily-note layout. Fixes BUG-001 / [REQ-006 S4](../requirements/REQ-006-bug-001-chat-accuracy-ux-search.md) (and strengthens S2).
 **Epic**: 11 — Chat accuracy and UX bug fixes (REQ-006)
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -197,70 +197,70 @@ ChatView
 
 ### Phase A: Resolver (pure, anchor-driven)
 
-- [ ] **A1** — `resolveDateRangeFromPrompt("List out my job search activities over the last 2 weeks", clockAt("2026-04-21"))` returns `dateRange: { start: '2026-04-08', end: '2026-04-21' }`, `matchRuleId: 'last_n_weeks'`
+- [x] **A1** — `resolveDateRangeFromPrompt("List out my job search activities over the last 2 weeks", clockAt("2026-04-21"))` returns `dateRange: { start: '2026-04-08', end: '2026-04-21' }`, `matchRuleId: 'last_n_weeks'`
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::A1_last_2_weeks_rolling_14_days(vitest)` — covers S4.
 
-- [ ] **A2** — `"from March 16 onwards"` at anchor `2026-04-21` resolves to `{ start: '2026-03-16', end: '2026-04-21' }`, `matchRuleId: 'from_onwards'`
+- [x] **A2** — `"from March 16 onwards"` at anchor `2026-04-21` resolves to `{ start: '2026-03-16', end: '2026-04-21' }`, `matchRuleId: 'from_onwards'`
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::A2_from_onwards_inclusive(vitest)` — covers S2.
 
-- [ ] **A3** — `"this month"` at anchor `2026-04-21` resolves to `{ start: '2026-04-01', end: '2026-04-21' }`
+- [x] **A3** — `"this month"` at anchor `2026-04-21` resolves to `{ start: '2026-04-01', end: '2026-04-21' }`
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::A3_this_month(vitest)`
 
-- [ ] **A4** — `"last month"` at anchor `2026-04-21` resolves to `{ start: '2026-03-01', end: '2026-03-31' }`
+- [x] **A4** — `"last month"` at anchor `2026-04-21` resolves to `{ start: '2026-03-01', end: '2026-03-31' }`
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::A4_last_month(vitest)`
 
-- [ ] **A5** — `"yesterday"` / `"today"` resolve to single-day ranges
+- [x] **A5** — `"yesterday"` / `"today"` resolve to single-day ranges
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::A5_today_and_yesterday(vitest)`
 
-- [ ] **A6** — `"between March 1 and March 15"` resolves to `{ start: '2026-03-01', end: '2026-03-15' }` inclusive
+- [x] **A6** — `"between March 1 and March 15"` resolves to `{ start: '2026-03-01', end: '2026-03-15' }` inclusive
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::A6_between_and_inclusive(vitest)`
 
 ### Phase B: Settings UI and transport
 
-- [ ] **B1** — `timezoneUtcOffsetHours` default is `0`
+- [x] **B1** — `timezoneUtcOffsetHours` default is `0`
   - Evidence: `tests/plugin/settings/SettingsTab.timezone.test.ts::B1_default_zero(vitest)`
 
-- [ ] **B2** — Settings round-trip: write `-5`, reload plugin data, read back `-5`
+- [x] **B2** — Settings round-trip: write `-5`, reload plugin data, read back `-5`
   - Evidence: `tests/plugin/settings/SettingsTab.timezone.test.ts::B2_round_trip(vitest)`
 
-- [ ] **B3** — Out-of-range input (e.g. `99`) is clamped or rejected with a visible validation state; last-valid value persists
+- [x] **B3** — Out-of-range input (e.g. `99`) is clamped or rejected with a visible validation state; last-valid value persists
   - Evidence: `tests/plugin/settings/SettingsTab.timezone.test.ts::B3_validation_clamp(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** Anchor is local time when `Intl.DateTimeFormat().resolvedOptions().timeZone` is defined
+- [x] **Y1** — **(binding)** Anchor is local time when `Intl.DateTimeFormat().resolvedOptions().timeZone` is defined
   - Evidence: `tests/integration/chat-last-two-weeks.integration.test.ts::Y1_anchor_local_tz_when_defined(vitest)` — runs a chat turn in a process with defined TZ and verifies the resulting `dateRange.end` matches the host's local calendar date.
 
-- [ ] **Y2** — **(binding)** Fallback uses `timezoneUtcOffsetHours` when TZ is undefined
+- [x] **Y2** — **(binding)** Fallback uses `timezoneUtcOffsetHours` when TZ is undefined
   - Force `Intl.DateTimeFormat().resolvedOptions().timeZone === undefined` via a test harness and verify the resolver shifts "now" by `timezoneUtcOffsetHours` hours before computing the date.
   - Evidence: `tests/integration/chat-last-two-weeks.integration.test.ts::Y2_fallback_uses_utc_offset(vitest)`
 
-- [ ] **Y3** — **(binding)** "Last 2 weeks" = 14-day rolling window inclusive of today
+- [x] **Y3** — **(binding)** "Last 2 weeks" = 14-day rolling window inclusive of today
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::A1_last_2_weeks_rolling_14_days(vitest)` (shared with A1) — covers S4.
 
-- [ ] **Y4** — **(binding)** "From X onwards" and similar open-ended phrases are inclusive on both ends
+- [x] **Y4** — **(binding)** "From X onwards" and similar open-ended phrases are inclusive on both ends
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::A2_from_onwards_inclusive(vitest)` (shared with A2) — covers S2.
 
-- [ ] **Y5** — **(binding)** Resolver is pure: identical inputs produce identical outputs
+- [x] **Y5** — **(binding)** Resolver is pure: identical inputs produce identical outputs
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::Y5_pure_with_injected_clock(vitest)` — runs the same input against two clocks at the same anchor and asserts equality.
 
-- [ ] **Y6** — **(binding)** Unrecognized phrases return `null` (no error, no `dateRange` attached)
+- [x] **Y6** — **(binding)** Unrecognized phrases return `null` (no error, no `dateRange` attached)
   - Evidence: `tests/core/domain/dateRangeResolver.test.ts::Y6_unrecognized_phrase_returns_null(vitest)` — covers S4 fallback expectation.
 
-- [ ] **Y7** — **(binding)** When `dailyNotePathGlobs` is set, the resolver returns `pathGlobs` alongside `dateRange`, and `ChatWorkflow` passes both into `runSearch`
+- [x] **Y7** — **(binding)** When `dailyNotePathGlobs` is set, the resolver returns `pathGlobs` alongside `dateRange`, and `ChatWorkflow` passes both into `runSearch`
   - Evidence: `tests/core/workflows/ChatWorkflow.dateRange.test.ts::Y7_compose_pathGlobs_with_dateRange(vitest)` — covers S4 composition.
 
-- [ ] **Y8** — **(binding)** REQ-006 S4 end-to-end: asking "List out my job search activities over the last 2 weeks" against a vault fixture returns a non-refusal reply with `dateRange` and `pathGlobs` applied
+- [x] **Y8** — **(binding)** REQ-006 S4 end-to-end: asking "List out my job search activities over the last 2 weeks" against a vault fixture returns a non-refusal reply with `dateRange` and `pathGlobs` applied
   - Evidence: `tests/integration/chat-last-two-weeks.integration.test.ts::Y8_req006_s4_end_to_end(vitest)` — covers S4.
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — No relative imports where the project alias applies
-- [ ] **Z5** — New or modified code emits `debug`-level logs on resolver hits with `{ matchRuleId, dateRange, pathGlobs }` and an `info`-level count of turns that applied natural-language date filters per [§20 Logging](../../README.md#20-logging-and-observability)
-- [ ] **Z6** — `/review-story BUG-3` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — No relative imports where the project alias applies
+- [x] **Z5** — New or modified code emits `debug`-level logs on resolver hits with `{ matchRuleId, dateRange, pathGlobs }` and an `info`-level count of turns that applied natural-language date filters per [§20 Logging](../../README.md#20-logging-and-observability)
+- [x] **Z6** — `/review-story BUG-3` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
 
 ---
 
