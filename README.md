@@ -1,4 +1,4 @@
-# Obsidian AI Plugin — Iteration 3
+# Obsidian AI Plugin — Iteration 4
 
 ## Preface
 
@@ -27,11 +27,13 @@ A community Obsidian plugin that brings **semantic search** and **RAG-powered ch
 
 **Iteration 2** replaces the fragile WASM-in-renderer approach from iteration 1 with a **sidecar architecture**: the plugin `main.js` stays a thin UI client while a local Node.js sidecar process handles SQLite, embeddings, summarization, and search — communicating over a transport-abstracted channel (stdio IPC by default, HTTP opt-in).
 
-I**teration 3** improves search by expanding `k` values in addition to a hybrid search using full-text search.  This iteration was also the testing ground for the new versions of the Cursor agents.
+**Iteration 3** improves search by expanding `k` values in addition to a hybrid search using full-text search.  This iteration was also the testing ground for the new versions of the Cursor agents.
+
+**Iteration 4** moves to an agentic loop.  Previously, the chat went to the embedding model first, then fed the results into the LLM.  That resulted in very non-deterministic behavior.  The first epic of iteration 4 stabilizes the chat determinism.  Epics 2-5 add tool use and a loop workflow.  Write/edit capability will be assessed after that.
 
 ## Table of Contents
 
-- [Obsidian AI Plugin — Iteration 3](#obsidian-ai-plugin--iteration-3)
+- [Obsidian AI Plugin — Iteration 4](#obsidian-ai-plugin--iteration-4)
   - [Preface](#preface)
   - [Purpose](#purpose)
   - [Table of Contents](#table-of-contents)
