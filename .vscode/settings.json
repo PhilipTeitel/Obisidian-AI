@@ -1,0 +1,12 @@
+{
+  "sqltools.connections": [
+    {
+      "previewLimit": 50,
+      "driver": "SQLite",
+      "name": "Obsidian-AI",
+      "group": "test",
+      "database": "Users/philipteitel/.obsidian-ai/me.db"
+    }
+  ],
+  "sqltools.useNodeRuntime": true
+}

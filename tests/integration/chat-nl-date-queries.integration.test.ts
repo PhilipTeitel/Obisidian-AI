@@ -1,17 +1,25 @@
 /**
- * End-to-end-ish: full user sentences go through {@link runChatStream} → {@link runSearch},
- * so retrieval sees the same query string the user typed (embed + BM25), not only parsed dates.
+ * End-to-end-ish: user sentences go through {@link runChatStream} → {@link runSearch}.
+ * After NL date resolution, {@link stripMatchedNLDatePhraseForRetrieval} removes the matched
+ * calendar phrase from the embed + BM25 query; filters still carry `dateRange` / path globs.
  *
  * Dependencies: Vitest, core workflows, {@link SearchTestStore} (in-memory fake store — no Obsidian).
  * Heavier SQLite integration lives in `SqliteDocumentStore.filters.test.ts` + contract B7 (path LIKE + note_date).
  */
 import { describe, expect, it } from 'vitest';
-import type { ResolverClock } from '@src/core/domain/dateRangeResolver.js';
 import { DEFAULT_SEARCH_ASSEMBLY } from '@src/core/domain/contextAssembly.js';
+import {
+  type ResolverClock,
+  resolveDateRangeFromPrompt,
+} from '@src/core/domain/dateRangeResolver.js';
 import type { ChatMessage, DocumentNode } from '@src/core/domain/types.js';
 import type { ChatCompletionOptions, IChatPort } from '@src/core/ports/IChatPort.js';
 import type { IEmbeddingPort } from '@src/core/ports/IEmbeddingPort.js';
-import { type ChatWorkflowResult, runChatStream } from '@src/core/workflows/ChatWorkflow.js';
+import {
+  type ChatWorkflowResult,
+  runChatStream,
+  stripMatchedNLDatePhraseForRetrieval,
+} from '@src/core/workflows/ChatWorkflow.js';
 import { chatWorkflowDeps } from './chatWorkflowDeps.js';
 import { SearchTestStore } from '../core/workflows/searchTestStore.js';
 
@@ -115,8 +123,13 @@ describe('chat NL date queries — full user message through retrieval (BUG-3)',
     });
     expect(store.lastContentFilter?.pathRegex).toBeTruthy();
     expect(embedBatches.length).toBeGreaterThan(0);
-    expect(embedBatches[0]![0]).toBe(userMsg);
-    expect(store.lastKeywordQuery).toBe(userMsg);
+    const match = resolveDateRangeFromPrompt(userMsg, clockUtcApr21, {
+      utcOffsetHoursFallback: 0,
+      dailyNotePathGlobs: ['daily/**/*.md'],
+    });
+    const retrievalQuery = stripMatchedNLDatePhraseForRetrieval(userMsg, match);
+    expect(embedBatches[0]![0]).toBe(retrievalQuery);
+    expect(store.lastKeywordQuery).toBe(retrievalQuery);
   });
 
   it('on_iso_passes_whole_prompt_to_embed_and_keyword', async () => {
@@ -165,7 +178,12 @@ describe('chat NL date queries — full user message through retrieval (BUG-3)',
       start: '2026-04-16',
       end: '2026-04-16',
     });
-    expect(embedBatches[0]![0]).toBe(userMsg);
-    expect(store.lastKeywordQuery).toBe(userMsg);
+    const match = resolveDateRangeFromPrompt(userMsg, clockUtcApr21, {
+      utcOffsetHoursFallback: 0,
+      dailyNotePathGlobs: ['daily/**/*.md'],
+    });
+    const retrievalQuery = stripMatchedNLDatePhraseForRetrieval(userMsg, match);
+    expect(embedBatches[0]![0]).toBe(retrievalQuery);
+    expect(store.lastKeywordQuery).toBe(retrievalQuery);
   });
 });

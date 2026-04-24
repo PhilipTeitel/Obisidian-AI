@@ -3,7 +3,7 @@
 **Story**: Replace the existing character-strip sanitizer with a `tokenize → quote-as-phrase → OR-combine` builder, and make the hybrid retrieval leg safe when the resulting query is empty. Fixes BUG-001 / [REQ-006 S5–S6](../requirements/REQ-006-bug-001-chat-accuracy-ux-search.md) — ordinary punctuation (`?`, `!`, `.`) and inline backticks (`` ` ``) no longer raise `fts syntax error` slideouts; chat and search continue to work, falling back to vector-only when BM25 input collapses to zero tokens.
 **Epic**: 11 — Chat accuracy and UX bug fixes (REQ-006)
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -139,58 +139,58 @@ Not applicable.
 
 ### Phase A: `buildFtsMatchQuery` (pure)
 
-- [ ] **A1** — Alphanumeric-only input produces the expected OR-of-phrases
+- [x] **A1** — Alphanumeric-only input produces the expected OR-of-phrases
   - `buildFtsMatchQuery("pros cons") === '"pros" OR "cons"'`.
   - Evidence: `tests/core/domain/fts-sanitize.test.ts::A1_basic_tokens_or_joined(vitest)`
 
-- [ ] **A2** — Punctuation is stripped; residual tokens are quoted and OR-joined
+- [x] **A2** — Punctuation is stripped; residual tokens are quoted and OR-joined
   - `buildFtsMatchQuery("What happened last month?") === '"what" OR "happened" OR "last" OR "month"'` (lowercased per ADR-017 Decision 2).
   - Evidence: `tests/core/domain/fts-sanitize.test.ts::A2_punctuation_stripped(vitest)` — covers S5.
 
-- [ ] **A3** — Inline backticks are stripped
+- [x] **A3** — Inline backticks are stripped
   - `buildFtsMatchQuery("use the \`foo\` command") === '"use" OR "the" OR "foo" OR "command"'`.
   - Evidence: `tests/core/domain/fts-sanitize.test.ts::A3_backticks_stripped(vitest)` — covers S6.
 
-- [ ] **A4** — Reserved keywords (`AND`, `OR`, `NOT`, `NEAR`, case-insensitive) are dropped
+- [x] **A4** — Reserved keywords (`AND`, `OR`, `NOT`, `NEAR`, case-insensitive) are dropped
   - `buildFtsMatchQuery("pros and cons") === '"pros" OR "cons"'`; the word `AND` does not become an FTS5 operator.
   - Evidence: `tests/core/domain/fts-sanitize.test.ts::A4_reserved_keywords_dropped(vitest)`
 
-- [ ] **A5** — Zero-token input returns `null`
+- [x] **A5** — Zero-token input returns `null`
   - `buildFtsMatchQuery("??!!...") === null`; `buildFtsMatchQuery("") === null`; whitespace-only returns `null`.
   - Evidence: `tests/core/domain/fts-sanitize.test.ts::A5_zero_tokens_returns_null(vitest)`
 
-- [ ] **A6** — Over-length input is capped at 64 unique tokens
+- [x] **A6** — Over-length input is capped at 64 unique tokens
   - Given 100 unique words, the returned expression contains exactly 64 `"…"` tokens joined by ` OR `.
   - Evidence: `tests/core/domain/fts-sanitize.test.ts::A6_64_term_cap(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** — **(binding)** `IDocumentStore` contract: punctuation-only input returns `[]` without error
+- [x] **Y1** — **(binding)** `IDocumentStore` contract: punctuation-only input returns `[]` without error
   - Contract test runs against any `IDocumentStore`; in-memory fakes and the real `SqliteDocumentStore` both pass.
   - Evidence: `tests/contract/documentStore.searchContentKeyword.contract.ts::Y1_punctuation_only_returns_empty(vitest)` — covers S5 / S6 behavior at the port level.
 
-- [ ] **Y2** — **(binding)** `IDocumentStore` contract: keyword input returns ranked hits
+- [x] **Y2** — **(binding)** `IDocumentStore` contract: keyword input returns ranked hits
   - Seed a known corpus; query with keywords only; assert nonempty results in BM25 order.
   - Evidence: `tests/contract/documentStore.searchContentKeyword.contract.ts::Y2_keyword_input_returns_hits(vitest)`
 
-- [ ] **Y3** — **(binding)** Real SQLite + FTS5: `searchContentKeyword("What did I do yesterday?", 10)` completes without throwing and returns a (possibly empty) ranked list
+- [x] **Y3** — **(binding)** Real SQLite + FTS5: `searchContentKeyword("What did I do yesterday?", 10)` completes without throwing and returns a (possibly empty) ranked list
   - Evidence: `tests/integration/SqliteDocumentStore.fts-sanitize.integration.test.ts::Y3_real_fts_no_syntax_error(vitest)` — covers S5 at the real adapter boundary.
 
-- [ ] **Y4** — **(binding)** Real SQLite + FTS5: `searchContentKeyword("\`foo\` bar?", 10)` completes without throwing
+- [x] **Y4** — **(binding)** Real SQLite + FTS5: `searchContentKeyword("\`foo\` bar?", 10)` completes without throwing
   - Evidence: `tests/integration/SqliteDocumentStore.fts-sanitize.integration.test.ts::Y4_backticks_and_punctuation(vitest)` — covers S6.
 
-- [ ] **Y5** — **(binding)** Real SQLite + FTS5: zero-token input short-circuits to `[]` without calling `MATCH`
+- [x] **Y5** — **(binding)** Real SQLite + FTS5: zero-token input short-circuits to `[]` without calling `MATCH`
   - Attach a spy to the underlying `db.prepare` or similar; assert the FTS prepared statement is **not** executed for pure-punctuation input.
   - Evidence: `tests/integration/SqliteDocumentStore.fts-sanitize.integration.test.ts::Y5_zero_token_short_circuit(vitest)`
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
-- [ ] **Z3** — No `any` types in any new or modified file
-- [ ] **Z4** — No relative imports where the project alias applies
-- [ ] **Z5** — Zero-token short-circuit emits a `debug`-level log (`{ scope: 'searchContentKeyword', reason: 'zero_tokens', rawLength: n }`) per [§20 Logging](../../README.md#20-logging-and-observability); no `error`-level noise on ordinary punctuation
-- [ ] **Z6** — `/review-story BUG-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z3** — No `any` types in any new or modified file
+- [x] **Z4** — No relative imports where the project alias applies
+- [x] **Z5** — Zero-token short-circuit emits a `debug`-level log (`{ scope: 'searchContentKeyword', reason: 'zero_tokens', rawLength: n }`) per [§20 Logging](../../README.md#20-logging-and-observability); no `error`-level noise on ordinary punctuation
+- [x] **Z6** — `/review-story BUG-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
 
 ---
 

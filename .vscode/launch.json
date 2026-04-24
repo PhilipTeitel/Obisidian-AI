@@ -1,10 +1,19 @@
 {
   "configurations": [
     {
-      "type": "node",
-      "name": "ws://127.0.0.1",
+      "type": "pwa-node",
+      "name": "Attach: Obsidian AI sidecar",
       "request": "attach",
-      "port": 61911
+      "port": 62127,
+      "cwd": "${workspaceFolder}",
+      "outFiles": [
+        "${workspaceFolder}/dist/sidecar/**/*.cjs",
+        "${workspaceFolder}/dist/sidecar/**/*.map",
+        "**/plugins/obsidian-ai/sidecar/**/*.cjs",
+        "**/plugins/obsidian-ai/sidecar/**/*.map"
+      ],
+      "resolveSourceMapLocations": ["**", "!**/node_modules/**"],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
     }
   ]
 }

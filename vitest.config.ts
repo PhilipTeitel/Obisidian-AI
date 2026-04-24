@@ -16,6 +16,7 @@ export default defineConfig({
     include: [
       'tests/**/*.test.ts',
       'tests/contract/document-store.contract.ts',
+      'tests/contract/documentStore.searchContentKeyword.contract.ts',
       'tests/contract/IChatPort.contract.ts',
       'tests/contract/chat-port.contract.ts',
     ],

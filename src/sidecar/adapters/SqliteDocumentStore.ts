@@ -9,7 +9,7 @@ import type {
   VectorMatch,
   VectorType,
 } from '../../core/domain/types.js';
-import { sanitizeFtsQuery } from '../../core/domain/fts-sanitize.js';
+import { buildFtsMatchQuery } from '../../core/domain/fts-sanitize.js';
 import { VAULT_PATH_GLOB_REGEX_FLAGS } from '../../core/domain/pathGlob.js';
 import type { IDocumentStore } from '../../core/ports/IDocumentStore.js';
 import Database from 'better-sqlite3';
@@ -324,8 +324,12 @@ export class SqliteDocumentStore implements IDocumentStore {
   }
 
   async searchContentKeyword(query: string, k: number, filter?: NodeFilter): Promise<VectorMatch[]> {
-    const sanitized = sanitizeFtsQuery(query);
-    if (!sanitized) {
+    const matchExpr = buildFtsMatchQuery(query);
+    if (matchExpr === null) {
+      console.debug(
+        { scope: 'searchContentKeyword', reason: 'zero_tokens', rawLength: query.length },
+        'fts.zero_tokens',
+      );
       return [];
     }
     const { sql: filterSql, params: filterParams } = SqliteDocumentStore.appendFilterWhere(
@@ -344,7 +348,7 @@ export class SqliteDocumentStore implements IDocumentStore {
          ORDER BY score ASC
          LIMIT ?`,
       )
-      .all(sanitized, ...filterParams, k) as { node_id: string; score: number }[];
+      .all(matchExpr, ...filterParams, k) as { node_id: string; score: number }[];
     return rows.map((r) => ({ nodeId: r.node_id, score: r.score }));
   }
 
