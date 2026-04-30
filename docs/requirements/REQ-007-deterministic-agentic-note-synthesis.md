@@ -8,7 +8,7 @@
 - User follow-up in current chat (2026-04-30) — resolved defaults and constraints: default date range is one week; vault organization prompt remains configurable for different vaults; response format can be requested in the prompt; file writing is much later and no review UI is needed now; agent budgets should be fixed constants for now with actual token use logged; Ollama is first for pre-query reasoning, then OpenAI, with future providers behind hexagonal ports; retrieval plans should be logged.
 
 **Date:** 2026-04-29
-**Status:** Draft
+**Status:** Ready for Design
 
 ---
 
