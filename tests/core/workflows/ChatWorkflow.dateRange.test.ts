@@ -111,4 +111,50 @@ describe('ChatWorkflow.dateRange (BUG-3)', () => {
       'chat.nl_date_filter_applied',
     );
   });
+
+  it('AGT2_optional_info_logger_does_not_block_date_resolution', async () => {
+    const store = new SearchTestStore();
+    store.nodes.clear();
+    store.meta.clear();
+    store.nodes.set(
+      'n1',
+      seedNode({
+        id: 'n1',
+        noteId: 'daily1',
+        content: 'job search call with Alice',
+      }),
+    );
+    store.meta.set('daily1', {
+      noteId: 'daily1',
+      vaultPath: 'Daily/2026-04-10.md',
+      contentHash: 'x',
+      indexedAt: '2026-01-01T00:00:00.000Z',
+      nodeCount: 1,
+      noteDate: '2026-04-10',
+    });
+    store.summaryHits = [{ nodeId: 'n1', score: 0.9 }];
+    store.contentHits = [{ nodeId: 'n1', score: 0.8 }];
+
+    const clock: ResolverClock = {
+      now: () => new Date('2026-04-21T12:00:00.000Z'),
+      timeZone: () => 'UTC',
+    };
+    const log = { debug: vi.fn() };
+    const deps = { ...chatWorkflowDeps(store, embed(), new StubChat()), log };
+
+    await expect(
+      drainChatStream(
+        runChatStream(deps, [{ role: 'user', content: 'job search over the last 2 weeks' }], {
+          search: DEFAULT_SEARCH_ASSEMBLY,
+          resolverClock: clock,
+          timezoneUtcOffsetHours: 0,
+          dailyNotePathGlobs: ['Daily/**/*.md'],
+        }),
+      ),
+    ).resolves.toMatchObject({ groundingOutcome: 'answered' });
+    expect(log.debug).toHaveBeenCalledWith(
+      expect.objectContaining({ matchRuleId: 'last_n_weeks' }),
+      'chat.date_range_resolved',
+    );
+  });
 });

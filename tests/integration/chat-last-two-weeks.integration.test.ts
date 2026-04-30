@@ -69,7 +69,7 @@ describe('chat last-two-weeks binding (BUG-3)', () => {
   it('Y2_fallback_uses_utc_offset', () => {
     const orig = Intl.DateTimeFormat.prototype.resolvedOptions;
     Intl.DateTimeFormat.prototype.resolvedOptions = function () {
-      return { ...orig.call(this), timeZone: undefined };
+      return { ...orig.call(this), timeZone: undefined } as unknown as Intl.ResolvedDateTimeFormatOptions;
     };
     try {
       const clock: ResolverClock = {

@@ -5,6 +5,7 @@ export * from './domain/types.js';
 export * from './domain/chunker.js';
 export * from './domain/tokenEstimator.js';
 export * from './domain/contextAssembly.js';
+export * from './domain/agentRetrievalPlan.js';
 export * from './ports/index.js';
 export * from './workflows/SearchWorkflow.js';
 export * from './workflows/ChatWorkflow.js';

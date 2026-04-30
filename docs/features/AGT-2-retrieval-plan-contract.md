@@ -3,7 +3,7 @@
 **Story**: Define the core `RetrievalPlan` contract, planner port, validation/defaulting helpers, and deterministic contract tests that future planner adapters must satisfy before any vector or keyword retrieval runs.
 **Epic**: 12 — Deterministic agentic note synthesis (REQ-007)
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -206,11 +206,13 @@ ChatView (unchanged in AGT-2)
 |---|------|--------|
 | 1 | `src/core/index.ts` | Export `agentRetrievalPlan` types/helpers and `IAgentPlannerPort` if core exports ports from this index. |
 | 2 | `src/core/ports/index.ts` | Export `IAgentPlannerPort`. |
-| 3 | `README.md` | Already links AGT-2 from Epic 12; implementer should leave the backlog row status unchanged until implementation is complete. |
+| 3 | `vitest.config.ts` | Include the new reusable planner contract file in Vitest's explicit contract-file discovery list. |
+| 4 | `src/core/workflows/ChatWorkflow.ts` | Type-safe optional `log.info` invocation only; AGT-4 still owns planner wiring into chat. |
+| 5 | `README.md` | Already links AGT-2 from Epic 12; implementer should leave the backlog row status unchanged until implementation is complete. |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
-- `src/core/workflows/ChatWorkflow.ts` — AGT-4 wires the planner into chat; AGT-2 only defines the contract.
+- `src/core/workflows/ChatWorkflow.ts` — AGT-4 wires the planner into chat; AGT-2 does not add planner/retrieval behavior here.
 - `src/sidecar/adapters/OllamaChatAdapter.ts` — PRV-3 owns the Ollama planner adapter.
 - `src/plugin/ui/ChatView.ts` — no user-visible behavior until AGT-4.
 - `src/plugin/settings/SettingsTab.ts` — no new settings; budgets are constants in code for now.
@@ -222,97 +224,97 @@ ChatView (unchanged in AGT-2)
 
 ### Phase A: Plan Contract Types
 
-- [ ] **A1** — `AgentPlanInput`, `RetrievalPlan`, `NeedsScopePlan`, `AgentToolCallPlan`, and `AgentPlanResult` are defined in core with no infrastructure imports.
+- [x] **A1** — `AgentPlanInput`, `RetrievalPlan`, `NeedsScopePlan`, `AgentToolCallPlan`, and `AgentPlanResult` are defined in core with no infrastructure imports.
   - The types include `vaultOrganizationPrompt`, explicit path/date scope, `anchorDate`, `modelConfigId`, and `vaultIndexFingerprint`.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::A1_exports_plan_contract_shapes(vitest)`
 
-- [ ] **A2** — A ready plan includes task/topic, entities, filters, output intent, planned note-tool calls, `planVersion: 'v1'`, and `stablePlanKey`.
+- [x] **A2** — A ready plan includes task/topic, entities, filters, output intent, planned note-tool calls, `planVersion: 'v1'`, and `stablePlanKey`.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::A2_ready_plan_has_required_fields(vitest)` — covers S1.
 
-- [ ] **A3** — A needs-scope plan includes `status: 'needs_scope'`, a human-usable reason, missing fields, `planVersion: 'v1'`, and `stablePlanKey`; it contains no `search_notes` tool call.
+- [x] **A3** — A needs-scope plan includes `status: 'needs_scope'`, a human-usable reason, missing fields, `planVersion: 'v1'`, and `stablePlanKey`; it contains no `search_notes` tool call.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::A3_needs_scope_plan_is_not_searchable(vitest)` — covers S2.
 
 ### Phase B: Deterministic Normalization and Defaults
 
-- [ ] **B1** — Normalizing equivalent plans sorts/deduplicates entities, tags, path globs, and tool calls into stable order without changing semantics.
+- [x] **B1** — Normalizing equivalent plans sorts/deduplicates entities, tags, path globs, and tool calls into stable order without changing semantics.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B1_normalization_stable_order(vitest)` — covers S7.
 
-- [ ] **B2** — Same prompt/settings/modelConfigId/vaultIndexFingerprint/anchorDate produce the same `stablePlanKey` and normalized plan on repeated runs.
+- [x] **B2** — Same prompt/settings/modelConfigId/vaultIndexFingerprint/anchorDate produce the same `stablePlanKey` and normalized plan on repeated runs.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B2_same_inputs_same_plan_key(vitest)` — covers S7.
 
-- [ ] **B3** — A date-bounded synthesis plan with no explicit `dateRange` defaults to one week: `[anchorDate - 6 days, anchorDate]`, with `dateRange.defaulted === true`.
+- [x] **B3** — A date-bounded synthesis plan with no explicit `dateRange` defaults to one week: `[anchorDate - 6 days, anchorDate]`, with `dateRange.defaulted === true`.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B3_date_bounded_defaults_to_one_week(vitest)` — covers S1.
 
-- [ ] **B4** — Explicit `dateRange` from input is preserved and is not overwritten by the one-week default.
+- [x] **B4** — Explicit `dateRange` from input is preserved and is not overwritten by the one-week default.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B4_explicit_date_range_wins(vitest)` — covers S1.
 
-- [ ] **B5** — Prompt-requested output format is captured in `output.requestedFormat`; when omitted, `output.defaultFormat` is `bullet_list`.
+- [x] **B5** — Prompt-requested output format is captured in `output.requestedFormat`; when omitted, `output.defaultFormat` is `bullet_list`.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B5_output_format_defaults_to_bullets(vitest)` — covers S1.
 
-- [ ] **B6** — `vaultOrganizationPrompt` is part of `AgentPlanInput` and can influence filter/output metadata, but validation rejects plans that try to weaken grounding or mark off-vault sources as allowed.
+- [x] **B6** — `vaultOrganizationPrompt` is part of `AgentPlanInput` and can influence filter/output metadata, but validation rejects plans that try to weaken grounding or mark off-vault sources as allowed.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B6_vault_org_prompt_does_not_override_grounding(vitest)` — covers S1.
 
 ### Phase C: Planner Port Contract
 
-- [ ] **C1** — `IAgentPlannerPort.planRetrieval` is declared as a provider-neutral port returning `Promise<AgentPlanResult>`.
+- [x] **C1** — `IAgentPlannerPort.planRetrieval` is declared as a provider-neutral port returning `Promise<AgentPlanResult>`.
   - Evidence: `tests/contract/agent-planner.contract.ts::C1_port_contract_signature(vitest)`
 
-- [ ] **C2** — The generic planner contract asserts ready-plan determinism using a fixture planner: repeated calls with identical `AgentPlanInput` produce deep-equal normalized plans.
+- [x] **C2** — The generic planner contract asserts ready-plan determinism using a fixture planner: repeated calls with identical `AgentPlanInput` produce deep-equal normalized plans.
   - Evidence: `tests/contract/agent-planner.contract.ts::C2_contract_ready_plan_deterministic(vitest)` — covers S7.
 
-- [ ] **C3** — The generic planner contract asserts underspecified prompts produce `needs_scope` and no planned search/read tool calls.
+- [x] **C3** — The generic planner contract asserts underspecified prompts produce `needs_scope` and no planned search/read tool calls.
   - Evidence: `tests/contract/agent-planner.contract.ts::C3_contract_needs_scope_no_search(vitest)` — covers S2.
 
-- [ ] **C4** — The generic planner contract asserts all ready plans contain at least one `search_notes` tool call and no file-write tool calls.
+- [x] **C4** — The generic planner contract asserts all ready plans contain at least one `search_notes` tool call and no file-write tool calls.
   - Evidence: `tests/contract/agent-planner.contract.ts::C4_contract_ready_plan_search_only_tools(vitest)` — covers S1.
 
 ### Phase Y: Binding & Stack Compliance
 
-- [ ] **Y1** — **(binding)** Planning contract exists before retrieval and includes task/topic, filters, output intent, and planned note-tool calls.
+- [x] **Y1** — **(binding)** Planning contract exists before retrieval and includes task/topic, filters, output intent, and planned note-tool calls.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::A2_ready_plan_has_required_fields(vitest)` — maps §4 Y1.
 
-- [ ] **Y2** — **(binding)** Stable normalization produces identical plans and keys for identical inputs.
+- [x] **Y2** — **(binding)** Stable normalization produces identical plans and keys for identical inputs.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B2_same_inputs_same_plan_key(vitest)` — maps §4 Y2.
 
-- [ ] **Y3** — **(binding)** One-week default is applied only for date-bounded synthesis without an explicit date range.
+- [x] **Y3** — **(binding)** One-week default is applied only for date-bounded synthesis without an explicit date range.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B3_date_bounded_defaults_to_one_week(vitest)` — maps §4 Y3.
 
-- [ ] **Y4** — **(binding)** `vaultOrganizationPrompt` is accepted as planning input but cannot override vault-only grounding.
+- [x] **Y4** — **(binding)** `vaultOrganizationPrompt` is accepted as planning input but cannot override vault-only grounding.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B6_vault_org_prompt_does_not_override_grounding(vitest)` — maps §4 Y4.
 
-- [ ] **Y5** — **(binding)** Output defaults to bullet lists unless a requested format is present.
+- [x] **Y5** — **(binding)** Output defaults to bullet lists unless a requested format is present.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::B5_output_format_defaults_to_bullets(vitest)` — maps §4 Y5.
 
-- [ ] **Y6** — **(binding)** Underspecified prompts cannot become broad unconstrained search plans.
+- [x] **Y6** — **(binding)** Underspecified prompts cannot become broad unconstrained search plans.
   - Evidence: `tests/contract/agent-planner.contract.ts::C3_contract_needs_scope_no_search(vitest)` — maps §4 Y6.
 
-- [ ] **Y7** — **(binding)** AGT-2 introduces no provider adapter, note-tool execution, retrieval call, synthesis, file write, or review UI.
+- [x] **Y7** — **(binding)** AGT-2 introduces no provider adapter, note-tool execution, retrieval call, synthesis, file write, or review UI.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::Y7_no_runtime_tool_or_file_write_surface(vitest)` plus static review of file touchpoints — maps §4 Y7.
 
-- [ ] **Y8** — **(binding)** Planner budgets are fixed constants in `agentRetrievalPlan.ts`, not plugin settings.
+- [x] **Y8** — **(binding)** Planner budgets are fixed constants in `agentRetrievalPlan.ts`, not plugin settings.
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::Y8_budget_constants_not_settings(vitest)` — maps §4 Y8.
 
-- [ ] **Y9** — **(binding)** The new planner port has a reusable contract suite for future adapters.
+- [x] **Y9** — **(binding)** The new planner port has a reusable contract suite for future adapters.
   - Evidence: `tests/contract/agent-planner.contract.ts::C2_contract_ready_plan_deterministic(vitest)` — maps §4b.
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
+- [x] **Z1** — `npm run build` passes with zero TypeScript errors in all workspaces
   - Evidence: `npm run build`
 
-- [ ] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
+- [x] **Z2** — `npm run lint` passes (or only has pre-existing warnings)
   - Evidence: `npm run lint`
 
-- [ ] **Z3** — No `any` types in any new or modified file
+- [x] **Z3** — No `any` types in any new or modified file
   - Evidence: `rg "\\bany\\b" src/core/domain/agentRetrievalPlan.ts src/core/ports/IAgentPlannerPort.ts tests/core/domain/agentRetrievalPlan.test.ts tests/contract/agent-planner.contract.ts`
 
-- [ ] **Z4** — All core exports follow existing project import/export conventions
+- [x] **Z4** — All core exports follow existing project import/export conventions
   - Evidence: `npm run typecheck`
 
-- [ ] **Z5** — New or modified code includes appropriate logging hooks or explicitly avoids logging because AGT-2 is pure contract work
+- [x] **Z5** — New or modified code includes appropriate logging hooks or explicitly avoids logging because AGT-2 is pure contract work
   - Evidence: `tests/core/domain/agentRetrievalPlan.test.ts::Z5_no_raw_prompt_or_note_content_required_for_plan_key(vitest)`
 
-- [ ] **Z6** — `/review-story AGT-2` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
+- [x] **Z6** — `/review-story AGT-2` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface
   - Evidence: `/review-story AGT-2`
 
 ---

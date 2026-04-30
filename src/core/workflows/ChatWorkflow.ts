@@ -146,7 +146,7 @@ export async function* runChatStream(
         },
         'chat.date_range_resolved',
       );
-      deps.log?.info({ naturalLanguageDateFilterApplied: true }, 'chat.nl_date_filter_applied');
+      deps.log?.info?.({ naturalLanguageDateFilterApplied: true }, 'chat.nl_date_filter_applied');
       pathGlobs = mergePathGlobs(pathGlobs, match.pathGlobs);
       dateRange = match.dateRange;
     }
