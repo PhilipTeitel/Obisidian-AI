@@ -39,6 +39,10 @@ export interface AgentToolCallPlan {
   query?: string;
   pathGlobs?: string[];
   dateRange?: AgentDateRange;
+  tags?: string[];
+  notePath?: string;
+  nodeIds?: string[];
+  fromPreviousSearchResultIds?: string[];
 }
 
 export interface RetrievalPlan {
@@ -253,6 +257,12 @@ function normalizeToolCalls(toolCalls: AgentToolCallPlan[], inheritedFilters: Re
       ...(pathGlobs.length > 0 ? { pathGlobs } : {}),
       ...(normalizeDateRange(toolCall.dateRange ?? inheritedFilters.dateRange) !== undefined
         ? { dateRange: normalizeDateRange(toolCall.dateRange ?? inheritedFilters.dateRange) }
+        : {}),
+      ...(stableUniqueStrings(toolCall.tags).length > 0 ? { tags: stableUniqueStrings(toolCall.tags) } : {}),
+      ...(cleanOptionalString(toolCall.notePath) !== undefined ? { notePath: cleanOptionalString(toolCall.notePath) } : {}),
+      ...(stableUniqueStrings(toolCall.nodeIds).length > 0 ? { nodeIds: stableUniqueStrings(toolCall.nodeIds) } : {}),
+      ...(stableUniqueStrings(toolCall.fromPreviousSearchResultIds).length > 0
+        ? { fromPreviousSearchResultIds: stableUniqueStrings(toolCall.fromPreviousSearchResultIds) }
         : {}),
     };
   });

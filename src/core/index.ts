@@ -6,9 +6,11 @@ export * from './domain/chunker.js';
 export * from './domain/tokenEstimator.js';
 export * from './domain/contextAssembly.js';
 export * from './domain/agentRetrievalPlan.js';
+export * from './domain/agentNoteTools.js';
 export * from './ports/index.js';
 export * from './workflows/SearchWorkflow.js';
 export * from './workflows/ChatWorkflow.js';
+export * from './workflows/AgentNoteToolRunner.js';
 
 export function getCoreLabel(): string {
   return 'obsidian-ai-core';

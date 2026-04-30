@@ -15,6 +15,7 @@ export default defineConfig({
     environment: 'node',
     include: [
       'tests/**/*.test.ts',
+      'tests/contract/agent-note-tools.contract.ts',
       'tests/contract/agent-planner.contract.ts',
       'tests/contract/document-store.contract.ts',
       'tests/contract/documentStore.searchContentKeyword.contract.ts',

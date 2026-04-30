@@ -3,7 +3,7 @@
 **Story**: Implement a bounded core note-tool runner that executes `search_notes`, `read_note`, and `assemble_draft` plan steps by delegating to existing retrieval and store boundaries, returning draft-only output with traceable source records and no vault writes.
 **Epic**: 12 - Deterministic agentic note synthesis (REQ-007)
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -219,7 +219,8 @@ ChatView (unchanged in AGT-3)
 | 2 | `src/core/index.ts` | Export `agentNoteTools` types/helpers and `IAgentNoteToolPort`. |
 | 3 | `src/core/ports/index.ts` | Export `IAgentNoteToolPort`. |
 | 4 | `vitest.config.ts` | Include the new reusable contract test file if contract tests are explicitly listed. |
-| 5 | `README.md` | Link AGT-3 from the Epic 12 backlog row; leave status as `Not Started` until implementation completes. |
+| 5 | `tests/core/workflows/searchTestStore.ts` | Make the existing store test double honor `getNodesByNote` for runner unit tests. |
+| 6 | `README.md` | Link AGT-3 from the Epic 12 backlog row; leave status as `Not Started` until implementation completes. |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -236,112 +237,112 @@ ChatView (unchanged in AGT-3)
 
 ### Phase A: Tool Contracts and Budgets
 
-- [ ] **A1** - Core note-tool contracts exist with typed request/result/trace shapes.
+- [x] **A1** - Core note-tool contracts exist with typed request/result/trace shapes.
   - `src/core/domain/agentNoteTools.ts` defines `AgentNoteToolRunInput`, `AgentNoteToolResult`, per-tool result variants, source records, used-node records, and typed statuses/errors.
   - Evidence: `tests/core/domain/agentNoteTools.test.ts::A1_exports_tool_contract_shapes(vitest)`
 
-- [ ] **A2** - Fixed tool budgets are code constants, not plugin settings.
+- [x] **A2** - Fixed tool budgets are code constants, not plugin settings.
   - Budgets include max tool steps, max search results, max read nodes, and max draft source budget; no new settings are added.
   - Evidence: `tests/core/domain/agentNoteTools.test.ts::A2_budget_constants_not_settings(vitest)`
 
-- [ ] **A3** - The `IAgentNoteToolPort` contract runs one planned tool call and returns a typed result.
+- [x] **A3** - The `IAgentNoteToolPort` contract runs one planned tool call and returns a typed result.
   - The port accepts `AgentNoteToolRunInput` and returns `Promise<AgentNoteToolResult>`.
   - Evidence: `tests/contract/agent-note-tools.contract.ts::A3_port_contract_signature(vitest)`
 
-- [ ] **A4** - Unsupported or write-like tools fail closed.
+- [x] **A4** - Unsupported or write-like tools fail closed.
   - Unknown tool names and write-like names such as `write_note`, `create_file`, or `modify_note` return/throw typed unsupported-tool outcomes and do not execute search/read/draft logic.
   - Evidence: `tests/core/domain/agentNoteTools.test.ts::A4_rejects_unsupported_write_like_tools(vitest)` - covers S9
 
 ### Phase B: `search_notes`
 
-- [ ] **B1** - `search_notes` delegates to `runSearch` with the planned query and inherited filters.
+- [x] **B1** - `search_notes` delegates to `runSearch` with the planned query and inherited filters.
   - The runner passes plan/tool `query`, `pathGlobs`, `dateRange`, `tags`, `coarseK`, `k`, `enableHybridSearch`, and assembly options through to `SearchWorkflow`.
   - Evidence: `tests/core/workflows/AgentNoteToolRunner.test.ts::B1_search_notes_delegates_to_search_workflow(vitest)` - covers S3
 
-- [ ] **B2** - `search_notes` does not broaden scope when tool-level filters are omitted.
+- [x] **B2** - `search_notes` does not broaden scope when tool-level filters are omitted.
   - Missing tool-level filters inherit plan filters; an empty tool-level scope never clears a narrower plan scope.
   - Evidence: `tests/core/workflows/AgentNoteToolRunner.test.ts::B2_search_inherits_plan_scope(vitest)` - covers S3
 
-- [ ] **B3** - `search_notes` returns stable, bounded search results and source records.
+- [x] **B3** - `search_notes` returns stable, bounded search results and source records.
   - Results are capped by budget, ordered deterministically, and sources follow first-use order with note-level dedupe.
   - Evidence: `tests/contract/agent-note-tools.contract.ts::B3_contract_search_results_stable_and_bounded(vitest)` - covers S3
 
-- [ ] **B4** - `search_notes` uses the existing hybrid/filter retrieval behavior in integration.
+- [x] **B4** - `search_notes` uses the existing hybrid/filter retrieval behavior in integration.
   - The integration test proves vector, keyword, path/date filters, and content fallback remain owned by `SearchWorkflow` / store fixtures rather than a new parallel search implementation.
   - Evidence: `tests/integration/agent-note-tools.integration.test.ts::B4_search_notes_uses_searchworkflow_filters_and_hybrid(vitest)` - covers S3
 
 ### Phase C: `read_note`
 
-- [ ] **C1** - `read_note` reads indexed note content through `IDocumentStore`.
+- [x] **C1** - `read_note` reads indexed note content through `IDocumentStore`.
   - Read targets may come from explicit `notePath`/`nodeIds` fields or prior `search_notes` results; reads never use Obsidian APIs or filesystem APIs.
   - Evidence: `tests/core/workflows/AgentNoteToolRunner.test.ts::C1_read_note_uses_document_store(vitest)` - covers S3
 
-- [ ] **C2** - `read_note` fails closed when no target can be resolved.
+- [x] **C2** - `read_note` fails closed when no target can be resolved.
   - Missing explicit targets and missing prior search targets produce `needs_target` without broad search, whole-vault read, or file access.
   - Evidence: `tests/core/workflows/AgentNoteToolRunner.test.ts::C2_read_note_missing_target_fails_closed(vitest)` - covers S3
 
-- [ ] **C3** - `read_note` preserves filters, budgets, and source provenance.
+- [x] **C3** - `read_note` preserves filters, budgets, and source provenance.
   - Filtered-out, missing, duplicate, and over-budget nodes are excluded from returned content and source records.
   - Evidence: `tests/integration/agent-note-tools.integration.test.ts::C3_read_note_filters_and_sources_indexed_nodes(vitest)` - covers S3
 
 ### Phase D: `assemble_draft`
 
-- [ ] **D1** - `assemble_draft` creates an in-memory draft from prior tool results.
+- [x] **D1** - `assemble_draft` creates an in-memory draft from prior tool results.
   - The draft combines searched/read indexed content into markdown with source records and no provider call.
   - Evidence: `tests/core/workflows/AgentNoteToolRunner.test.ts::D1_assemble_draft_uses_prior_tool_outputs(vitest)` - covers S4
 
-- [ ] **D2** - `assemble_draft` is draft-only and performs no vault writes.
+- [x] **D2** - `assemble_draft` is draft-only and performs no vault writes.
   - Static and runtime tests prove no use of `AgentNoteWriter`, `IVaultAccessPort`, Obsidian `Vault.create`/`modify`, or Node file-write APIs.
   - Evidence: `tests/core/domain/agentNoteTools.test.ts::D2_assemble_draft_has_no_write_surface(vitest)` - covers S9
 
-- [ ] **D3** - `assemble_draft` preserves requested output intent without owning final synthesis.
+- [x] **D3** - `assemble_draft` preserves requested output intent without owning final synthesis.
   - The result carries plan output metadata (`answer` vs `draft_note`, requested format, default bullet-list format) for AGT-5, but does not attempt final LLM prose generation.
   - Evidence: `tests/core/workflows/AgentNoteToolRunner.test.ts::D3_assemble_draft_carries_output_intent(vitest)` - covers S4
 
 ### Phase E: Runner Sequencing and Traceability
 
-- [ ] **E1** - The runner produces stable trace records for each tool call.
+- [x] **E1** - The runner produces stable trace records for each tool call.
   - Trace records include plan key, tool call ID, tool type, status, counts, budget flags, and source counts without raw note content.
   - Evidence: `tests/contract/agent-note-tools.contract.ts::E1_contract_trace_records_are_stable(vitest)` - covers S3
 
-- [ ] **E2** - Budget exhaustion stops the current tool without executing unsafe fallback behavior.
+- [x] **E2** - Budget exhaustion stops the current tool without executing unsafe fallback behavior.
   - Over-budget searches/reads/drafts return `budget_exceeded` and preserve already-collected source records without broadening scope or writing files.
   - Evidence: `tests/core/workflows/AgentNoteToolRunner.test.ts::E2_budget_exhaustion_fails_closed(vitest)` - covers S3, S9
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** - **(binding)** Tool budgets are fixed constants and not plugin settings.
+- [x] **Y1** - **(binding)** Tool budgets are fixed constants and not plugin settings.
   - Evidence: `tests/core/domain/agentNoteTools.test.ts::A2_budget_constants_not_settings(vitest)` - maps Section 4 Y1
 
-- [ ] **Y2** - **(binding)** `search_notes` delegates to `SearchWorkflow.runSearch`.
+- [x] **Y2** - **(binding)** `search_notes` delegates to `SearchWorkflow.runSearch`.
   - Evidence: `tests/integration/agent-note-tools.integration.test.ts::B4_search_notes_uses_searchworkflow_filters_and_hybrid(vitest)` - maps Section 4 Y2 and Section 4b adapter row
 
-- [ ] **Y3** - **(binding)** `read_note` uses indexed store content only.
+- [x] **Y3** - **(binding)** `read_note` uses indexed store content only.
   - Evidence: `tests/integration/agent-note-tools.integration.test.ts::C3_read_note_filters_and_sources_indexed_nodes(vitest)` - maps Section 4 Y3
 
-- [ ] **Y4** - **(binding)** Draft assembly has no vault-write surface.
+- [x] **Y4** - **(binding)** Draft assembly has no vault-write surface.
   - Evidence: `tests/core/domain/agentNoteTools.test.ts::D2_assemble_draft_has_no_write_surface(vitest)` - maps Section 4 Y4
 
-- [ ] **Y5** - **(binding)** Plan-derived scope cannot be broadened by tool execution.
+- [x] **Y5** - **(binding)** Plan-derived scope cannot be broadened by tool execution.
   - Evidence: `tests/core/workflows/AgentNoteToolRunner.test.ts::B2_search_inherits_plan_scope(vitest)` - maps Section 4 Y5
 
-- [ ] **Y6** - **(binding)** Equivalent inputs produce stable results and traces.
+- [x] **Y6** - **(binding)** Equivalent inputs produce stable results and traces.
   - Evidence: `tests/contract/agent-note-tools.contract.ts::E1_contract_trace_records_are_stable(vitest)` - maps Section 4 Y6 and Section 4b port row
 
-- [ ] **Y7** - **(binding)** Sources only represent searched/read/assembled indexed content.
+- [x] **Y7** - **(binding)** Sources only represent searched/read/assembled indexed content.
   - Evidence: `tests/integration/agent-note-tools.integration.test.ts::C3_read_note_filters_and_sources_indexed_nodes(vitest)` - maps Section 4 Y7
 
-- [ ] **Y8** - **(binding)** Unknown, write-like, missing-target, and budget-exceeded paths fail closed.
+- [x] **Y8** - **(binding)** Unknown, write-like, missing-target, and budget-exceeded paths fail closed.
   - Evidence: `tests/core/workflows/AgentNoteToolRunner.test.ts::E2_budget_exhaustion_fails_closed(vitest)` and `tests/core/domain/agentNoteTools.test.ts::A4_rejects_unsupported_write_like_tools(vitest)` - maps Section 4 Y8
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
-- [ ] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
-- [ ] **Z3** - No `any` types in any new or modified file.
-- [ ] **Z4** - All client imports from shared use `@shared/types` alias where applicable; AGT-3 core-only files should not introduce client shared imports.
-- [ ] **Z5** - New or modified code includes appropriate logging/trace fields for errors and significant operations without raw note content.
-- [ ] **Z6** - `/review-story AGT-3` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
+- [x] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
+- [x] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
+- [x] **Z3** - No `any` types in any new or modified file.
+- [x] **Z4** - All client imports from shared use `@shared/types` alias where applicable; AGT-3 core-only files should not introduce client shared imports.
+- [x] **Z5** - New or modified code includes appropriate logging/trace fields for errors and significant operations without raw note content.
+- [x] **Z6** - `/review-story AGT-3` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
 
 ---
 

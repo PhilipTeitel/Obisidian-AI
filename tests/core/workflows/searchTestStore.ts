@@ -69,8 +69,10 @@ export class SearchTestStore implements IDocumentStore {
   async upsertNodes(): Promise<void> {}
   async replaceNoteTags(_noteId: string, _tags: ParsedTag[]): Promise<void> {}
   async replaceNoteCrossRefs(_noteId: string, _refs: ParsedCrossRef[]): Promise<void> {}
-  async getNodesByNote(): Promise<DocumentNode[]> {
-    return [];
+  async getNodesByNote(noteId: string): Promise<DocumentNode[]> {
+    return [...this.nodes.values()]
+      .filter((node) => node.noteId === noteId)
+      .sort((a, b) => a.depth - b.depth || a.siblingOrder - b.siblingOrder || a.id.localeCompare(b.id));
   }
   async getNodeById(id: string): Promise<DocumentNode | null> {
     return this.nodes.get(id) ?? null;
