@@ -374,12 +374,16 @@ export class SidecarRuntime {
     agentLog.info({ event: 'agent.run_started', op: 'chat' }, 'agent.run_started');
     this.log.debug(
       {
+        tags_count: payload.tags?.length ?? 0,
         path_globs_count: payload.pathGlobs?.length ?? 0,
         date_range_start: payload.dateRange?.start,
         date_range_end: payload.dateRange?.end,
       },
       'sidecar.chat.filters',
     );
+    // #region agent log
+    fetch('http://127.0.0.1:7279/ingest/93aba0d1-d956-4d96-a52b-680185909f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'293b7a'},body:JSON.stringify({sessionId:'293b7a',runId:'post-fix-child-tags',hypothesisId:'H2',location:'src/sidecar/runtime/SidecarRuntime.ts:383',message:'chat payload filter forwarding',data:{tags:payload.tags ?? [],pathGlobsCount:payload.pathGlobs?.length ?? 0,hasDateRange:payload.dateRange !== undefined},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const deps = this.getChatWorkflowDeps();
     const policyVer = payload.groundingPolicyVersion ?? GROUNDING_POLICY_VERSION;
     this.log.debug({ groundingPolicyVersion: policyVer }, 'sidecar.chat.request');
@@ -404,9 +408,9 @@ export class SidecarRuntime {
       k: payload.k,
       coarseK: payload.coarseK,
       enableHybridSearch: payload.enableHybridSearch,
+      tags: payload.tags,
       pathGlobs: payload.pathGlobs,
       dateRange: payload.dateRange,
-      tags: undefined,
       systemPrompt: payload.systemPrompt,
       vaultOrganizationPrompt: payload.vaultOrganizationPrompt,
       resolverClock,

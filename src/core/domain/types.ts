@@ -59,7 +59,7 @@ export interface NodeFilter {
   nodeTypes?: NodeType[];
   /** Limit hits to these nodes and all descendants (Phase 2 drill-down, RET-1). */
   subtreeRootNodeIds?: string[];
-  /** OR semantics: node matches if it has any of these tags (case-insensitive), RET-3. */
+  /** OR semantics: node matches exact tags or child tags (case-insensitive), RET-3. */
   tagsAny?: string[];
   /**
    * Union regex for `note_meta.vault_path` (compiled from `SearchRequest.pathGlobs` in the workflow).
@@ -357,6 +357,8 @@ export interface ChatRequestPayload {
   /** Assembly budgets from plugin settings (RET-2 / RET-4). */
   search?: SearchAssemblyOptions;
   enableHybridSearch?: boolean;
+  /** Optional tag filter (OR, case-insensitive); matches exact tags and child tags. */
+  tags?: string[];
   pathGlobs?: string[];
   dateRange?: { start?: string; end?: string };
   /** Persona from plugin `chatSystemPrompt`; ordering enforced in `buildGroundedMessages`. */

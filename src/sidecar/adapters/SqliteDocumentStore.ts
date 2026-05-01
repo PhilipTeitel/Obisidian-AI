@@ -63,6 +63,18 @@ function rowToDocumentNode(row: Record<string, unknown>): DocumentNode {
   };
 }
 
+function tagFilterSql(tagsAny: string[]): { clause: string; params: string[] } {
+  const parts = tagsAny.map(() => '(lower(t.tag) = ? OR lower(t.tag) LIKE ?)');
+  const params = tagsAny.flatMap((t) => {
+    const tag = t.toLowerCase();
+    return [tag, `${tag}/%`];
+  });
+  // #region agent log
+  fetch('http://127.0.0.1:7279/ingest/93aba0d1-d956-4d96-a52b-680185909f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'293b7a'},body:JSON.stringify({sessionId:'293b7a',runId:'post-fix-child-tags',hypothesisId:'H1',location:'src/sidecar/adapters/SqliteDocumentStore.ts:70',message:'expanded tag filter includes child tags',data:{tagsAny,patterns:params.filter((_,i)=>i%2===1)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  return { clause: parts.join(' OR '), params };
+}
+
 /**
  * SQLite + sqlite-vec implementation of {@link IDocumentStore} (STO-3).
  * Expects relational + vector migrations applied; ANN uses sqlite-vec L2 `distance`.
@@ -100,9 +112,9 @@ export class SqliteDocumentStore implements IDocumentStore {
       params.push(...filter.nodeTypes);
     }
     if (filter.tagsAny?.length) {
-      const lowered = filter.tagsAny.map((t) => t.toLowerCase());
-      sql += ` AND EXISTS (SELECT 1 FROM tags t WHERE t.node_id = ${nodeAlias}.id AND lower(t.tag) IN (${lowered.map(() => '?').join(',')}))`;
-      params.push(...lowered);
+      const tagSql = tagFilterSql(filter.tagsAny);
+      sql += ` AND EXISTS (SELECT 1 FROM tags t WHERE t.node_id = ${nodeAlias}.id AND (${tagSql.clause}))`;
+      params.push(...tagSql.params);
     }
     if (filter.pathLikes?.length) {
       const ph = filter.pathLikes.map(() => `${metaAlias}.vault_path LIKE ?`).join(' OR ');
@@ -488,17 +500,16 @@ export class SqliteDocumentStore implements IDocumentStore {
 
   async noteMatchesTagFilter(noteId: string, tagsAny: string[]): Promise<boolean> {
     if (tagsAny.length === 0) return true;
-    const lowered = tagsAny.map((t) => t.toLowerCase());
-    const ph = lowered.map(() => '?').join(', ');
+    const tagSql = tagFilterSql(tagsAny);
     const row = this.db
       .prepare(
         `SELECT EXISTS (
            SELECT 1 FROM tags t
            INNER JOIN nodes n ON n.id = t.node_id
-           WHERE n.note_id = ? AND lower(t.tag) IN (${ph})
+           WHERE n.note_id = ? AND (${tagSql.clause})
          ) AS ok`,
       )
-      .get(noteId, ...lowered) as { ok: number };
+      .get(noteId, ...tagSql.params) as { ok: number };
     return row.ok === 1;
   }
 }

@@ -23,4 +23,10 @@ describe('chatInputParser (RET-6)', () => {
     expect(r.text).toBe('hello');
     expect(r.dateRange).toEqual({ start: '2026-04-01', end: '2026-04-10' });
   });
+
+  it('A5_extracts_inline_tags_without_removing_text', () => {
+    const r = parseChatInput('list #jobhunt/application and #JobHunt/Application results');
+    expect(r.text).toBe('list #jobhunt/application and #JobHunt/Application results');
+    expect(r.tags).toEqual(['jobhunt/application']);
+  });
 });

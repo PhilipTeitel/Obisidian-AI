@@ -50,10 +50,12 @@ describe('SidecarRuntime chat retrieval (RET-4)', () => {
       coarseK: 48,
       search: asmAlt(),
       k: 15,
+      tags: ['jobhunt/application'],
     });
     await drainChatStream(gen);
     expect(optionsPassed?.coarseK).toBe(48);
     expect(optionsPassed?.k).toBe(15);
+    expect(optionsPassed?.tags).toEqual(['jobhunt/application']);
     expect(optionsPassed?.search).toEqual(asmAlt());
   });
 

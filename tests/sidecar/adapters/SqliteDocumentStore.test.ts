@@ -376,8 +376,17 @@ describe('SqliteDocumentStore', () => {
         depth: 1,
         siblingOrder: 1,
       }),
+      baseNode({
+        id: 'child-tagged',
+        noteId: 'n',
+        parentId: 'nr',
+        type: 'paragraph',
+        depth: 1,
+        siblingOrder: 2,
+      }),
     ]);
     db.prepare(`INSERT INTO tags (node_id, tag, source) VALUES ('tagged', 'Foo', 'inline')`).run();
+    db.prepare(`INSERT INTO tags (node_id, tag, source) VALUES ('child-tagged', 'Foo/bar', 'inline')`).run();
     await s.upsertEmbedding('plain', 'content', v, {
       model: 'm',
       dimension: DIM,
@@ -388,17 +397,22 @@ describe('SqliteDocumentStore', () => {
       dimension: DIM,
       contentHash: 'h2',
     });
+    await s.upsertEmbedding('child-tagged', 'content', v, {
+      model: 'm',
+      dimension: DIM,
+      contentHash: 'h3',
+    });
     await s.upsertNoteMeta({
       noteId: 'n',
       vaultPath: 'tag.md',
       contentHash: 'hx',
       indexedAt: '2026-01-01T00:00:00.000Z',
-      nodeCount: 3,
+      nodeCount: 4,
     });
     const all = await s.searchContentVectors(q, 10);
-    expect(new Set(all.map((h) => h.nodeId))).toEqual(new Set(['plain', 'tagged']));
+    expect(new Set(all.map((h) => h.nodeId))).toEqual(new Set(['plain', 'tagged', 'child-tagged']));
     const filt = await s.searchContentVectors(q, 10, { tagsAny: ['foo'] });
-    expect(filt.map((h) => h.nodeId)).toEqual(['tagged']);
+    expect(new Set(filt.map((h) => h.nodeId))).toEqual(new Set(['tagged', 'child-tagged']));
   });
 
   it('B2_tag_or_semantics', async () => {

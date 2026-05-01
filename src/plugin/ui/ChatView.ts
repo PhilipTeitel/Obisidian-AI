@@ -203,6 +203,7 @@ export class ChatView extends ItemView {
           coarseK: ps.chatCoarseK,
           enableHybridSearch: ps.enableHybridSearch,
           search: buildSearchAssemblyFromSettings(ps),
+          tags: parsed.tags,
           pathGlobs,
           dateRange,
           timezoneUtcOffsetHours: ps.timezoneUtcOffsetHours,
