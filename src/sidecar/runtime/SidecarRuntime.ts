@@ -13,6 +13,14 @@ import {
   clampUtcOffsetHoursForResolver,
   type ResolverClock,
 } from '../../core/domain/dateRangeResolver.js';
+import {
+  summarizeAgentPlan,
+  summarizeAgentSources,
+  type AgentBudgetWarning,
+  type AgentRunTraceEvent,
+  type AgentUsageStage,
+  type ProviderTokenUsage,
+} from '../../core/domain/agentRunTrace.js';
 import type { IAgentPlannerPort } from '../../core/ports/IAgentPlannerPort.js';
 import { runChatStream, type ChatWorkflowDeps, type ChatWorkflowResult } from '../../core/workflows/ChatWorkflow.js';
 import { AgentNoteToolRunner } from '../../core/workflows/AgentNoteToolRunner.js';
@@ -42,6 +50,44 @@ function parseProvider(
 function parsePositiveInt(raw: string | undefined, def: number): number {
   const n = parseInt(raw ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : def;
+}
+
+function logAgentUsage(log: Logger, stage: AgentUsageStage, usage: ProviderTokenUsage): void {
+  log.info({ event: 'agent.usage', stage, usage }, 'agent.usage');
+}
+
+function logAgentBudgetWarning(log: Logger, warning: AgentBudgetWarning): void {
+  log.warn(
+    {
+      event: 'agent.budget_exceeded',
+      budgetName: warning.budgetName,
+      configured: warning.configured,
+      observed: warning.observed,
+      planKey: warning.planKey,
+      toolCallId: warning.toolCallId,
+    },
+    'agent.budget_exceeded',
+  );
+}
+
+function logAgentTraceEvent(log: Logger, event: AgentRunTraceEvent): void {
+  switch (event.type) {
+    case 'plan':
+      log.info({ event: 'agent.plan', plan: summarizeAgentPlan(event.plan) }, 'agent.plan');
+      return;
+    case 'tool':
+      log.info({ event: 'agent.tool', tool: event.tool }, 'agent.tool');
+      return;
+    case 'sources':
+      log.info({ event: 'agent.sources', sources: summarizeAgentSources(event.sources) }, 'agent.sources');
+      return;
+    case 'usage':
+      logAgentUsage(log, event.stage, event.usage);
+      return;
+    case 'budget':
+      logAgentBudgetWarning(log, event);
+      return;
+  }
 }
 
 export interface SidecarRuntimeOptions {
@@ -323,6 +369,9 @@ export class SidecarRuntime {
   ): AsyncGenerator<ChatStreamChunk, ChatWorkflowResult> {
     const t0 = Date.now();
     this.ensureDb();
+    const agentRunId = randomUUID();
+    const agentLog = this.log.child({ agentRunId });
+    agentLog.info({ event: 'agent.run_started', op: 'chat' }, 'agent.run_started');
     this.log.debug(
       {
         path_globs_count: payload.pathGlobs?.length ?? 0,
@@ -365,9 +414,11 @@ export class SidecarRuntime {
       dailyNotePathGlobs: payload.dailyNotePathGlobs,
       modelConfigId: `${chatKind}:${process.env.OBSIDIAN_AI_CHAT_MODEL ?? 'gpt-4o-mini'}`,
       vaultIndexFingerprint: `sqlite:${process.env.OBSIDIAN_AI_DB_PATH ?? ''}`,
+      onAgentTrace: (event) => logAgentTraceEvent(agentLog, event),
       completion: {
         signal: options?.signal,
         timeoutMs: payload.timeoutMs,
+        onUsage: (usage) => logAgentUsage(agentLog, 'completion', usage),
       },
     });
     let out: IteratorResult<string, ChatWorkflowResult>;
@@ -382,6 +433,16 @@ export class SidecarRuntime {
         sourceCount: out.value.sources.length,
       },
       'sidecar.chat.done',
+    );
+    agentLog.info(
+      {
+        event: 'agent.run_done',
+        op: 'chat',
+        ms: Date.now() - t0,
+        groundingPolicyVersion: out.value.groundingPolicyVersion,
+        sourceCount: out.value.sources.length,
+      },
+      'agent.run_done',
     );
     return out.value;
   }

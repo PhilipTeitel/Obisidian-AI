@@ -19,6 +19,13 @@ import type {
   RetrievalPlan,
   AgentToolCallPlan,
 } from '../domain/agentRetrievalPlan.js';
+import {
+  normalizeProviderTokenUsage,
+  plannerToolCallBudgetWarning,
+  summarizeAgentToolTrace,
+  toolBudgetWarning,
+  type AgentRunTraceEvent,
+} from '../domain/agentRunTrace.js';
 import type {
   BuildGroundedMessagesHooks,
   ChatMessage,
@@ -75,6 +82,8 @@ export interface ChatWorkflowOptions {
   modelConfigId?: string;
   /** AGT-4: caller-supplied vault/index state fingerprint for planner determinism. */
   vaultIndexFingerprint?: string;
+  /** AGT-6: sidecar-owned structured observability callback. */
+  onAgentTrace?: (event: AgentRunTraceEvent) => void;
 }
 
 export interface ChatWorkflowResult {
@@ -179,6 +188,12 @@ async function runAgenticTools(
       enableHybridSearch: options.enableHybridSearch,
     });
     results.push(result);
+    const tool = summarizeAgentToolTrace(result.trace);
+    options.onAgentTrace?.({ type: 'tool', tool });
+    const budget = toolBudgetWarning(tool);
+    if (budget !== null) {
+      options.onAgentTrace?.({ type: 'budget', ...budget });
+    }
     if (hasBudgetExceeded(result)) {
       return { results, budgetExceeded: true };
     }
@@ -249,9 +264,20 @@ export async function* runChatStream(
     const plan = await deps.planner.planRetrieval(
       buildPlannerInput(messages, query, options, pathGlobs, dateRange),
     );
+    options.onAgentTrace?.({ type: 'plan', plan });
+    options.onAgentTrace?.({
+      type: 'usage',
+      stage: 'planner',
+      usage: normalizeProviderTokenUsage(plan.usage),
+    });
+    const plannerBudget = plannerToolCallBudgetWarning(plan);
+    if (plannerBudget !== null) {
+      options.onAgentTrace?.({ type: 'budget', ...plannerBudget });
+    }
 
     if (plan.status === 'needs_scope') {
       yield `${INSUFFICIENT_EVIDENCE_STREAM_MESSAGE}\n\nMissing scope: ${plan.reason}`;
+      options.onAgentTrace?.({ type: 'sources', sources: [] });
       return {
         sources: [],
         groundingOutcome: 'insufficient_evidence',
@@ -263,6 +289,7 @@ export async function* runChatStream(
     if (toolRun.budgetExceeded) {
       deps.log?.warn?.({ stablePlanKey: plan.stablePlanKey }, 'chat.agentic_tool_budget_exceeded');
       yield AGENTIC_BUDGET_MESSAGE;
+      options.onAgentTrace?.({ type: 'sources', sources: [] });
       return {
         sources: [],
         groundingOutcome: 'insufficient_evidence',
@@ -280,6 +307,7 @@ export async function* runChatStream(
     if (synthesis.isInsufficient) {
       deps.log?.info?.({ stablePlanKey: plan.stablePlanKey }, 'chat.agentic_synthesis_insufficient_context');
       yield INSUFFICIENT_EVIDENCE_STREAM_MESSAGE;
+      options.onAgentTrace?.({ type: 'sources', sources: [] });
       return {
         sources: [],
         groundingOutcome: 'insufficient_evidence',
@@ -308,6 +336,7 @@ export async function* runChatStream(
 
     const sources = synthesis.sources;
     deps.log?.info?.({ stablePlanKey: plan.stablePlanKey, sourceCount: sources.length }, 'chat.agentic_completion_sources');
+    options.onAgentTrace?.({ type: 'sources', sources });
 
     return {
       sources,
@@ -333,6 +362,7 @@ export async function* runChatStream(
 
   if (searchRes.results.length === 0) {
     yield INSUFFICIENT_EVIDENCE_STREAM_MESSAGE;
+    options.onAgentTrace?.({ type: 'sources', sources: [] });
     return {
       sources: [],
       groundingOutcome: 'insufficient_evidence',
@@ -369,6 +399,7 @@ export async function* runChatStream(
 
   const sources = usedNodeRecordsToSources(stitched.usedRecords);
   deps.log?.info?.({ sourceCount: sources.length }, 'chat.completion_sources');
+  options.onAgentTrace?.({ type: 'sources', sources });
 
   return {
     sources,

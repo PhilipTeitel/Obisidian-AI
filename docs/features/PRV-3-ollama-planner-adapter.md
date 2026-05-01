@@ -3,7 +3,7 @@
 **Story**: Implement an Ollama-backed `IAgentPlannerPort` adapter that turns a user prompt, settings, and vault fingerprint into a normalized `AgentPlanResult` before retrieval runs.
 **Epic**: 12 - Deterministic agentic note synthesis (REQ-007)
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -169,75 +169,75 @@ ChatView (unchanged in PRV-3)
 
 ### Phase A: Adapter Construction
 
-- [ ] **A1** - `OllamaAgentPlannerAdapter` implements `IAgentPlannerPort`.
+- [x] **A1** - `OllamaAgentPlannerAdapter` implements `IAgentPlannerPort`.
   - It exposes `planRetrieval(input: AgentPlanInput): Promise<AgentPlanResult>`.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::A1_implements_planner_port(vitest)`
 
-- [ ] **A2** - `createAgentPlannerPort('ollama', config)` returns the Ollama planner adapter with trimmed config.
+- [x] **A2** - `createAgentPlannerPort('ollama', config)` returns the Ollama planner adapter with trimmed config.
   - Evidence: `tests/sidecar/adapters/createAgentPlannerPort.test.ts::A2_creates_ollama_planner(vitest)`
 
 ### Phase B: Ollama Request and Parsing
 
-- [ ] **B1** - The adapter posts to `{baseUrl}/api/chat` with configured model and `stream: false`.
+- [x] **B1** - The adapter posts to `{baseUrl}/api/chat` with configured model and `stream: false`.
   - The request body includes only prompt/settings/fingerprint metadata needed for planning and no raw vault note content.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::B1_posts_ollama_chat_json_request(vitest)` - covers S1
 
-- [ ] **B2** - A valid ready-plan JSON response normalizes to a `RetrievalPlan`.
+- [x] **B2** - A valid ready-plan JSON response normalizes to a `RetrievalPlan`.
   - The normalized plan includes topic/task, filters, output intent, planned tool calls, and `stablePlanKey`.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::B2_ready_response_normalizes_plan(vitest)` - covers S1
 
-- [ ] **B3** - A valid `needs_scope` JSON response normalizes to `NeedsScopePlan` without search/read tool calls.
+- [x] **B3** - A valid `needs_scope` JSON response normalizes to `NeedsScopePlan` without search/read tool calls.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::B3_needs_scope_response_has_no_tools(vitest)` - covers S2
 
-- [ ] **B4** - Invalid JSON, missing required fields, or grounding-weakening fields fail closed.
+- [x] **B4** - Invalid JSON, missing required fields, or grounding-weakening fields fail closed.
   - The adapter returns a typed `needs_scope` result or throws a typed planner error that AGT-4 can turn into insufficient evidence; it does not run retrieval.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::B4_invalid_or_unsafe_response_fails_closed(vitest)` - covers S2
 
 ### Phase C: Determinism and Contract Reuse
 
-- [ ] **C1** - The Ollama adapter passes the reusable planner contract against deterministic HTTP fixtures.
+- [x] **C1** - The Ollama adapter passes the reusable planner contract against deterministic HTTP fixtures.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::C1_passes_agent_planner_contract(vitest)` - covers S7
 
-- [ ] **C2** - Equivalent inputs and equivalent fixture responses produce deep-equal normalized plans.
+- [x] **C2** - Equivalent inputs and equivalent fixture responses produce deep-equal normalized plans.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::C2_same_fixture_response_same_plan_key(vitest)` - covers S7
 
-- [ ] **C3** - Planner constants remain code constants and are not exposed as plugin settings.
+- [x] **C3** - Planner constants remain code constants and are not exposed as plugin settings.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::C3_uses_fixed_planner_budgets(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** - **(binding)** Provider-specific planning stays behind `IAgentPlannerPort`.
+- [x] **Y1** - **(binding)** Provider-specific planning stays behind `IAgentPlannerPort`.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::A1_implements_planner_port(vitest)` - maps Section 4 Y1 and Section 4b port row
 
-- [ ] **Y2** - **(binding)** Ollama API is the only provider API used by PRV-3.
+- [x] **Y2** - **(binding)** Ollama API is the only provider API used by PRV-3.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::B1_posts_ollama_chat_json_request(vitest)` - maps Section 4 Y2 and Section 4b adapter row
 
-- [ ] **Y3** - **(binding)** Planner prompts do not include raw note content or secrets.
+- [x] **Y3** - **(binding)** Planner prompts do not include raw note content or secrets.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::B1_posts_ollama_chat_json_request(vitest)` - maps Section 4 Y3
 
-- [ ] **Y4** - **(binding)** Adapter output always passes through AGT-2 normalization/validation.
+- [x] **Y4** - **(binding)** Adapter output always passes through AGT-2 normalization/validation.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::B2_ready_response_normalizes_plan(vitest)` - maps Section 4 Y4
 
-- [ ] **Y5** - **(binding)** Planner budgets are not user-configurable.
+- [x] **Y5** - **(binding)** Planner budgets are not user-configurable.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::C3_uses_fixed_planner_budgets(vitest)` - maps Section 4 Y5
 
-- [ ] **Y6** - **(binding)** Deterministic fixtures produce stable normalized plans.
+- [x] **Y6** - **(binding)** Deterministic fixtures produce stable normalized plans.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::C2_same_fixture_response_same_plan_key(vitest)` - maps Section 4 Y6
 
-- [ ] **Y7** - **(binding)** `needs_scope` cannot include search/read tool calls.
+- [x] **Y7** - **(binding)** `needs_scope` cannot include search/read tool calls.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::B3_needs_scope_response_has_no_tools(vitest)` - maps Section 4 Y7
 
-- [ ] **Y8** - **(binding)** PRV-3 does not execute tools, synthesis, or vault writes.
+- [x] **Y8** - **(binding)** PRV-3 does not execute tools, synthesis, or vault writes.
   - Evidence: `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::Y8_no_tool_or_write_surface(vitest)` - maps Section 4 Y8
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
-- [ ] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
-- [ ] **Z3** - No `any` types in any new or modified file.
-- [ ] **Z4** - All client imports from shared use `@shared/types` alias where applicable; PRV-3 sidecar files should not add client shared imports.
-- [ ] **Z5** - Adapter errors include actionable status/model/base URL metadata but no raw prompt, raw note content, or secrets.
-- [ ] **Z6** - `/review-story PRV-3` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
+- [x] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
+- [x] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
+- [x] **Z3** - No `any` types in any new or modified file.
+- [x] **Z4** - All client imports from shared use `@shared/types` alias where applicable; PRV-3 sidecar files should not add client shared imports.
+- [x] **Z5** - Adapter errors include actionable status/model/base URL metadata but no raw prompt, raw note content, or secrets.
+- [x] **Z6** - `/review-story PRV-3` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
 
 ---
 

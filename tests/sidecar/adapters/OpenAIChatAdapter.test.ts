@@ -170,4 +170,31 @@ describe('OpenAIChatAdapter', () => {
     expect(parts).toEqual(['.']);
     expect(captured?.aborted).toBe(true);
   }, 10_000);
+
+  it('C2_usage_unavailable_is_nonfatal', async () => {
+    // @scenario S8
+    const fetchMock = vi.fn().mockResolvedValue(
+      sseResponse([
+        'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"lo"}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const usage: unknown[] = [];
+
+    const adapter = new OpenAIChatAdapter({
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+    });
+    let out = '';
+    for await (const d of adapter.complete([{ role: 'user', content: 'hi' }], '', undefined, {
+      onUsage: (value) => usage.push(value),
+    })) {
+      out += d;
+    }
+
+    expect(out).toBe('Hello');
+    expect(usage).toEqual([{ source: 'unavailable' }]);
+  });
 });

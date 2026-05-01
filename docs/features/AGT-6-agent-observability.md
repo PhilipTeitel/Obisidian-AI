@@ -3,7 +3,7 @@
 **Story**: Add structured sidecar observability for agent runs: retrieval plan summaries, tool activity, source set, budget warnings, and actual provider token usage when reported.
 **Epic**: 12 - Deterministic agentic note synthesis (REQ-007)
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -153,12 +153,17 @@ ChatView (unchanged)
 |---|------|--------|
 | 1 | `src/core/workflows/ChatWorkflow.ts` | Emit trace metadata/callbacks for plan, tools, source set, budget flags, and usage hooks. |
 | 2 | `src/core/workflows/AgentNoteToolRunner.ts` | Ensure trace fields are sufficient for sidecar logging; avoid raw content. |
-| 3 | `src/core/ports/IChatPort.ts` | Add optional usage callback support only if needed and backward-compatible. |
-| 4 | `src/sidecar/adapters/OllamaChatAdapter.ts` | Capture reported usage fields if Ollama includes them; log unavailable otherwise. |
-| 5 | `src/sidecar/adapters/OpenAIChatAdapter.ts` | Capture reported usage fields if available in non-stream or final streaming chunks; log unavailable otherwise. |
-| 6 | `src/sidecar/adapters/OllamaAgentPlannerAdapter.ts` | Preserve reported planner usage if PRV-3 response exposes it. |
-| 7 | `src/sidecar/runtime/SidecarRuntime.ts` | Generate agent run ID and write structured plan/tool/source/usage/budget logs. |
-| 8 | `README.md` | Link AGT-6 from the Epic 12 backlog row. |
+| 3 | `src/core/domain/agentRetrievalPlan.ts` | Carry optional provider usage metadata on planner results. |
+| 4 | `src/core/ports/IChatPort.ts` | Add optional usage callback support only if needed and backward-compatible. |
+| 5 | `src/core/index.ts` | Export the new trace helper surface. |
+| 6 | `src/sidecar/adapters/OllamaChatAdapter.ts` | Capture reported usage fields if Ollama includes them; log unavailable otherwise. |
+| 7 | `src/sidecar/adapters/OpenAIChatAdapter.ts` | Capture reported usage fields if available in non-stream or final streaming chunks; log unavailable otherwise. |
+| 8 | `src/sidecar/adapters/OllamaAgentPlannerAdapter.ts` | Preserve reported planner usage if PRV-3 response exposes it. |
+| 9 | `src/sidecar/runtime/SidecarRuntime.ts` | Generate agent run ID and write structured plan/tool/source/usage/budget logs. |
+| 10 | `tests/sidecar/adapters/OllamaChatAdapter.test.ts` | Add Ollama usage fixture coverage. |
+| 11 | `tests/sidecar/adapters/OpenAIChatAdapter.test.ts` | Add OpenAI unavailable-usage fixture coverage. |
+| 12 | `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts` | Add Ollama planner usage fixture coverage. |
+| 13 | `README.md` | Link AGT-6 from the Epic 12 backlog row. |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -173,77 +178,77 @@ ChatView (unchanged)
 
 ### Phase A: Trace Shapes and Redaction
 
-- [ ] **A1** - Agent trace helpers produce compact plan summaries without raw prompt, raw note content, API keys, or secrets.
+- [x] **A1** - Agent trace helpers produce compact plan summaries without raw prompt, raw note content, API keys, or secrets.
   - Evidence: `tests/core/domain/agentRunTrace.test.ts::A1_plan_summary_redacts_sensitive_content(vitest)` - covers S8
 
-- [ ] **A2** - Tool trace summaries include counts/status/budget flags and exclude snippets/node content.
+- [x] **A2** - Tool trace summaries include counts/status/budget flags and exclude snippets/node content.
   - Evidence: `tests/core/domain/agentRunTrace.test.ts::A2_tool_summary_excludes_content(vitest)` - covers S8
 
-- [ ] **A3** - Source summaries match final source set semantics and avoid unused sources.
+- [x] **A3** - Source summaries match final source set semantics and avoid unused sources.
   - Evidence: `tests/core/domain/agentRunTrace.test.ts::A3_source_summary_matches_used_sources(vitest)` - covers S8
 
-- [ ] **A4** - Provider usage normalization distinguishes reported usage from unavailable usage.
+- [x] **A4** - Provider usage normalization distinguishes reported usage from unavailable usage.
   - Evidence: `tests/core/domain/agentRunTrace.test.ts::A4_usage_reported_vs_unavailable(vitest)` - covers S8
 
 ### Phase B: Runtime Logs
 
-- [ ] **B1** - Sidecar logs `agent.run_started`, `agent.plan`, `agent.tool`, `agent.sources`, `agent.usage`, and `agent.run_done` with one correlation ID.
+- [x] **B1** - Sidecar logs `agent.run_started`, `agent.plan`, `agent.tool`, `agent.sources`, `agent.usage`, and `agent.run_done` with one correlation ID.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentObservability.test.ts::B1_logs_agent_run_lifecycle(vitest)` - covers S8
 
-- [ ] **B2** - Budget-exceeded tool or planner outcomes log `warn` with budget name, configured constant, observed value, and correlation ID.
+- [x] **B2** - Budget-exceeded tool or planner outcomes log `warn` with budget name, configured constant, observed value, and correlation ID.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentObservability.test.ts::B2_budget_exceeded_logs_warn(vitest)` - covers S3, S8
 
-- [ ] **B3** - Logs never include raw note content, retrieval snippets, API keys, or full user prompts.
+- [x] **B3** - Logs never include raw note content, retrieval snippets, API keys, or full user prompts.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentObservability.test.ts::B3_logs_redact_content_and_secrets(vitest)` - covers S8
 
-- [ ] **B4** - Planner and final completion token usage are logged when reported and logged as unavailable when not reported.
+- [x] **B4** - Planner and final completion token usage are logged when reported and logged as unavailable when not reported.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentObservability.test.ts::B4_logs_provider_usage_or_unavailable(vitest)` - covers S8
 
-- [ ] **B5** - Chat stream `delta` and final `done` payloads do not expose plan/tool/usage logs.
+- [x] **B5** - Chat stream `delta` and final `done` payloads do not expose plan/tool/usage logs.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentObservability.test.ts::B5_chat_wire_payload_unchanged(vitest)` - covers S8
 
 ### Phase C: Adapter Usage Metadata
 
-- [ ] **C1** - Ollama chat/planner adapters capture reported usage fields when present in provider-shaped fixtures.
+- [x] **C1** - Ollama chat/planner adapters capture reported usage fields when present in provider-shaped fixtures.
   - Evidence: `tests/sidecar/adapters/OllamaChatAdapter.test.ts::C1_reports_usage_when_available(vitest)` and `tests/sidecar/adapters/OllamaAgentPlannerAdapter.test.ts::C1_reports_planner_usage_when_available(vitest)` - covers S8
 
-- [ ] **C2** - OpenAI chat adapter either captures streaming usage when available or marks usage unavailable without failing the stream.
+- [x] **C2** - OpenAI chat adapter either captures streaming usage when available or marks usage unavailable without failing the stream.
   - Evidence: `tests/sidecar/adapters/OpenAIChatAdapter.test.ts::C2_usage_unavailable_is_nonfatal(vitest)` - covers S8
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** - **(binding)** All agent log events include the same correlation ID.
+- [x] **Y1** - **(binding)** All agent log events include the same correlation ID.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentObservability.test.ts::B1_logs_agent_run_lifecycle(vitest)` - maps Section 4 Y1
 
-- [ ] **Y2** - **(binding)** Retrieval plan logs are structured and redacted.
+- [x] **Y2** - **(binding)** Retrieval plan logs are structured and redacted.
   - Evidence: `tests/core/domain/agentRunTrace.test.ts::A1_plan_summary_redacts_sensitive_content(vitest)` - maps Section 4 Y2
 
-- [ ] **Y3** - **(binding)** Tool logs include trace counts/status only, not content.
+- [x] **Y3** - **(binding)** Tool logs include trace counts/status only, not content.
   - Evidence: `tests/core/domain/agentRunTrace.test.ts::A2_tool_summary_excludes_content(vitest)` - maps Section 4 Y3
 
-- [ ] **Y4** - **(binding)** Logged source set matches final used sources.
+- [x] **Y4** - **(binding)** Logged source set matches final used sources.
   - Evidence: `tests/core/domain/agentRunTrace.test.ts::A3_source_summary_matches_used_sources(vitest)` - maps Section 4 Y4
 
-- [ ] **Y5** - **(binding)** Budget exhaustion emits `warn`.
+- [x] **Y5** - **(binding)** Budget exhaustion emits `warn`.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentObservability.test.ts::B2_budget_exceeded_logs_warn(vitest)` - maps Section 4 Y5
 
-- [ ] **Y6** - **(binding)** Actual provider token usage is logged when reported and unavailable is explicit.
+- [x] **Y6** - **(binding)** Actual provider token usage is logged when reported and unavailable is explicit.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentObservability.test.ts::B4_logs_provider_usage_or_unavailable(vitest)` - maps Section 4 Y6 and Section 4b provider rows
 
-- [ ] **Y7** - **(binding)** Plan/tool/usage observability is not exposed on chat wire.
+- [x] **Y7** - **(binding)** Plan/tool/usage observability is not exposed on chat wire.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentObservability.test.ts::B5_chat_wire_payload_unchanged(vitest)` - maps Section 4 Y7
 
-- [ ] **Y8** - **(binding)** AGT-6 adds no trace tables, vault writes, or budget settings.
+- [x] **Y8** - **(binding)** AGT-6 adds no trace tables, vault writes, or budget settings.
   - Evidence: `tests/core/domain/agentRunTrace.test.ts::Y8_no_persistence_write_or_budget_setting_surface(vitest)` - maps Section 4 Y8
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
-- [ ] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
-- [ ] **Z3** - No `any` types in any new or modified file.
-- [ ] **Z4** - All client imports from shared use `@shared/types` alias where applicable; AGT-6 sidecar/core changes should not add client shared imports.
-- [ ] **Z5** - Logs use structured fields and redact raw note content, raw prompts, API keys, and secrets.
-- [ ] **Z6** - `/review-story AGT-6` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
+- [x] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
+- [x] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
+- [x] **Z3** - No `any` types in any new or modified file.
+- [x] **Z4** - All client imports from shared use `@shared/types` alias where applicable; AGT-6 sidecar/core changes should not add client shared imports.
+- [x] **Z5** - Logs use structured fields and redact raw note content, raw prompts, API keys, and secrets.
+- [x] **Z6** - `/review-story AGT-6` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
 
 ---
 

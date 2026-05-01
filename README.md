@@ -166,7 +166,7 @@ graph TB
             IndexWF["IndexWorkflow<br/>State machine"]
             SearchWF["SearchWorkflow<br/>Three-phase retrieval"]
             ChatWF["ChatWorkflow<br/>Agentic synthesis loop"]
-            QueryPlan["IAgentPlannerPort<br/>plan before query<br/>(injected; PRV-3 adapter pending)"]
+            QueryPlan["IAgentPlannerPort<br/>plan before query<br/>(Ollama adapter available)"]
             NoteTools["Bounded note tools<br/>search / read / draft"]
             SummaryWF["SummaryWorkflow<br/>Bottom-up generation"]
             Chunker["Hierarchical chunker"]
@@ -777,7 +777,7 @@ Each note's indexing progress is tracked per-step in the `job_steps` table:
 - **Log levels:** Standard `debug`, `info`, `warn`, `error`. Default level: `info`. Configurable via plugin settings.
 - **Sensitive data:** API keys, note content, and user PII must **never** appear in logs. Embeddings are logged only as dimensions/counts, not raw vectors. Note paths may appear in `debug` level only.
 - **Operation scopes:** Key operations (`index.full`, `index.incremental`, `search`, `chat`) are logged at `info` with timing metrics (duration, note count, error count).
-- **Agent synthesis logs:** REQ-007 agent runs must eventually log the structured retrieval plan, searches performed, notes read, source set used for synthesis, and actual provider token usage when the provider reports it. AGT-4 logs bounded-run metadata such as source counts and budget warnings without raw note content; AGT-6 completes the full structured observability surface. Logs must still redact raw note content and secrets.
+- **Agent synthesis logs:** REQ-007 agent runs log a structured sidecar-only observability surface: correlated run lifecycle events, compact retrieval-plan summaries, tool activity counts, source set summaries, budget warnings, and actual provider token usage when reported. Provider usage is marked unavailable when absent, and logs must redact raw prompts, raw note content, API keys, and secrets.
 
 ### 21. Source Provenance Contract
 
@@ -849,9 +849,9 @@ Determinism is measured in tiers:
 
 Output follows the prompt's requested format when feasible. If no format is requested, the default output structure is a bullet list. Sources continue to follow [ADR-015](docs/decisions/ADR-015-source-provenance-contract.md): every note that contributes to the answer or draft appears once, and no unused note appears.
 
-AGT-4 wires this loop into `ChatWorkflow` and `SidecarRuntime` through explicit ports. `ChatWorkflowDeps` can receive an `IAgentPlannerPort` and `IAgentNoteToolPort`; `SidecarRuntime` constructs the AGT-3 `AgentNoteToolRunner` and can accept an injected planner. Until PRV-3 provides the first real Ollama planner adapter/factory, deployments without a planner keep the existing single-shot retrieval path as a migration path.
+AGT-4 wires this loop into `ChatWorkflow` and `SidecarRuntime` through explicit ports. `ChatWorkflowDeps` can receive an `IAgentPlannerPort` and `IAgentNoteToolPort`; `SidecarRuntime` constructs the AGT-3 `AgentNoteToolRunner` and can accept an injected planner. PRV-3 provides the first real Ollama planner adapter/factory; deployments without an injected planner keep the existing single-shot retrieval path as a migration path.
 
-Agent budgets are fixed constants in the first implementation, set high enough for testing and easy to tune in code. Do not expose token-limit configuration yet. AGT-4 logs bounded-run metadata such as source counts and budget warnings without raw note content. Full structured retrieval-plan, tool-trace, and provider token-usage logging is tracked separately in AGT-6.
+Agent budgets are fixed constants in the first implementation, set high enough for testing and easy to tune in code. Do not expose token-limit configuration yet. Agent runs emit sidecar-only structured logs for lifecycle, retrieval-plan summaries, tool traces, source summaries, budget warnings, and provider token usage when adapters report it.
 
 ### Project Structure
 
@@ -1381,8 +1381,8 @@ Move chat from single-shot RAG to deterministic pre-query planning, bounded note
 | [AGT-3](docs/features/AGT-3-bounded-note-tools.md) | Done | Bounded note tools for search, note read, and draft assembly          | L    | Tool calls delegate to `SearchWorkflow` / `IDocumentStore`; no vault writes; fixed high testing budgets; covers REQ-007 S3/S4/S9 |
 | [AGT-4](docs/features/AGT-4-agentic-chat-workflow-loop.md) | Done | Agentic `ChatWorkflow` loop: plan → tools → synthesize                | L    | Ollama first for pre-query reasoning; OpenAI next; stable source set except ranking ties; covers REQ-007 S3/S6/S7 |
 | [AGT-5](docs/features/AGT-5-topic-synthesis-draft-output.md) | Done | Topic synthesis draft output and prompt-requested formats             | M    | Bullet list default; honor requested format where feasible; sources equal contributing notes; covers REQ-007 S4/S5/S6 |
-| [AGT-6](docs/features/AGT-6-agent-observability.md) | Not Started | Agent observability: retrieval plan, tool trace, token usage, budgets | M    | Log retrieval plan, searches, note reads, source set, actual provider token usage when reported, and `warn` on budget exceedance; covers REQ-007 S8 |
-| [PRV-3](docs/features/PRV-3-ollama-planner-adapter.md) | Not Started | Ollama planner adapter support for pre-query reasoning                | M    | Provider-specific planner behavior behind hexagonal boundary; prepares OpenAI follow-up without changing core workflow |
+| [AGT-6](docs/features/AGT-6-agent-observability.md) | Done | Agent observability: retrieval plan, tool trace, token usage, budgets | M    | Log retrieval plan, searches, note reads, source set, actual provider token usage when reported, and `warn` on budget exceedance; covers REQ-007 S8 |
+| [PRV-3](docs/features/PRV-3-ollama-planner-adapter.md) | Done | Ollama planner adapter support for pre-query reasoning                | M    | Provider-specific planner behavior behind hexagonal boundary; prepares OpenAI follow-up without changing core workflow |
 
 **Design sections affected (applied inline above):** Requirements log (REQ-007 added); Architecture diagram; Data Flow → Chat Query; Technical Stack; Key Design Decisions §14/§16/§20/§24; UI Components → ChatView; API Contract → port interfaces and `chat` protocol; Plugin Settings (`vaultOrganizationPrompt`, deferred file-write settings); Backlog Items → Epic 12.
 

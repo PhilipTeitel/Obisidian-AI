@@ -1,5 +1,6 @@
 import type { ChatMessage } from './types.js';
 import { hashText } from './hashText.js';
+import type { ProviderTokenUsage } from './agentRunTrace.js';
 
 export const AGENT_RETRIEVAL_PLAN_VERSION = 'v1';
 export const AGENT_RETRIEVAL_DEFAULT_FORMAT = 'bullet_list';
@@ -63,6 +64,7 @@ export interface RetrievalPlan {
   };
   toolCalls: AgentToolCallPlan[];
   stablePlanKey: string;
+  usage?: ProviderTokenUsage;
 }
 
 export interface NeedsScopePlan {
@@ -71,6 +73,7 @@ export interface NeedsScopePlan {
   reason: string;
   missing: Array<'topic' | 'scope' | 'output'>;
   stablePlanKey: string;
+  usage?: ProviderTokenUsage;
 }
 
 export type AgentPlanResult = RetrievalPlan | NeedsScopePlan;

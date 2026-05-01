@@ -102,4 +102,36 @@ describe('OllamaChatAdapter', () => {
       void _;
     }
   });
+
+  it('C1_reports_usage_when_available', async () => {
+    // @scenario S8
+    const fetchMock = vi.fn().mockResolvedValue(
+      ndjsonResponse([
+        JSON.stringify({
+          message: { role: 'assistant', content: 'a' },
+          done: false,
+        }),
+        JSON.stringify({
+          message: { role: 'assistant', content: 'ab' },
+          prompt_eval_count: 9,
+          eval_count: 4,
+          done: true,
+        }),
+      ]),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const usage: unknown[] = [];
+
+    const adapter = new OllamaChatAdapter({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'llama3',
+    });
+    for await (const _ of adapter.complete([{ role: 'user', content: 'hi' }], '', undefined, {
+      onUsage: (value) => usage.push(value),
+    })) {
+      void _;
+    }
+
+    expect(usage).toEqual([{ source: 'reported', promptTokens: 9, completionTokens: 4, totalTokens: 13 }]);
+  });
 });

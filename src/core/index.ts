@@ -8,6 +8,7 @@ export * from './domain/contextAssembly.js';
 export * from './domain/agentRetrievalPlan.js';
 export * from './domain/agentNoteTools.js';
 export * from './domain/agentSynthesis.js';
+export * from './domain/agentRunTrace.js';
 export * from './ports/index.js';
 export * from './workflows/SearchWorkflow.js';
 export * from './workflows/ChatWorkflow.js';
