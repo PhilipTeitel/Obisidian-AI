@@ -13,6 +13,7 @@ import {
 } from '../domain/dateRangeResolver.js';
 import { formatNoteDateIso } from '../domain/dailyNoteDate.js';
 import type { AgentNoteToolResult } from '../domain/agentNoteTools.js';
+import { buildAgentSynthesisContext } from '../domain/agentSynthesis.js';
 import type {
   AgentPlanInput,
   RetrievalPlan,
@@ -154,66 +155,6 @@ function buildPlannerInput(
   };
 }
 
-function toolResultContentItems(
-  result: AgentNoteToolResult,
-): Array<{ nodeId: string; notePath: string; content: string }> {
-  if (result.type === 'search_notes') {
-    return result.results.map((item) => ({
-      nodeId: item.nodeId,
-      notePath: item.notePath,
-      content: item.snippet,
-    }));
-  }
-  if (result.type === 'read_note') {
-    return result.nodes.map((node) => ({
-      nodeId: node.nodeId,
-      notePath: node.notePath,
-      content: node.content,
-    }));
-  }
-  return result.draftMarkdown.trim().length > 0
-    ? [
-        {
-          nodeId: 'draft',
-          notePath: 'draft',
-          content: result.draftMarkdown,
-        },
-      ]
-    : [];
-}
-
-function assembleAgenticContext(toolResults: AgentNoteToolResult[]): {
-  context: string;
-  usedRecords: UsedNodeRecord[];
-} {
-  const lines: string[] = ['## Agent tool context'];
-  const usedRecords: UsedNodeRecord[] = [];
-  const seenNodes = new Set<string>();
-
-  for (const result of toolResults) {
-    for (const item of toolResultContentItems(result)) {
-      const key = `${item.notePath}\u0000${item.nodeId}`;
-      if (seenNodes.has(key)) {
-        continue;
-      }
-      seenNodes.add(key);
-      if (item.notePath !== 'draft') {
-        usedRecords.push({
-          nodeId: item.nodeId,
-          notePath: item.notePath,
-          insertionOrder: usedRecords.length,
-        });
-      }
-      lines.push(`\n### ${item.notePath}#${item.nodeId}\n${item.content}`);
-    }
-  }
-
-  return {
-    context: usedRecords.length > 0 ? lines.join('\n') : '',
-    usedRecords,
-  };
-}
-
 function hasBudgetExceeded(result: AgentNoteToolResult): boolean {
   return result.status === 'budget_exceeded' || result.trace.budgetExceeded;
 }
@@ -329,8 +270,15 @@ export async function* runChatStream(
       };
     }
 
-    const agentContext = assembleAgenticContext(toolRun.results);
-    if (agentContext.context.trim().length === 0) {
+    const synthesis = buildAgentSynthesisContext({
+      plan,
+      toolResults: toolRun.results,
+      messages,
+      systemPrompt: options.systemPrompt,
+      vaultOrganizationPrompt: options.vaultOrganizationPrompt,
+    });
+    if (synthesis.isInsufficient) {
+      deps.log?.info?.({ stablePlanKey: plan.stablePlanKey }, 'chat.agentic_synthesis_insufficient_context');
       yield INSUFFICIENT_EVIDENCE_STREAM_MESSAGE;
       return {
         sources: [],
@@ -346,7 +294,7 @@ export async function* runChatStream(
     const assembled = deps.buildGroundedMessages(
       messages,
       {
-        retrievalContext: agentContext.context,
+        retrievalContext: synthesis.retrievalContext,
         systemPrompt: options.systemPrompt,
         vaultOrganizationPrompt: options.vaultOrganizationPrompt,
       },
@@ -358,7 +306,7 @@ export async function* runChatStream(
       yield delta;
     }
 
-    const sources = usedNodeRecordsToSources(agentContext.usedRecords);
+    const sources = synthesis.sources;
     deps.log?.info?.({ stablePlanKey: plan.stablePlanKey, sourceCount: sources.length }, 'chat.agentic_completion_sources');
 
     return {

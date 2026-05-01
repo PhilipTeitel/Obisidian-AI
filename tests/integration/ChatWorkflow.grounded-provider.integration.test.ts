@@ -163,6 +163,8 @@ describe('ChatWorkflow grounded provider integration (CHAT-3)', () => {
     expect(sent[1]).toEqual({ role: 'system', content: 'Project notes live under Projects/' });
     expect(sent[2]).toEqual({ role: 'system', content: 'Be concise.' });
     expect(sent[3]?.role).toBe('system');
+    expect(sent[3]?.content).toContain('## Synthesis instructions');
+    expect(sent[3]?.content).toContain('Default output format: bullet list');
     expect(sent[3]?.content).toContain('Beta launch is blocked by design review.');
     expect(sent.slice(4)).toEqual(messages);
   });

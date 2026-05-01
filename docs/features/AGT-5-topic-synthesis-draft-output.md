@@ -3,7 +3,7 @@
 **Story**: Convert grounded agent tool results into useful answer or draft-note output that follows prompt-requested formats when feasible, defaults to bullet lists, and exposes traceable contributing sources without writing vault files.
 **Epic**: 12 - Deterministic agentic note synthesis (REQ-007)
 **Size**: Medium
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -165,68 +165,68 @@ ChatView
 
 ### Phase A: Synthesis Context
 
-- [ ] **A1** - `agentSynthesis` helpers produce a grounded retrieval context from tool results only.
+- [x] **A1** - `agentSynthesis` helpers produce a grounded retrieval context from tool results only.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::A1_context_uses_tool_results_only(vitest)` - covers S6
 
-- [ ] **A2** - Empty or unusable tool context produces an insufficient-context outcome.
+- [x] **A2** - Empty or unusable tool context produces an insufficient-context outcome.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::A2_empty_context_reports_gap(vitest)` - covers S6
 
-- [ ] **A3** - Source records are deduped by note path in first-use order and exclude dropped-over-budget content.
+- [x] **A3** - Source records are deduped by note path in first-use order and exclude dropped-over-budget content.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::A3_sources_match_included_context(vitest)` - covers S5
 
 ### Phase B: Output Format
 
-- [ ] **B1** - Draft/answer instructions default to bullet lists when no requested format exists.
+- [x] **B1** - Draft/answer instructions default to bullet lists when no requested format exists.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::B1_defaults_to_bullet_list(vitest)` - covers S4
 
-- [ ] **B2** - Requested formats from `RetrievalPlan.output.requestedFormat` are carried into provider instructions.
+- [x] **B2** - Requested formats from `RetrievalPlan.output.requestedFormat` are carried into provider instructions.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::B2_requested_format_instructions(vitest)` - covers S4
 
-- [ ] **B3** - Draft-note output is clearly marked as draft content but does not add a review UI or write target.
+- [x] **B3** - Draft-note output is clearly marked as draft content but does not add a review UI or write target.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::B3_draft_output_is_chat_only(vitest)` - covers S9
 
 ### Phase C: Workflow Integration
 
-- [ ] **C1** - `ChatWorkflow` passes synthesis context through `buildGroundedMessages` in ADR-011 order.
+- [x] **C1** - `ChatWorkflow` passes synthesis context through `buildGroundedMessages` in ADR-011 order.
   - Evidence: `tests/core/workflows/ChatWorkflow.synthesis.test.ts::C1_provider_messages_include_synthesis_context(vitest)` - covers S6
 
-- [ ] **C2** - Final chat result sources equal synthesis sources.
+- [x] **C2** - Final chat result sources equal synthesis sources.
   - Evidence: `tests/core/workflows/ChatWorkflow.synthesis.test.ts::C2_done_sources_equal_synthesis_sources(vitest)` - covers S5, S6
 
-- [ ] **C3** - Deterministic planner/tool/chat fakes produce repeatable draft structure and source set.
+- [x] **C3** - Deterministic planner/tool/chat fakes produce repeatable draft structure and source set.
   - Evidence: `tests/core/workflows/ChatWorkflow.synthesis.test.ts::C3_draft_structure_repeatable(vitest)` - covers S7
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** - **(binding)** Synthesis uses only grounded tool results.
+- [x] **Y1** - **(binding)** Synthesis uses only grounded tool results.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::A1_context_uses_tool_results_only(vitest)` - maps Section 4 Y1
 
-- [ ] **Y2** - **(binding)** Requested format is honored where feasible, with bullet-list default.
+- [x] **Y2** - **(binding)** Requested format is honored where feasible, with bullet-list default.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::B2_requested_format_instructions(vitest)` - maps Section 4 Y2
 
-- [ ] **Y3** - **(binding)** Output remains draft-only and chat-only.
+- [x] **Y3** - **(binding)** Output remains draft-only and chat-only.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::B3_draft_output_is_chat_only(vitest)` - maps Section 4 Y3
 
-- [ ] **Y4** - **(binding)** Sources equal contributing synthesis context notes.
+- [x] **Y4** - **(binding)** Sources equal contributing synthesis context notes.
   - Evidence: `tests/core/workflows/ChatWorkflow.synthesis.test.ts::C2_done_sources_equal_synthesis_sources(vitest)` - maps Section 4 Y4 and Section 4b chat port row
 
-- [ ] **Y5** - **(binding)** Insufficient context cannot fabricate facts or sources.
+- [x] **Y5** - **(binding)** Insufficient context cannot fabricate facts or sources.
   - Evidence: `tests/core/domain/agentSynthesis.test.ts::A2_empty_context_reports_gap(vitest)` - maps Section 4 Y5
 
-- [ ] **Y6** - **(binding)** Deterministic fixtures preserve draft structure and source set.
+- [x] **Y6** - **(binding)** Deterministic fixtures preserve draft structure and source set.
   - Evidence: `tests/core/workflows/ChatWorkflow.synthesis.test.ts::C3_draft_structure_repeatable(vitest)` - maps Section 4 Y6
 
-- [ ] **Y7** - **(binding)** Grounding message order remains ADR-011 compliant.
+- [x] **Y7** - **(binding)** Grounding message order remains ADR-011 compliant.
   - Evidence: `tests/core/workflows/ChatWorkflow.synthesis.test.ts::C1_provider_messages_include_synthesis_context(vitest)` - maps Section 4 Y7
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
-- [ ] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
-- [ ] **Z3** - No `any` types in any new or modified file.
-- [ ] **Z4** - All client imports from shared use `@shared/types` alias where applicable; AGT-5 core files should not add client shared imports.
-- [ ] **Z5** - New or modified code includes appropriate trace/log hooks for synthesis outcomes without raw note content; full logging is AGT-6.
-- [ ] **Z6** - `/review-story AGT-5` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
+- [x] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
+- [x] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
+- [x] **Z3** - No `any` types in any new or modified file.
+- [x] **Z4** - All client imports from shared use `@shared/types` alias where applicable; AGT-5 core files should not add client shared imports.
+- [x] **Z5** - New or modified code includes appropriate trace/log hooks for synthesis outcomes without raw note content; full logging is AGT-6.
+- [x] **Z6** - `/review-story AGT-5` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
 
 ---
 
@@ -243,9 +243,13 @@ ChatView
 | 7 | unit | `tests/core/workflows/ChatWorkflow.synthesis.test.ts::C1_provider_messages_include_synthesis_context` | C1, Y7 | S6 | ADR-011 order. |
 | 8 | unit | `tests/core/workflows/ChatWorkflow.synthesis.test.ts::C2_done_sources_equal_synthesis_sources` | C2, Y4 | S5, S6 | Final sources. |
 | 9 | unit | `tests/core/workflows/ChatWorkflow.synthesis.test.ts::C3_draft_structure_repeatable` | C3, Y6 | S7 | Deterministic fakes. |
-| 10 | static | `package.json scripts + TypeScript compiler::npm run build` | Z1, Z3 |  | Build/no-`any` quality gate. |
-| 11 | static | `eslint.config.mjs::npm run lint` | Z2, Z3, Z5 |  | Lint quality gate. |
-| 12 | review | `/review-story AGT-5` | Z6 |  | Required story review gate. |
+| 10 | integration | `tests/sidecar/adapters/OpenAIChatAdapter.test.ts::B1_openai_sse_deltas` | Y7 |  | Existing `IChatPort` OpenAI adapter evidence; provider-neutral messages remain upstream. |
+| 11 | integration | `tests/sidecar/adapters/OllamaChatAdapter.test.ts::C1_ollama_stream_deltas` | Y7 |  | Existing `IChatPort` Ollama adapter evidence; provider-neutral messages remain upstream. |
+| 12 | integration | `tests/integration/agent-note-tools.integration.test.ts::B4_search_notes_uses_searchworkflow_filters_and_hybrid` | Y1, Y4 | S3, S5, S6 | Existing `AgentNoteToolRunner` evidence against SQLite fixture/SearchWorkflow. |
+| 13 | integration | `tests/integration/agent-note-tools.integration.test.ts::C3_read_note_filters_and_sources_indexed_nodes` | Y1, Y4 | S3, S5, S6 | Existing `AgentNoteToolRunner` read evidence against SQLite fixture. |
+| 14 | static | `package.json scripts + TypeScript compiler::npm run build` | Z1, Z3 |  | Build/no-`any` quality gate. |
+| 15 | static | `eslint.config.mjs::npm run lint` | Z2, Z3, Z5 |  | Lint quality gate. |
+| 16 | review | `/review-story AGT-5` | Z6 |  | Required story review gate. |
 
 ---
 
