@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SEARCH_ASSEMBLY } from '@src/core/domain/contextAssembly.js';
 import type { ChatMessage } from '@src/core/domain/types.js';
+import type { RetrievalPlan } from '@src/core/domain/agentRetrievalPlan.js';
+import {
+  AGENT_RETRIEVAL_DEFAULT_FORMAT,
+  AGENT_RETRIEVAL_PLAN_VERSION,
+} from '@src/core/domain/agentRetrievalPlan.js';
+import type { AgentNoteToolResult, AgentNoteToolRunInput } from '@src/core/domain/agentNoteTools.js';
+import type { IAgentNoteToolPort } from '@src/core/ports/IAgentNoteToolPort.js';
+import type { IAgentPlannerPort } from '@src/core/ports/IAgentPlannerPort.js';
 import type { ChatCompletionOptions, IChatPort } from '@src/core/ports/IChatPort.js';
 import type { IEmbeddingPort } from '@src/core/ports/IEmbeddingPort.js';
 import { type ChatWorkflowResult, runChatStream } from '@src/core/workflows/ChatWorkflow.js';
@@ -27,6 +35,58 @@ class CaptureChat implements IChatPort {
   ): AsyncIterable<string> {
     this.lastCall = { messages, context };
     yield '';
+  }
+}
+
+function readyPlan(): RetrievalPlan {
+  return {
+    planVersion: AGENT_RETRIEVAL_PLAN_VERSION,
+    status: 'ready',
+    task: 'answer',
+    topic: 'project beta',
+    entities: [],
+    filters: {},
+    output: { kind: 'answer', defaultFormat: AGENT_RETRIEVAL_DEFAULT_FORMAT },
+    toolCalls: [{ id: 'search-1', type: 'search_notes', reason: 'find beta', query: 'beta' }],
+    stablePlanKey: 'agent-plan:v1:grounded',
+  };
+}
+
+class FixturePlanner implements IAgentPlannerPort {
+  async planRetrieval() {
+    return readyPlan();
+  }
+}
+
+class FixtureTools implements IAgentNoteToolPort {
+  calls: AgentNoteToolRunInput[] = [];
+  async runTool(input: AgentNoteToolRunInput): Promise<AgentNoteToolResult> {
+    this.calls.push(input);
+    return {
+      type: 'search_notes',
+      status: 'ok',
+      results: [
+        {
+          nodeId: 'beta-node',
+          notePath: 'Projects/beta.md',
+          score: 0.1,
+          snippet: 'Beta launch is blocked by design review.',
+          headingTrail: ['Launch'],
+        },
+      ],
+      sources: [{ notePath: 'Projects/beta.md', nodeId: 'beta-node' }],
+      usedNodes: [{ nodeId: 'beta-node', notePath: 'Projects/beta.md', insertionOrder: 0 }],
+      trace: {
+        planKey: 'agent-plan:v1:grounded',
+        toolCallId: input.toolCall.id,
+        toolType: input.toolCall.type,
+        status: 'ok',
+        resultCount: 1,
+        sourceCount: 1,
+        usedNodeCount: 1,
+        budgetExceeded: false,
+      },
+    };
   }
 }
 
@@ -69,5 +129,41 @@ describe('ChatWorkflow grounded provider integration (CHAT-3)', () => {
 
     expect(chat.lastCall?.context).toBe('');
     expect(chat.lastCall?.messages).toEqual(expected);
+  });
+
+  // @scenario S6
+  it('D1_agentic_context_preserves_grounding_order', async () => {
+    const store = new SearchTestStore();
+    const chat = new CaptureChat();
+    const messages: ChatMessage[] = [
+      { role: 'user', content: 'previous question' },
+      { role: 'assistant', content: 'previous answer' },
+      { role: 'user', content: 'summarize beta' },
+    ];
+
+    await drainChatStream(
+      runChatStream(
+        {
+          ...chatWorkflowDeps(store, embed(), chat),
+          planner: new FixturePlanner(),
+          noteTools: new FixtureTools(),
+        },
+        messages,
+        {
+          search: DEFAULT_SEARCH_ASSEMBLY,
+          vaultOrganizationPrompt: 'Project notes live under Projects/',
+          systemPrompt: 'Be concise.',
+        },
+      ),
+    );
+
+    const sent = chat.lastCall?.messages ?? [];
+    expect(sent[0]?.role).toBe('system');
+    expect(sent[0]?.content).toContain('[grounding_policy_version=v1]');
+    expect(sent[1]).toEqual({ role: 'system', content: 'Project notes live under Projects/' });
+    expect(sent[2]).toEqual({ role: 'system', content: 'Be concise.' });
+    expect(sent[3]?.role).toBe('system');
+    expect(sent[3]?.content).toContain('Beta launch is blocked by design review.');
+    expect(sent.slice(4)).toEqual(messages);
   });
 });

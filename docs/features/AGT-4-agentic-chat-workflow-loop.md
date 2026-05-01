@@ -3,7 +3,7 @@
 **Story**: Wire `ChatWorkflow` from single-shot RAG to a bounded agentic loop that plans retrieval, executes AGT-3 note tools, and streams a grounded answer or draft using the existing chat provider port.
 **Epic**: 12 - Deterministic agentic note synthesis (REQ-007)
 **Size**: Large
-**Status**: Open
+**Status**: Complete
 
 ---
 
@@ -156,9 +156,10 @@ ChatView
 | 1 | `src/core/workflows/ChatWorkflow.ts` | Replace single-shot retrieval path for synthesis prompts with injected planner/tool loop while preserving grounding, cancellation, filters, and source semantics. |
 | 2 | `src/core/workflows/chatStreamGuard.ts` | Modify only if timeout/abort handling needs to cover planner/tool phases; otherwise leave unchanged. |
 | 3 | `src/sidecar/runtime/SidecarRuntime.ts` | Construct planner/tool deps and inject them into `ChatWorkflow`; use PRV-3 planner factory when available. |
-| 4 | `tests/integration/chatWorkflowDeps.ts` | Update test helper for new workflow deps. |
-| 5 | Existing `tests/core/workflows/ChatWorkflow*.test.ts` | Update expectations where the planner/tool loop supersedes direct search behavior, preserving existing grounding/filter/source tests. |
-| 6 | `README.md` | Link AGT-4 from the Epic 12 backlog row. |
+| 4 | `src/sidecar/adapters/chatProviderMessages.ts` | Preserve ADR-011 grounded message order when AGT-4 passes tool-derived context. |
+| 5 | `tests/integration/chatWorkflowDeps.ts` | Update test helper for new workflow deps. |
+| 6 | Existing `tests/core/workflows/ChatWorkflow*.test.ts` | Update expectations where the planner/tool loop supersedes direct search behavior, preserving existing grounding/filter/source tests. |
+| 7 | `README.md` | Link AGT-4 from the Epic 12 backlog row. |
 
 ### Files UNCHANGED (confirm no modifications needed)
 
@@ -175,82 +176,82 @@ ChatView
 
 ### Phase A: Workflow Dependency Wiring
 
-- [ ] **A1** - `ChatWorkflowDeps` accepts injected planner and note-tool ports.
+- [x] **A1** - `ChatWorkflowDeps` accepts injected planner and note-tool ports.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::A1_accepts_planner_and_tool_ports(vitest)`
 
-- [ ] **A2** - `SidecarRuntime` wires planner, note-tool runner, chat port, search/store/embedder deps, grounding builder, and abort/timeout into `runChatStream`.
+- [x] **A2** - `SidecarRuntime` wires planner, note-tool runner, chat port, search/store/embedder deps, grounding builder, and abort/timeout into `runChatStream`.
   - Evidence: `tests/sidecar/runtime/SidecarRuntime.agentic.test.ts::A2_runtime_wires_agentic_deps(vitest)`
 
 ### Phase B: Plan Before Retrieval
 
-- [ ] **B1** - The workflow calls `IAgentPlannerPort.planRetrieval` before any search/tool execution.
+- [x] **B1** - The workflow calls `IAgentPlannerPort.planRetrieval` before any search/tool execution.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::B1_plans_before_tools_or_search(vitest)` - covers S1
 
-- [ ] **B2** - Planner input includes user prompt, conversation, `vaultOrganizationPrompt`, explicit path/date filters, daily-note globs, anchor date, model config ID, and vault index fingerprint.
+- [x] **B2** - Planner input includes user prompt, conversation, `vaultOrganizationPrompt`, explicit path/date filters, daily-note globs, anchor date, model config ID, and vault index fingerprint.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::B2_planner_input_contains_settings_and_fingerprint(vitest)` - covers S1, S7
 
-- [ ] **B3** - `needs_scope` produces an insufficient-evidence-style terminal result without search, tools, or provider completion.
+- [x] **B3** - `needs_scope` produces an insufficient-evidence-style terminal result without search, tools, or provider completion.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::B3_needs_scope_skips_tools_and_provider(vitest)` - covers S2
 
 ### Phase C: Bounded Tool Loop
 
-- [ ] **C1** - Ready plans execute planned AGT-3 tool calls in normalized order.
+- [x] **C1** - Ready plans execute planned AGT-3 tool calls in normalized order.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::C1_executes_planned_tools_in_order(vitest)` - covers S3
 
-- [ ] **C2** - Tool loop stops at fixed budgets and does not execute unsafe fallback searches or writes.
+- [x] **C2** - Tool loop stops at fixed budgets and does not execute unsafe fallback searches or writes.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::C2_tool_budget_stop_is_terminal(vitest)` - covers S3, S9
 
-- [ ] **C3** - Plan-derived filters and output intent are forwarded to `IAgentNoteToolPort.runTool`.
+- [x] **C3** - Plan-derived filters and output intent are forwarded to `IAgentNoteToolPort.runTool`.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::C3_forwards_plan_scope_to_tools(vitest)` - covers S3
 
 ### Phase D: Grounded Completion and Sources
 
-- [ ] **D1** - Final provider messages include built-in grounding, vault organization prompt, user system prompt, tool-derived context, conversation history, and current user turn in ADR-011 order.
+- [x] **D1** - Final provider messages include built-in grounding, vault organization prompt, user system prompt, tool-derived context, conversation history, and current user turn in ADR-011 order.
   - Evidence: `tests/integration/ChatWorkflow.grounded-provider.integration.test.ts::D1_agentic_context_preserves_grounding_order(vitest)` - covers S6
 
-- [ ] **D2** - Final `sources` equals the deduped note set whose tool-result content is included in grounded context.
+- [x] **D2** - Final `sources` equals the deduped note set whose tool-result content is included in grounded context.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::D2_sources_match_tool_context(vitest)` - covers S6
 
-- [ ] **D3** - Equivalent deterministic planner/tool/chat fakes produce the same retrieval plan key, source set, and output structure.
+- [x] **D3** - Equivalent deterministic planner/tool/chat fakes produce the same retrieval plan key, source set, and output structure.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::D3_repeated_runs_stable_source_set(vitest)` - covers S7
 
-- [ ] **D4** - Chat cancellation and timeout still terminate the final provider stream promptly.
+- [x] **D4** - Chat cancellation and timeout still terminate the final provider stream promptly.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::D4_abort_and_timeout_still_stop_stream(vitest)`
 
 ### Phase Y: Binding & stack compliance
 
-- [ ] **Y1** - **(binding)** Planning happens before retrieval/tool execution.
+- [x] **Y1** - **(binding)** Planning happens before retrieval/tool execution.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::B1_plans_before_tools_or_search(vitest)` - maps Section 4 Y1
 
-- [ ] **Y2** - **(binding)** `needs_scope` cannot trigger search, tools, or provider completion.
+- [x] **Y2** - **(binding)** `needs_scope` cannot trigger search, tools, or provider completion.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::B3_needs_scope_skips_tools_and_provider(vitest)` - maps Section 4 Y2
 
-- [ ] **Y3** - **(binding)** Ready plans execute only bounded AGT-3 tools.
+- [x] **Y3** - **(binding)** Ready plans execute only bounded AGT-3 tools.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::C1_executes_planned_tools_in_order(vitest)` - maps Section 4 Y3 and Section 4b note-tool port row
 
-- [ ] **Y4** - **(binding)** Final context is assembled from tool results only and stays vault-only.
+- [x] **Y4** - **(binding)** Final context is assembled from tool results only and stays vault-only.
   - Evidence: `tests/integration/ChatWorkflow.grounded-provider.integration.test.ts::D1_agentic_context_preserves_grounding_order(vitest)` - maps Section 4 Y4
 
-- [ ] **Y5** - **(binding)** Sources equal contributing tool-result notes.
+- [x] **Y5** - **(binding)** Sources equal contributing tool-result notes.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::D2_sources_match_tool_context(vitest)` - maps Section 4 Y5
 
-- [ ] **Y6** - **(binding)** Existing chat settings, filters, cancellation, and timeout remain honored.
+- [x] **Y6** - **(binding)** Existing chat settings, filters, cancellation, and timeout remain honored.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::D4_abort_and_timeout_still_stop_stream(vitest)` - maps Section 4 Y6 and Section 4b chat port row
 
-- [ ] **Y7** - **(binding)** Equivalent deterministic runs preserve plan/source/output structure.
+- [x] **Y7** - **(binding)** Equivalent deterministic runs preserve plan/source/output structure.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::D3_repeated_runs_stable_source_set(vitest)` - maps Section 4 Y7 and Section 4b planner port row
 
-- [ ] **Y8** - **(binding)** Workflow remains draft-only with no vault-write surface.
+- [x] **Y8** - **(binding)** Workflow remains draft-only with no vault-write surface.
   - Evidence: `tests/core/workflows/ChatWorkflow.agentic.test.ts::Y8_no_vault_write_surface(vitest)` - maps Section 4 Y8
 
 ### Phase Z: Quality Gates
 
-- [ ] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
-- [ ] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
-- [ ] **Z3** - No `any` types in any new or modified file.
-- [ ] **Z4** - All client imports from shared use `@shared/types` alias where applicable; AGT-4 core/sidecar changes should not add client shared imports.
-- [ ] **Z5** - New trace/log fields avoid raw note content and secrets; full log coverage is deferred to AGT-6.
-- [ ] **Z6** - `/review-story AGT-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
+- [x] **Z1** - `npm run build` passes with zero TypeScript errors in all workspaces.
+- [x] **Z2** - `npm run lint` passes, or only has pre-existing warnings.
+- [x] **Z3** - No `any` types in any new or modified file.
+- [x] **Z4** - All client imports from shared use `@shared/types` alias where applicable; AGT-4 core/sidecar changes should not add client shared imports.
+- [x] **Z5** - New trace/log fields avoid raw note content and secrets; full log coverage is deferred to AGT-6.
+- [x] **Z6** - `/review-story AGT-4` reports zero `high` or `critical` `TEST-#`, `SEC-#`, `REL-#`, or `API-#` findings on the changed surface.
 
 ---
 

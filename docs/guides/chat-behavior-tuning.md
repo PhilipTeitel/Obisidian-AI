@@ -11,7 +11,7 @@ Both are optional, are sent with every chat request, and are appended after the 
 
 The built-in grounding policy tells the assistant **how to behave** (answer only from the vault, don't invent sources, don't ask the user to paste notes). It does **not** know anything about your vault, because no default assumption would be correct for everyone.
 
-- `vaultOrganizationPrompt` fills that gap with **factual, user-specific conventions** — a short description of how you write notes. This lets the assistant translate natural-language questions into the right retrieval intent.
+- `vaultOrganizationPrompt` fills that gap with **factual, user-specific conventions** — a short description of how you write notes. This lets the assistant translate natural-language questions into the right retrieval intent. In the AGT-4 agentic chat path, the same prompt is included in the planner input before note tools run, then included again in the grounded provider messages after tool context is assembled.
 - `chatSystemPrompt` expresses **stylistic preferences** that are independent of your vault — tone, output format, language.
 
 Keep them short. Both together should be at most a few hundred tokens; long prompts crowd out retrieval context and are truncated when the combined system-message budget is exceeded.
@@ -76,6 +76,12 @@ Use this for style only. Examples:
 
 Don't use it to redefine what the assistant is. The grounding policy is authoritative; the assistant will ignore style instructions that conflict with vault-only answering.
 
+## Interaction with agentic planning
+
+AGT-4 adds an internal `plan -> bounded note tools -> grounded completion` path when the sidecar is configured with an `IAgentPlannerPort`. The user-facing chat payload and response shape stay the same, but the vault organization prompt becomes more important because it helps the planner choose topic scope, folders, date ranges, tags, and planned note-tool calls before retrieval begins.
+
+Until the real planner adapter is wired by PRV-3, deployments without a planner continue to use the existing single-shot retrieval path. The prompt guidance in this document still applies to both paths.
+
 ## Interaction with the insufficient-evidence response
 
 When retrieval returns nothing usable, the assistant emits a product-owned **insufficient-evidence response** that explains what was searched and suggests how to narrow the query. Your `chatSystemPrompt` does **not** affect that response text — it is fixed per policy version. If you see insufficient-evidence replies on questions you believe are answered in your vault:
@@ -88,6 +94,7 @@ When retrieval returns nothing usable, the assistant emits a product-owned **ins
 ## Related
 
 - [ADR-011 — Vault-only chat grounding](../decisions/ADR-011-vault-only-chat-grounding.md)
+- [ADR-018 — Deterministic agentic note synthesis loop](../decisions/ADR-018-deterministic-agentic-note-synthesis.md)
 - [Authoring notes for better semantic search and chat](authoring-for-ai-indexing.md)
 - [REQUIREMENTS §6 — Chat and agent](../requirements/REQUIREMENTS.md)
 

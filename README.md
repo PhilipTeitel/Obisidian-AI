@@ -166,7 +166,7 @@ graph TB
             IndexWF["IndexWorkflow<br/>State machine"]
             SearchWF["SearchWorkflow<br/>Three-phase retrieval"]
             ChatWF["ChatWorkflow<br/>Agentic synthesis loop"]
-            QueryPlan["Retrieval planner<br/>plan before query"]
+            QueryPlan["IAgentPlannerPort<br/>plan before query<br/>(injected; PRV-3 adapter pending)"]
             NoteTools["Bounded note tools<br/>search / read / draft"]
             SummaryWF["SummaryWorkflow<br/>Bottom-up generation"]
             Chunker["Hierarchical chunker"]
@@ -291,29 +291,34 @@ sequenceDiagram
     User->>Plugin: Send chat message
     Plugin->>Transport: chat { messages, systemPrompt?, vaultOrganizationPrompt?, apiKey?, settings }
     Transport->>Sidecar: Route message
-    Note over Sidecar,Planner: Pre-query planning (ADR-018)
-    Sidecar->>Planner: Interpret task, topic, scope, output format
-    Planner-->>Sidecar: RetrievalPlan { topic, filters, dateRange, outputType, toolCalls }
-    Sidecar->>Sidecar: Log retrieval plan with runId
-    loop Bounded by fixed step/tool/token constants
-        Sidecar->>Tools: Execute planned note tool
-        alt search_notes
-            Tools->>SQLite: SearchWorkflow phased + hybrid retrieval
-            SQLite-->>Tools: Search hits
-        else read_note / related context
-            Tools->>SQLite: Read nodes / note metadata / cross-refs
-            SQLite-->>Tools: Note context
+    alt Planner port configured (AGT-4 agentic path)
+        Note over Sidecar,Planner: Pre-query planning (ADR-018)
+        Sidecar->>Planner: Interpret task, topic, scope, output format
+        Planner-->>Sidecar: RetrievalPlan { topic, filters, dateRange, outputType, toolCalls }
+        loop Bounded by fixed step/tool constants
+            Sidecar->>Tools: Execute planned note tool
+            alt search_notes
+                Tools->>SQLite: SearchWorkflow phased + hybrid retrieval
+                SQLite-->>Tools: Search hits
+            else read_note / related context
+                Tools->>SQLite: Read indexed nodes / note metadata
+                SQLite-->>Tools: Note context
+            else assemble_draft
+                Tools->>Tools: Assemble in-memory draft content
+            end
+            Tools-->>Sidecar: Tool result + used-node candidates
         end
-        Tools-->>Sidecar: Tool result + used-node candidates
+    else Planner port not configured (migration path)
+        Sidecar->>SQLite: Existing single-shot SearchWorkflow retrieval
+        SQLite-->>Sidecar: Search hits + snippets
     end
     alt Usable grounded context found
         Note over Sidecar: Synthesize answer or draft note (ADR-011, ADR-015, ADR-018)
         Sidecar->>Sidecar: [built-in grounding policy] + [vault org prompt] + [user system prompt] + [tool context] + history
         Sidecar->>Provider: IChatPort.complete(messages, options)
         Provider-->>Sidecar: Stream deltas
-        Sidecar->>Sidecar: Log actual token usage when provider reports it
         Sidecar-->>Transport: { delta } chunks
-        Sidecar-->>Transport: done { sources, groundingOutcome: 'answered', draft? }
+        Sidecar-->>Transport: done { sources, groundingOutcome: 'answered' }
     else No usable context (ADR-011)
         Sidecar-->>Transport: { delta: insufficient-evidence text }
         Sidecar-->>Transport: done { sources: [], groundingOutcome: 'insufficient_evidence' }
@@ -772,7 +777,7 @@ Each note's indexing progress is tracked per-step in the `job_steps` table:
 - **Log levels:** Standard `debug`, `info`, `warn`, `error`. Default level: `info`. Configurable via plugin settings.
 - **Sensitive data:** API keys, note content, and user PII must **never** appear in logs. Embeddings are logged only as dimensions/counts, not raw vectors. Note paths may appear in `debug` level only.
 - **Operation scopes:** Key operations (`index.full`, `index.incremental`, `search`, `chat`) are logged at `info` with timing metrics (duration, note count, error count).
-- **Agent synthesis logs:** REQ-007 agent runs log the structured retrieval plan, searches performed, notes read, source set used for synthesis, and actual provider token usage when the provider reports it. If a fixed step/tool/token budget is exceeded, the sidecar logs a `warn` event. Logs must still redact raw note content and secrets.
+- **Agent synthesis logs:** REQ-007 agent runs must eventually log the structured retrieval plan, searches performed, notes read, source set used for synthesis, and actual provider token usage when the provider reports it. AGT-4 logs bounded-run metadata such as source counts and budget warnings without raw note content; AGT-6 completes the full structured observability surface. Logs must still redact raw note content and secrets.
 
 ### 21. Source Provenance Contract
 
@@ -844,7 +849,9 @@ Determinism is measured in tiers:
 
 Output follows the prompt's requested format when feasible. If no format is requested, the default output structure is a bullet list. Sources continue to follow [ADR-015](docs/decisions/ADR-015-source-provenance-contract.md): every note that contributes to the answer or draft appears once, and no unused note appears.
 
-Agent budgets are fixed constants in the first implementation, set high enough for testing and easy to tune in code. Do not expose token-limit configuration yet. The sidecar logs the retrieval plan, searches, note reads, source set, actual provider token usage when available, and `warn` events when a budget is exceeded.
+AGT-4 wires this loop into `ChatWorkflow` and `SidecarRuntime` through explicit ports. `ChatWorkflowDeps` can receive an `IAgentPlannerPort` and `IAgentNoteToolPort`; `SidecarRuntime` constructs the AGT-3 `AgentNoteToolRunner` and can accept an injected planner. Until PRV-3 provides the first real Ollama planner adapter/factory, deployments without a planner keep the existing single-shot retrieval path as a migration path.
+
+Agent budgets are fixed constants in the first implementation, set high enough for testing and easy to tune in code. Do not expose token-limit configuration yet. AGT-4 logs bounded-run metadata such as source counts and budget warnings without raw note content. Full structured retrieval-plan, tool-trace, and provider token-usage logging is tracked separately in AGT-6.
 
 ### Project Structure
 
@@ -1164,7 +1171,7 @@ A non-blocking overlay that shows real-time indexing progress.
 | `IQueuePort<T>`    | `peek`                 | `() → Promise<number>`                                                                                                                                                      | Get pending item count                         |
 | `IEmbeddingPort`   | `embed`                | `(texts: string[], apiKey?: string) → Promise<Float32Array[]>`                                                                                                              | Embed text into vectors                        |
 | `IChatPort`        | `complete`             | `(messages, context, apiKey?, options?) → AsyncIterable<string>`; `options`: `{ signal?, timeoutMs? }` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md)) | Streaming chat completion; cancel/timeout      |
-| `IAgentPlannerPort` | `planRetrieval`       | `(input: AgentPlanInput) → Promise<AgentPlanResult>`                                                                                                                       | Pre-query reasoning contract for topic, scope, output type, planned note tools, or a non-searchable needs-scope result ([ADR-018](docs/decisions/ADR-018-deterministic-agentic-note-synthesis.md)) |
+| `IAgentPlannerPort` | `planRetrieval`       | `(input: AgentPlanInput) → Promise<AgentPlanResult>`                                                                                                                       | Pre-query reasoning contract for topic, scope, output type, planned note tools, or a non-searchable needs-scope result; consumed by AGT-4 and implemented by PRV-3 ([ADR-018](docs/decisions/ADR-018-deterministic-agentic-note-synthesis.md)) |
 | `IAgentNoteToolPort` | `runTool`            | `(input: AgentNoteToolRunInput) → Promise<AgentNoteToolResult>`                                                                                                            | Bounded note tools for search/read/draft assembly; delegates to `SearchWorkflow` / `IDocumentStore`; file-write tools deferred ([ADR-018](docs/decisions/ADR-018-deterministic-agentic-note-synthesis.md)) |
 | `IVaultAccessPort` | `listFiles`            | `(folders: string[]) → Promise<VaultFile[]>`                                                                                                                                | List vault files in configured folders         |
 | `IVaultAccessPort` | `readFile`             | `(path: string) → Promise<string>`                                                                                                                                          | Read a vault file's content                    |
@@ -1180,7 +1187,7 @@ These messages are sent between the plugin and sidecar over the transport layer.
 | `index/incremental` | Plugin → Sidecar | `{ files: [{path, content, hash}], deletedPaths: string[], apiKey? }`                                                                                             | `{ runId, noteCount }` + progress stream                                                                        |
 | `index/status`      | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ pending, processing, completed, failed, deadLetter, jobs: JobStep[] }`                                       |
 | `search`            | Plugin → Sidecar | `{ query, k?, apiKey?, tags?, coarseK?, enableHybridSearch?, pathGlobs?, dateRange? }` (tag OR / case-insensitive; `pathGlobs` + `dateRange` per [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md); `coarseK` / `enableHybridSearch` per [ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md); query string sanitized before FTS `MATCH` per [ADR-017](docs/decisions/ADR-017-fts-query-construction.md)) | `{ results: SearchResult[] }` — each result's `noteId` corresponds to the content actually scored by retrieval ([ADR-015](docs/decisions/ADR-015-source-provenance-contract.md))                                                                                 |
-| `chat`              | Plugin → Sidecar | `{ messages, apiKey?, context?, timeoutMs?, systemPrompt?, vaultOrganizationPrompt?, groundingPolicyVersion?, coarseK?, enableHybridSearch?, pathGlobs?, dateRange?, timezoneUtcOffsetHours?, dailyNotePathGlobs? }` + transport `streamChat(payload, { signal? })` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md), [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md), [ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md), [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md), [ADR-017](docs/decisions/ADR-017-fts-query-construction.md); natural-language date phrases resolved server-side per [ADR-016](docs/decisions/ADR-016-natural-language-date-range-resolution.md); plugin sends `timezoneUtcOffsetHours` and `dailyNotePathGlobs` each turn for anchor fallback and daily-note path composition; REQ-007 synthesis prompts first produce a logged retrieval plan and then run bounded note tools per [ADR-018](docs/decisions/ADR-018-deterministic-agentic-note-synthesis.md)) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[], groundingOutcome: 'answered' \| 'insufficient_evidence', groundingPolicyVersion }`; `sources` equals the notes whose content was actually used to produce the reply or draft ([ADR-015](docs/decisions/ADR-015-source-provenance-contract.md)); planner/tool activity and actual provider token usage are logged, not returned in the user-facing protocol; cancel/timeout via `signal` / `timeoutMs` |
+| `chat`              | Plugin → Sidecar | `{ messages, apiKey?, context?, timeoutMs?, systemPrompt?, vaultOrganizationPrompt?, groundingPolicyVersion?, coarseK?, enableHybridSearch?, pathGlobs?, dateRange?, timezoneUtcOffsetHours?, dailyNotePathGlobs? }` + transport `streamChat(payload, { signal? })` ([ADR-009](docs/decisions/ADR-009-chat-cancellation-and-timeout.md), [ADR-011](docs/decisions/ADR-011-vault-only-chat-grounding.md), [ADR-012](docs/decisions/ADR-012-hybrid-retrieval-and-coarse-k.md), [ADR-014](docs/decisions/ADR-014-temporal-and-path-filters.md), [ADR-017](docs/decisions/ADR-017-fts-query-construction.md); natural-language date phrases resolved server-side per [ADR-016](docs/decisions/ADR-016-natural-language-date-range-resolution.md); plugin sends `timezoneUtcOffsetHours` and `dailyNotePathGlobs` each turn for anchor fallback and daily-note path composition; when an `IAgentPlannerPort` is injected, AGT-4 runs `plan -> bounded note tools -> grounded completion` per [ADR-018](docs/decisions/ADR-018-deterministic-agentic-note-synthesis.md); otherwise it preserves the existing single-shot retrieval path until PRV-3 wires the real planner) | Streaming: `{ delta: string }` chunks, final `{ sources: Source[], groundingOutcome: 'answered' \| 'insufficient_evidence', groundingPolicyVersion }`; `sources` equals the notes whose content was actually used to produce the reply or draft ([ADR-015](docs/decisions/ADR-015-source-provenance-contract.md)); AGT-4 keeps planner/tool traces and raw note content off the user-facing protocol; cancel/timeout via `signal` / `timeoutMs` |
 | `chat/clear`        | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ ok: true }`                                                                                                  |
 | `health`            | Plugin → Sidecar | `{}`                                                                                                                                                              | `{ status: 'ok', uptime, dbReady }`                                                                             |
 | `progress`          | Sidecar → Plugin | `{ event: IndexProgressEvent }`                                                                                                                                   | — (push notification)                                                                                           |
@@ -1372,7 +1379,7 @@ Move chat from single-shot RAG to deterministic pre-query planning, bounded note
 | ----- | ----------- | --------------------------------------------------------------------- | ---- | ----- |
 | [AGT-2](docs/features/AGT-2-retrieval-plan-contract.md) | Done | Retrieval plan contract and deterministic plan tests                  | M    | Define `RetrievalPlan`; same prompt/settings/model/vault state must produce identical plan; default date range one week; vault conventions from `vaultOrganizationPrompt`; covers REQ-007 S1/S2/S7 |
 | [AGT-3](docs/features/AGT-3-bounded-note-tools.md) | Done | Bounded note tools for search, note read, and draft assembly          | L    | Tool calls delegate to `SearchWorkflow` / `IDocumentStore`; no vault writes; fixed high testing budgets; covers REQ-007 S3/S4/S9 |
-| [AGT-4](docs/features/AGT-4-agentic-chat-workflow-loop.md) | Not Started | Agentic `ChatWorkflow` loop: plan → tools → synthesize                | L    | Ollama first for pre-query reasoning; OpenAI next; stable source set except ranking ties; covers REQ-007 S3/S6/S7 |
+| [AGT-4](docs/features/AGT-4-agentic-chat-workflow-loop.md) | Done | Agentic `ChatWorkflow` loop: plan → tools → synthesize                | L    | Ollama first for pre-query reasoning; OpenAI next; stable source set except ranking ties; covers REQ-007 S3/S6/S7 |
 | [AGT-5](docs/features/AGT-5-topic-synthesis-draft-output.md) | Not Started | Topic synthesis draft output and prompt-requested formats             | M    | Bullet list default; honor requested format where feasible; sources equal contributing notes; covers REQ-007 S4/S5/S6 |
 | [AGT-6](docs/features/AGT-6-agent-observability.md) | Not Started | Agent observability: retrieval plan, tool trace, token usage, budgets | M    | Log retrieval plan, searches, note reads, source set, actual provider token usage when reported, and `warn` on budget exceedance; covers REQ-007 S8 |
 | [PRV-3](docs/features/PRV-3-ollama-planner-adapter.md) | Not Started | Ollama planner adapter support for pre-query reasoning                | M    | Provider-specific planner behavior behind hexagonal boundary; prepares OpenAI follow-up without changing core workflow |

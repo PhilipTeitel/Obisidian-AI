@@ -5,11 +5,19 @@ import {
   validateSearchAssemblyOptions,
 } from '../domain/contextAssembly.js';
 import {
+  anchorCalendarYmd,
   clampUtcOffsetHoursForResolver,
   resolveDateRangeFromPrompt,
   type ResolverClock,
   type ResolverMatch,
 } from '../domain/dateRangeResolver.js';
+import { formatNoteDateIso } from '../domain/dailyNoteDate.js';
+import type { AgentNoteToolResult } from '../domain/agentNoteTools.js';
+import type {
+  AgentPlanInput,
+  RetrievalPlan,
+  AgentToolCallPlan,
+} from '../domain/agentRetrievalPlan.js';
 import type {
   BuildGroundedMessagesHooks,
   ChatMessage,
@@ -20,6 +28,8 @@ import type {
   UsedNodeRecord,
 } from '../domain/types.js';
 import { CHAT_GROUNDING_POLICY_WIRE_VERSION } from '../domain/types.js';
+import type { IAgentNoteToolPort } from '../ports/IAgentNoteToolPort.js';
+import type { IAgentPlannerPort } from '../ports/IAgentPlannerPort.js';
 import type { ChatCompletionOptions, IChatPort } from '../ports/IChatPort.js';
 import type { SearchWorkflowDeps } from './SearchWorkflow.js';
 import { withChatCompletionControls } from './chatStreamGuard.js';
@@ -30,6 +40,8 @@ import { DEFAULT_SEARCH_K, runSearch } from './SearchWorkflow.js';
  */
 export interface ChatWorkflowDeps extends SearchWorkflowDeps {
   chat: IChatPort;
+  planner?: IAgentPlannerPort;
+  noteTools?: IAgentNoteToolPort;
   /** Injected from sidecar so core stays free of `src/sidecar` imports (CHAT-3 Y6). */
   buildGroundedMessages: (
     messages: ChatMessage[],
@@ -58,6 +70,10 @@ export interface ChatWorkflowOptions {
   resolverClock?: ResolverClock;
   timezoneUtcOffsetHours?: number;
   dailyNotePathGlobs?: string[];
+  /** AGT-4: provider/model identity included in deterministic planner input. */
+  modelConfigId?: string;
+  /** AGT-4: caller-supplied vault/index state fingerprint for planner determinism. */
+  vaultIndexFingerprint?: string;
 }
 
 export interface ChatWorkflowResult {
@@ -70,6 +86,9 @@ export interface ChatWorkflowResult {
 /** Product-owned copy for zero-hit path (CHAT-3 B4); not model-generated. */
 export const INSUFFICIENT_EVIDENCE_STREAM_MESSAGE =
   "I couldn't find notes in your vault that answer this. Try narrowing your search with a folder path, a tag, or a date range — then ask again.";
+
+const AGENTIC_BUDGET_MESSAGE =
+  "I stopped before generating an answer because the planned note-tool budget was exceeded. Try narrowing the topic, folder, tag, or date range — then ask again.";
 
 function usedNodeRecordsToSources(records: UsedNodeRecord[]): Source[] {
   const seenPath = new Set<string>();
@@ -100,6 +119,131 @@ function hasExplicitDateRange(dr?: { start?: string; end?: string }): boolean {
 function mergePathGlobs(a?: string[], b?: string[]): string[] | undefined {
   const all = [...(a ?? []), ...(b ?? [])];
   return all.length > 0 ? [...new Set(all)] : undefined;
+}
+
+function anchorDateForPlanner(options: ChatWorkflowOptions): string {
+  const clock =
+    options.resolverClock ??
+    ({
+      now: () => new Date(),
+      timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    } satisfies ResolverClock);
+  const anchor = anchorCalendarYmd(clock, clampUtcOffsetHoursForResolver(options.timezoneUtcOffsetHours));
+  return formatNoteDateIso(anchor.y, anchor.m, anchor.d);
+}
+
+function buildPlannerInput(
+  messages: ChatMessage[],
+  userPrompt: string,
+  options: ChatWorkflowOptions,
+  pathGlobs?: string[],
+  dateRange?: { start?: string; end?: string },
+): AgentPlanInput {
+  return {
+    userPrompt,
+    conversation: messages,
+    ...(options.vaultOrganizationPrompt !== undefined
+      ? { vaultOrganizationPrompt: options.vaultOrganizationPrompt }
+      : {}),
+    ...(pathGlobs !== undefined ? { explicitPathGlobs: pathGlobs } : {}),
+    ...(dateRange !== undefined ? { explicitDateRange: dateRange } : {}),
+    ...(options.dailyNotePathGlobs !== undefined ? { dailyNotePathGlobs: options.dailyNotePathGlobs } : {}),
+    anchorDate: anchorDateForPlanner(options),
+    modelConfigId: options.modelConfigId ?? 'unspecified-model',
+    vaultIndexFingerprint: options.vaultIndexFingerprint ?? 'unspecified-vault-index',
+  };
+}
+
+function toolResultContentItems(
+  result: AgentNoteToolResult,
+): Array<{ nodeId: string; notePath: string; content: string }> {
+  if (result.type === 'search_notes') {
+    return result.results.map((item) => ({
+      nodeId: item.nodeId,
+      notePath: item.notePath,
+      content: item.snippet,
+    }));
+  }
+  if (result.type === 'read_note') {
+    return result.nodes.map((node) => ({
+      nodeId: node.nodeId,
+      notePath: node.notePath,
+      content: node.content,
+    }));
+  }
+  return result.draftMarkdown.trim().length > 0
+    ? [
+        {
+          nodeId: 'draft',
+          notePath: 'draft',
+          content: result.draftMarkdown,
+        },
+      ]
+    : [];
+}
+
+function assembleAgenticContext(toolResults: AgentNoteToolResult[]): {
+  context: string;
+  usedRecords: UsedNodeRecord[];
+} {
+  const lines: string[] = ['## Agent tool context'];
+  const usedRecords: UsedNodeRecord[] = [];
+  const seenNodes = new Set<string>();
+
+  for (const result of toolResults) {
+    for (const item of toolResultContentItems(result)) {
+      const key = `${item.notePath}\u0000${item.nodeId}`;
+      if (seenNodes.has(key)) {
+        continue;
+      }
+      seenNodes.add(key);
+      if (item.notePath !== 'draft') {
+        usedRecords.push({
+          nodeId: item.nodeId,
+          notePath: item.notePath,
+          insertionOrder: usedRecords.length,
+        });
+      }
+      lines.push(`\n### ${item.notePath}#${item.nodeId}\n${item.content}`);
+    }
+  }
+
+  return {
+    context: usedRecords.length > 0 ? lines.join('\n') : '',
+    usedRecords,
+  };
+}
+
+function hasBudgetExceeded(result: AgentNoteToolResult): boolean {
+  return result.status === 'budget_exceeded' || result.trace.budgetExceeded;
+}
+
+async function runAgenticTools(
+  noteTools: IAgentNoteToolPort,
+  plan: RetrievalPlan,
+  options: ChatWorkflowOptions,
+  searchAssembly: SearchAssemblyOptions,
+): Promise<{ results: AgentNoteToolResult[]; budgetExceeded: boolean }> {
+  const results: AgentNoteToolResult[] = [];
+
+  for (const toolCall of plan.toolCalls) {
+    const result = await noteTools.runTool({
+      plan,
+      toolCall: toolCall as AgentToolCallPlan,
+      priorResults: results,
+      search: searchAssembly,
+      apiKey: options.apiKey,
+      coarseK: options.coarseK,
+      k: options.k,
+      enableHybridSearch: options.enableHybridSearch,
+    });
+    results.push(result);
+    if (hasBudgetExceeded(result)) {
+      return { results, budgetExceeded: true };
+    }
+  }
+
+  return { results, budgetExceeded: false };
 }
 
 /** After NL date resolution, keep filters but drop the matched phrase from the embedding/BM25 query (REQ-006 / ADR-016). */
@@ -158,6 +302,70 @@ export async function* runChatStream(
       { retrievalQueryLen: retrievalQuery.length, matchRuleId: nlDateMatch?.matchRuleId },
       'chat.retrieval_query_stripped_nl_date',
     );
+  }
+
+  if (deps.planner !== undefined && deps.noteTools !== undefined) {
+    const plan = await deps.planner.planRetrieval(
+      buildPlannerInput(messages, query, options, pathGlobs, dateRange),
+    );
+
+    if (plan.status === 'needs_scope') {
+      yield `${INSUFFICIENT_EVIDENCE_STREAM_MESSAGE}\n\nMissing scope: ${plan.reason}`;
+      return {
+        sources: [],
+        groundingOutcome: 'insufficient_evidence',
+        groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
+      };
+    }
+
+    const toolRun = await runAgenticTools(deps.noteTools, plan, options, searchAssembly);
+    if (toolRun.budgetExceeded) {
+      deps.log?.warn?.({ stablePlanKey: plan.stablePlanKey }, 'chat.agentic_tool_budget_exceeded');
+      yield AGENTIC_BUDGET_MESSAGE;
+      return {
+        sources: [],
+        groundingOutcome: 'insufficient_evidence',
+        groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
+      };
+    }
+
+    const agentContext = assembleAgenticContext(toolRun.results);
+    if (agentContext.context.trim().length === 0) {
+      yield INSUFFICIENT_EVIDENCE_STREAM_MESSAGE;
+      return {
+        sources: [],
+        groundingOutcome: 'insufficient_evidence',
+        groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
+      };
+    }
+
+    const hooks =
+      deps.onUserPromptTruncation !== undefined
+        ? { onUserPromptTruncated: deps.onUserPromptTruncation }
+        : undefined;
+    const assembled = deps.buildGroundedMessages(
+      messages,
+      {
+        retrievalContext: agentContext.context,
+        systemPrompt: options.systemPrompt,
+        vaultOrganizationPrompt: options.vaultOrganizationPrompt,
+      },
+      hooks,
+    );
+
+    const stream = deps.chat.complete(assembled, '', options.apiKey, options.completion);
+    for await (const delta of withChatCompletionControls(stream, options.completion)) {
+      yield delta;
+    }
+
+    const sources = usedNodeRecordsToSources(agentContext.usedRecords);
+    deps.log?.info?.({ stablePlanKey: plan.stablePlanKey, sourceCount: sources.length }, 'chat.agentic_completion_sources');
+
+    return {
+      sources,
+      groundingOutcome: 'answered',
+      groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
+    };
   }
 
   const searchRes = await runSearch(

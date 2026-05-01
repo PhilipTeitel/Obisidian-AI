@@ -13,7 +13,9 @@ import {
   clampUtcOffsetHoursForResolver,
   type ResolverClock,
 } from '../../core/domain/dateRangeResolver.js';
+import type { IAgentPlannerPort } from '../../core/ports/IAgentPlannerPort.js';
 import { runChatStream, type ChatWorkflowDeps, type ChatWorkflowResult } from '../../core/workflows/ChatWorkflow.js';
+import { AgentNoteToolRunner } from '../../core/workflows/AgentNoteToolRunner.js';
 import { runSearch } from '../../core/workflows/SearchWorkflow.js';
 import { openDatabase } from '../db/open.js';
 import { buildGroundedMessages, GROUNDING_POLICY_VERSION } from '../adapters/chatProviderMessages.js';
@@ -45,6 +47,8 @@ function parsePositiveInt(raw: string | undefined, def: number): number {
 export interface SidecarRuntimeOptions {
   log: Logger;
   progress: ProgressAdapter;
+  /** AGT-4 consumes the planner port; PRV-3 owns the real Ollama factory/adapter. */
+  planner?: IAgentPlannerPort;
 }
 
 /**
@@ -53,6 +57,7 @@ export interface SidecarRuntimeOptions {
 export class SidecarRuntime {
   private readonly log: Logger;
   private readonly progress: ProgressAdapter;
+  private readonly planner?: IAgentPlannerPort;
   private readonly started = Date.now();
   private db: SqliteDb | null = null;
   private store: SqliteDocumentStore | null = null;
@@ -62,6 +67,7 @@ export class SidecarRuntime {
   constructor(options: SidecarRuntimeOptions) {
     this.log = options.log;
     this.progress = options.progress;
+    this.planner = options.planner;
   }
 
   /** True after {@link ensureDb} succeeds. */
@@ -150,6 +156,8 @@ export class SidecarRuntime {
     return {
       ...search,
       chat,
+      ...(this.planner !== undefined ? { planner: this.planner } : {}),
+      noteTools: new AgentNoteToolRunner(search),
       buildGroundedMessages,
       onUserPromptTruncation: (ratio: number) => {
         this.log.warn({ userPromptTruncationRatio: ratio }, 'chat.user_prompts_truncated');
@@ -340,6 +348,7 @@ export class SidecarRuntime {
     if (ianaTz === undefined || ianaTz === '') {
       this.log.debug({ utcOffsetHoursFallback: utc }, 'chat.date_anchor_using_utc_offset_fallback');
     }
+    const chatKind = parseProvider(process.env.OBSIDIAN_AI_CHAT_PROVIDER, 'openai');
     const stream = runChatStream(deps, payload.messages, {
       search: payload.search,
       apiKey: payload.apiKey,
@@ -354,6 +363,8 @@ export class SidecarRuntime {
       resolverClock,
       timezoneUtcOffsetHours: utc,
       dailyNotePathGlobs: payload.dailyNotePathGlobs,
+      modelConfigId: `${chatKind}:${process.env.OBSIDIAN_AI_CHAT_MODEL ?? 'gpt-4o-mini'}`,
+      vaultIndexFingerprint: `sqlite:${process.env.OBSIDIAN_AI_DB_PATH ?? ''}`,
       completion: {
         signal: options?.signal,
         timeoutMs: payload.timeoutMs,
