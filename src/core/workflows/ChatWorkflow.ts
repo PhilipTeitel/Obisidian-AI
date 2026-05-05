@@ -5,11 +5,27 @@ import {
   validateSearchAssemblyOptions,
 } from '../domain/contextAssembly.js';
 import {
+  anchorCalendarYmd,
   clampUtcOffsetHoursForResolver,
   resolveDateRangeFromPrompt,
   type ResolverClock,
   type ResolverMatch,
 } from '../domain/dateRangeResolver.js';
+import { formatNoteDateIso } from '../domain/dailyNoteDate.js';
+import type { AgentNoteToolResult } from '../domain/agentNoteTools.js';
+import { buildAgentSynthesisContext } from '../domain/agentSynthesis.js';
+import type {
+  AgentPlanInput,
+  RetrievalPlan,
+  AgentToolCallPlan,
+} from '../domain/agentRetrievalPlan.js';
+import {
+  normalizeProviderTokenUsage,
+  plannerToolCallBudgetWarning,
+  summarizeAgentToolTrace,
+  toolBudgetWarning,
+  type AgentRunTraceEvent,
+} from '../domain/agentRunTrace.js';
 import type {
   BuildGroundedMessagesHooks,
   ChatMessage,
@@ -20,6 +36,8 @@ import type {
   UsedNodeRecord,
 } from '../domain/types.js';
 import { CHAT_GROUNDING_POLICY_WIRE_VERSION } from '../domain/types.js';
+import type { IAgentNoteToolPort } from '../ports/IAgentNoteToolPort.js';
+import type { IAgentPlannerPort } from '../ports/IAgentPlannerPort.js';
 import type { ChatCompletionOptions, IChatPort } from '../ports/IChatPort.js';
 import type { SearchWorkflowDeps } from './SearchWorkflow.js';
 import { withChatCompletionControls } from './chatStreamGuard.js';
@@ -30,6 +48,8 @@ import { DEFAULT_SEARCH_K, runSearch } from './SearchWorkflow.js';
  */
 export interface ChatWorkflowDeps extends SearchWorkflowDeps {
   chat: IChatPort;
+  planner?: IAgentPlannerPort;
+  noteTools?: IAgentNoteToolPort;
   /** Injected from sidecar so core stays free of `src/sidecar` imports (CHAT-3 Y6). */
   buildGroundedMessages: (
     messages: ChatMessage[],
@@ -58,6 +78,12 @@ export interface ChatWorkflowOptions {
   resolverClock?: ResolverClock;
   timezoneUtcOffsetHours?: number;
   dailyNotePathGlobs?: string[];
+  /** AGT-4: provider/model identity included in deterministic planner input. */
+  modelConfigId?: string;
+  /** AGT-4: caller-supplied vault/index state fingerprint for planner determinism. */
+  vaultIndexFingerprint?: string;
+  /** AGT-6: sidecar-owned structured observability callback. */
+  onAgentTrace?: (event: AgentRunTraceEvent) => void;
 }
 
 export interface ChatWorkflowResult {
@@ -70,6 +96,9 @@ export interface ChatWorkflowResult {
 /** Product-owned copy for zero-hit path (CHAT-3 B4); not model-generated. */
 export const INSUFFICIENT_EVIDENCE_STREAM_MESSAGE =
   "I couldn't find notes in your vault that answer this. Try narrowing your search with a folder path, a tag, or a date range — then ask again.";
+
+const AGENTIC_BUDGET_MESSAGE =
+  "I stopped before generating an answer because the planned note-tool budget was exceeded. Try narrowing the topic, folder, tag, or date range — then ask again.";
 
 function usedNodeRecordsToSources(records: UsedNodeRecord[]): Source[] {
   const seenPath = new Set<string>();
@@ -100,6 +129,77 @@ function hasExplicitDateRange(dr?: { start?: string; end?: string }): boolean {
 function mergePathGlobs(a?: string[], b?: string[]): string[] | undefined {
   const all = [...(a ?? []), ...(b ?? [])];
   return all.length > 0 ? [...new Set(all)] : undefined;
+}
+
+function anchorDateForPlanner(options: ChatWorkflowOptions): string {
+  const clock =
+    options.resolverClock ??
+    ({
+      now: () => new Date(),
+      timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    } satisfies ResolverClock);
+  const anchor = anchorCalendarYmd(clock, clampUtcOffsetHoursForResolver(options.timezoneUtcOffsetHours));
+  return formatNoteDateIso(anchor.y, anchor.m, anchor.d);
+}
+
+function buildPlannerInput(
+  messages: ChatMessage[],
+  userPrompt: string,
+  options: ChatWorkflowOptions,
+  pathGlobs?: string[],
+  dateRange?: { start?: string; end?: string },
+): AgentPlanInput {
+  return {
+    userPrompt,
+    conversation: messages,
+    ...(options.vaultOrganizationPrompt !== undefined
+      ? { vaultOrganizationPrompt: options.vaultOrganizationPrompt }
+      : {}),
+    ...(pathGlobs !== undefined ? { explicitPathGlobs: pathGlobs } : {}),
+    ...(dateRange !== undefined ? { explicitDateRange: dateRange } : {}),
+    ...(options.dailyNotePathGlobs !== undefined ? { dailyNotePathGlobs: options.dailyNotePathGlobs } : {}),
+    anchorDate: anchorDateForPlanner(options),
+    modelConfigId: options.modelConfigId ?? 'unspecified-model',
+    vaultIndexFingerprint: options.vaultIndexFingerprint ?? 'unspecified-vault-index',
+  };
+}
+
+function hasBudgetExceeded(result: AgentNoteToolResult): boolean {
+  return result.status === 'budget_exceeded' || result.trace.budgetExceeded;
+}
+
+async function runAgenticTools(
+  noteTools: IAgentNoteToolPort,
+  plan: RetrievalPlan,
+  options: ChatWorkflowOptions,
+  searchAssembly: SearchAssemblyOptions,
+): Promise<{ results: AgentNoteToolResult[]; budgetExceeded: boolean }> {
+  const results: AgentNoteToolResult[] = [];
+
+  for (const toolCall of plan.toolCalls) {
+    const result = await noteTools.runTool({
+      plan,
+      toolCall: toolCall as AgentToolCallPlan,
+      priorResults: results,
+      search: searchAssembly,
+      apiKey: options.apiKey,
+      coarseK: options.coarseK,
+      k: options.k,
+      enableHybridSearch: options.enableHybridSearch,
+    });
+    results.push(result);
+    const tool = summarizeAgentToolTrace(result.trace);
+    options.onAgentTrace?.({ type: 'tool', tool });
+    const budget = toolBudgetWarning(tool);
+    if (budget !== null) {
+      options.onAgentTrace?.({ type: 'budget', ...budget });
+    }
+    if (hasBudgetExceeded(result)) {
+      return { results, budgetExceeded: true };
+    }
+  }
+
+  return { results, budgetExceeded: false };
 }
 
 /** After NL date resolution, keep filters but drop the matched phrase from the embedding/BM25 query (REQ-006 / ADR-016). */
@@ -146,7 +246,7 @@ export async function* runChatStream(
         },
         'chat.date_range_resolved',
       );
-      deps.log?.info({ naturalLanguageDateFilterApplied: true }, 'chat.nl_date_filter_applied');
+      deps.log?.info?.({ naturalLanguageDateFilterApplied: true }, 'chat.nl_date_filter_applied');
       pathGlobs = mergePathGlobs(pathGlobs, match.pathGlobs);
       dateRange = match.dateRange;
     }
@@ -158,6 +258,91 @@ export async function* runChatStream(
       { retrievalQueryLen: retrievalQuery.length, matchRuleId: nlDateMatch?.matchRuleId },
       'chat.retrieval_query_stripped_nl_date',
     );
+  }
+
+  if (deps.planner !== undefined && deps.noteTools !== undefined) {
+    const plan = await deps.planner.planRetrieval(
+      buildPlannerInput(messages, query, options, pathGlobs, dateRange),
+    );
+    options.onAgentTrace?.({ type: 'plan', plan });
+    options.onAgentTrace?.({
+      type: 'usage',
+      stage: 'planner',
+      usage: normalizeProviderTokenUsage(plan.usage),
+    });
+    const plannerBudget = plannerToolCallBudgetWarning(plan);
+    if (plannerBudget !== null) {
+      options.onAgentTrace?.({ type: 'budget', ...plannerBudget });
+    }
+
+    if (plan.status === 'needs_scope') {
+      yield `${INSUFFICIENT_EVIDENCE_STREAM_MESSAGE}\n\nMissing scope: ${plan.reason}`;
+      options.onAgentTrace?.({ type: 'sources', sources: [] });
+      return {
+        sources: [],
+        groundingOutcome: 'insufficient_evidence',
+        groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
+      };
+    }
+
+    const toolRun = await runAgenticTools(deps.noteTools, plan, options, searchAssembly);
+    if (toolRun.budgetExceeded) {
+      deps.log?.warn?.({ stablePlanKey: plan.stablePlanKey }, 'chat.agentic_tool_budget_exceeded');
+      yield AGENTIC_BUDGET_MESSAGE;
+      options.onAgentTrace?.({ type: 'sources', sources: [] });
+      return {
+        sources: [],
+        groundingOutcome: 'insufficient_evidence',
+        groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
+      };
+    }
+
+    const synthesis = buildAgentSynthesisContext({
+      plan,
+      toolResults: toolRun.results,
+      messages,
+      systemPrompt: options.systemPrompt,
+      vaultOrganizationPrompt: options.vaultOrganizationPrompt,
+    });
+    if (synthesis.isInsufficient) {
+      deps.log?.info?.({ stablePlanKey: plan.stablePlanKey }, 'chat.agentic_synthesis_insufficient_context');
+      yield INSUFFICIENT_EVIDENCE_STREAM_MESSAGE;
+      options.onAgentTrace?.({ type: 'sources', sources: [] });
+      return {
+        sources: [],
+        groundingOutcome: 'insufficient_evidence',
+        groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
+      };
+    }
+
+    const hooks =
+      deps.onUserPromptTruncation !== undefined
+        ? { onUserPromptTruncated: deps.onUserPromptTruncation }
+        : undefined;
+    const assembled = deps.buildGroundedMessages(
+      messages,
+      {
+        retrievalContext: synthesis.retrievalContext,
+        systemPrompt: options.systemPrompt,
+        vaultOrganizationPrompt: options.vaultOrganizationPrompt,
+      },
+      hooks,
+    );
+
+    const stream = deps.chat.complete(assembled, '', options.apiKey, options.completion);
+    for await (const delta of withChatCompletionControls(stream, options.completion)) {
+      yield delta;
+    }
+
+    const sources = synthesis.sources;
+    deps.log?.info?.({ stablePlanKey: plan.stablePlanKey, sourceCount: sources.length }, 'chat.agentic_completion_sources');
+    options.onAgentTrace?.({ type: 'sources', sources });
+
+    return {
+      sources,
+      groundingOutcome: 'answered',
+      groundingPolicyVersion: CHAT_GROUNDING_POLICY_WIRE_VERSION,
+    };
   }
 
   const searchRes = await runSearch(
@@ -177,6 +362,7 @@ export async function* runChatStream(
 
   if (searchRes.results.length === 0) {
     yield INSUFFICIENT_EVIDENCE_STREAM_MESSAGE;
+    options.onAgentTrace?.({ type: 'sources', sources: [] });
     return {
       sources: [],
       groundingOutcome: 'insufficient_evidence',
@@ -213,6 +399,7 @@ export async function* runChatStream(
 
   const sources = usedNodeRecordsToSources(stitched.usedRecords);
   deps.log?.info?.({ sourceCount: sources.length }, 'chat.completion_sources');
+  options.onAgentTrace?.({ type: 'sources', sources });
 
   return {
     sources,

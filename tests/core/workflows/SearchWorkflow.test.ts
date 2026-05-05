@@ -132,11 +132,12 @@ describe('SearchWorkflow', () => {
     expect(res.results.length).toBe(DEFAULT_SEARCH_K);
   });
 
-  it('A1_tags_forwarded', async () => {
+  it('A1_tags_use_exhaustive_retrieval', async () => {
     const store = new SearchTestStore();
     const embedder = fakeEmbed();
+    const spy = vi.spyOn(store, 'searchNodesByTags');
     await runSearch({ store, embedder }, { query: 'q', tags: ['foo'] });
-    expect(store.lastContentFilter?.tagsAny).toEqual(['foo']);
+    expect(spy).toHaveBeenCalledWith(['foo'], expect.anything(), 200);
   });
 
   it('passes_subtree_roots_from_summary_hits', async () => {

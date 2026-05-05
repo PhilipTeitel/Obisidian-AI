@@ -54,7 +54,7 @@ export function buildGroundedMessages(
 
   const last = messages[messages.length - 1];
   if (last?.role === 'user') {
-    return [...prefix, ...messages.slice(0, -1), { role: 'system', content: VAULT_CONTEXT_PREFIX + ctx }, last];
+    return [...prefix, { role: 'system', content: VAULT_CONTEXT_PREFIX + ctx }, ...messages];
   }
   return [...prefix, ...messages, { role: 'user', content: ctx }];
 }

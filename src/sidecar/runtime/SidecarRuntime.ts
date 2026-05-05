@@ -13,7 +13,17 @@ import {
   clampUtcOffsetHoursForResolver,
   type ResolverClock,
 } from '../../core/domain/dateRangeResolver.js';
+import {
+  summarizeAgentPlan,
+  summarizeAgentSources,
+  type AgentBudgetWarning,
+  type AgentRunTraceEvent,
+  type AgentUsageStage,
+  type ProviderTokenUsage,
+} from '../../core/domain/agentRunTrace.js';
+import type { IAgentPlannerPort } from '../../core/ports/IAgentPlannerPort.js';
 import { runChatStream, type ChatWorkflowDeps, type ChatWorkflowResult } from '../../core/workflows/ChatWorkflow.js';
+import { AgentNoteToolRunner } from '../../core/workflows/AgentNoteToolRunner.js';
 import { runSearch } from '../../core/workflows/SearchWorkflow.js';
 import { openDatabase } from '../db/open.js';
 import { buildGroundedMessages, GROUNDING_POLICY_VERSION } from '../adapters/chatProviderMessages.js';
@@ -42,9 +52,49 @@ function parsePositiveInt(raw: string | undefined, def: number): number {
   return Number.isFinite(n) && n > 0 ? n : def;
 }
 
+function logAgentUsage(log: Logger, stage: AgentUsageStage, usage: ProviderTokenUsage): void {
+  log.info({ event: 'agent.usage', stage, usage }, 'agent.usage');
+}
+
+function logAgentBudgetWarning(log: Logger, warning: AgentBudgetWarning): void {
+  log.warn(
+    {
+      event: 'agent.budget_exceeded',
+      budgetName: warning.budgetName,
+      configured: warning.configured,
+      observed: warning.observed,
+      planKey: warning.planKey,
+      toolCallId: warning.toolCallId,
+    },
+    'agent.budget_exceeded',
+  );
+}
+
+function logAgentTraceEvent(log: Logger, event: AgentRunTraceEvent): void {
+  switch (event.type) {
+    case 'plan':
+      log.info({ event: 'agent.plan', plan: summarizeAgentPlan(event.plan) }, 'agent.plan');
+      return;
+    case 'tool':
+      log.info({ event: 'agent.tool', tool: event.tool }, 'agent.tool');
+      return;
+    case 'sources':
+      log.info({ event: 'agent.sources', sources: summarizeAgentSources(event.sources) }, 'agent.sources');
+      return;
+    case 'usage':
+      logAgentUsage(log, event.stage, event.usage);
+      return;
+    case 'budget':
+      logAgentBudgetWarning(log, event);
+      return;
+  }
+}
+
 export interface SidecarRuntimeOptions {
   log: Logger;
   progress: ProgressAdapter;
+  /** AGT-4 consumes the planner port; PRV-3 owns the real Ollama factory/adapter. */
+  planner?: IAgentPlannerPort;
 }
 
 /**
@@ -53,6 +103,7 @@ export interface SidecarRuntimeOptions {
 export class SidecarRuntime {
   private readonly log: Logger;
   private readonly progress: ProgressAdapter;
+  private readonly planner?: IAgentPlannerPort;
   private readonly started = Date.now();
   private db: SqliteDb | null = null;
   private store: SqliteDocumentStore | null = null;
@@ -62,6 +113,7 @@ export class SidecarRuntime {
   constructor(options: SidecarRuntimeOptions) {
     this.log = options.log;
     this.progress = options.progress;
+    this.planner = options.planner;
   }
 
   /** True after {@link ensureDb} succeeds. */
@@ -150,6 +202,8 @@ export class SidecarRuntime {
     return {
       ...search,
       chat,
+      ...(this.planner !== undefined ? { planner: this.planner } : {}),
+      noteTools: new AgentNoteToolRunner(search),
       buildGroundedMessages,
       onUserPromptTruncation: (ratio: number) => {
         this.log.warn({ userPromptTruncationRatio: ratio }, 'chat.user_prompts_truncated');
@@ -315,15 +369,19 @@ export class SidecarRuntime {
   ): AsyncGenerator<ChatStreamChunk, ChatWorkflowResult> {
     const t0 = Date.now();
     this.ensureDb();
-    this.log.debug(
-      {
-        path_globs_count: payload.pathGlobs?.length ?? 0,
-        date_range_start: payload.dateRange?.start,
-        date_range_end: payload.dateRange?.end,
-      },
-      'sidecar.chat.filters',
-    );
-    const deps = this.getChatWorkflowDeps();
+    const agentRunId = randomUUID();
+    const agentLog = this.log.child({ agentRunId });
+    agentLog.info({ event: 'agent.run_started', op: 'chat' }, 'agent.run_started');
+      this.log.debug(
+        {
+          tags_count: payload.tags?.length ?? 0,
+          path_globs_count: payload.pathGlobs?.length ?? 0,
+          date_range_start: payload.dateRange?.start,
+          date_range_end: payload.dateRange?.end,
+        },
+        'sidecar.chat.filters',
+      );
+      const deps = this.getChatWorkflowDeps();
     const policyVer = payload.groundingPolicyVersion ?? GROUNDING_POLICY_VERSION;
     this.log.debug({ groundingPolicyVersion: policyVer }, 'sidecar.chat.request');
     const utcRaw = payload.timezoneUtcOffsetHours ?? 0;
@@ -340,23 +398,28 @@ export class SidecarRuntime {
     if (ianaTz === undefined || ianaTz === '') {
       this.log.debug({ utcOffsetHoursFallback: utc }, 'chat.date_anchor_using_utc_offset_fallback');
     }
+    const chatKind = parseProvider(process.env.OBSIDIAN_AI_CHAT_PROVIDER, 'openai');
     const stream = runChatStream(deps, payload.messages, {
       search: payload.search,
       apiKey: payload.apiKey,
       k: payload.k,
       coarseK: payload.coarseK,
       enableHybridSearch: payload.enableHybridSearch,
+      tags: payload.tags,
       pathGlobs: payload.pathGlobs,
       dateRange: payload.dateRange,
-      tags: undefined,
       systemPrompt: payload.systemPrompt,
       vaultOrganizationPrompt: payload.vaultOrganizationPrompt,
       resolverClock,
       timezoneUtcOffsetHours: utc,
       dailyNotePathGlobs: payload.dailyNotePathGlobs,
+      modelConfigId: `${chatKind}:${process.env.OBSIDIAN_AI_CHAT_MODEL ?? 'gpt-4o-mini'}`,
+      vaultIndexFingerprint: `sqlite:${process.env.OBSIDIAN_AI_DB_PATH ?? ''}`,
+      onAgentTrace: (event) => logAgentTraceEvent(agentLog, event),
       completion: {
         signal: options?.signal,
         timeoutMs: payload.timeoutMs,
+        onUsage: (usage) => logAgentUsage(agentLog, 'completion', usage),
       },
     });
     let out: IteratorResult<string, ChatWorkflowResult>;
@@ -371,6 +434,16 @@ export class SidecarRuntime {
         sourceCount: out.value.sources.length,
       },
       'sidecar.chat.done',
+    );
+    agentLog.info(
+      {
+        event: 'agent.run_done',
+        op: 'chat',
+        ms: Date.now() - t0,
+        groundingPolicyVersion: out.value.groundingPolicyVersion,
+        sourceCount: out.value.sources.length,
+      },
+      'agent.run_done',
     );
     return out.value;
   }

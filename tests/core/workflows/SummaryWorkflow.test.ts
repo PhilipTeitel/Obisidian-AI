@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { chunkNote } from '@src/core/domain/chunker.js';
-import type { ChunkNoteResult, DocumentNode, StoredSummary } from '@src/core/domain/types.js';
+import type { ChunkNoteResult, DocumentNode, NodeFilter, StoredSummary } from '@src/core/domain/types.js';
 import type { IChatPort } from '@src/core/ports/IChatPort.js';
 import type { IDocumentStore } from '@src/core/ports/IDocumentStore.js';
 import { computeDirtyNodeIds, summarizeNote } from '@src/core/workflows/SummaryWorkflow.js';
@@ -112,6 +112,11 @@ class MemoryStore implements IDocumentStore {
 
   async noteMatchesTagFilter(): Promise<boolean> {
     return true;
+  }
+
+  async searchNodesByTags(tagsAny: string[], filter?: NodeFilter, limit?: number): Promise<string[]> {
+    void tagsAny; void filter; void limit;
+    return [];
   }
 }
 

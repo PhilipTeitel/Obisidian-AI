@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../core/domain/types.js';
+import { normalizeProviderTokenUsage, unavailableProviderTokenUsage } from '../../core/domain/agentRunTrace.js';
 import type { ChatCompletionOptions, IChatPort } from '../../core/ports/IChatPort.js';
 import { buildMessagesWithContext } from './chatProviderMessages.js';
 import { composeAbortSignal } from './composeAbortSignal.js';
@@ -57,6 +58,9 @@ export class OllamaChatAdapter implements IChatPort {
           model: this.model,
           messages: providerMessages,
           stream: true,
+          options: {
+            num_predict: 4096,
+          },
         }),
         signal,
       });
@@ -76,6 +80,7 @@ export class OllamaChatAdapter implements IChatPort {
       let buffer = '';
       /** Ollama may send cumulative `message.content`; emit only new suffix. */
       let contentPrefix = '';
+      let usageReported = false;
 
       while (!signal.aborted) {
         let chunk: Awaited<ReturnType<typeof readWithAbort>>;
@@ -91,11 +96,24 @@ export class OllamaChatAdapter implements IChatPort {
         for (const line of lines) {
           const t = line.trim();
           if (!t) continue;
-          let parsed: { message?: { content?: string }; done?: boolean };
+          let parsed: {
+            message?: { content?: string };
+            done?: boolean;
+            prompt_eval_count?: number;
+            eval_count?: number;
+          };
           try {
             parsed = JSON.parse(t) as { message?: { content?: string }; done?: boolean };
           } catch {
             continue;
+          }
+          if (parsed.done === true && !usageReported) {
+            const usage = normalizeProviderTokenUsage({
+              promptTokens: parsed.prompt_eval_count,
+              completionTokens: parsed.eval_count,
+            });
+            options?.onUsage?.(usage);
+            usageReported = true;
           }
           const c = parsed.message?.content;
           if (typeof c !== 'string' || c.length === 0) continue;
@@ -108,6 +126,9 @@ export class OllamaChatAdapter implements IChatPort {
             contentPrefix = c;
           }
         }
+      }
+      if (!usageReported) {
+        options?.onUsage?.(unavailableProviderTokenUsage());
       }
     } finally {
       dispose();

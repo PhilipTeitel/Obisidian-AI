@@ -179,6 +179,7 @@ function mergeHitsByNode(a: VectorMatch[], b: VectorMatch[]): Map<string, number
 /**
  * Three-phase semantic search (ADR-003): summary ANN → content ANN within subtrees → assembly;
  * optional unrestricted content ANN when Phase 1 under-delivers (RET-4 / ADR-012).
+ * When tags are present, uses exhaustive tag-based retrieval to avoid k-limit truncation.
  */
 export async function runSearch(
   deps: SearchWorkflowDeps,
@@ -194,8 +195,45 @@ export async function runSearch(
     return { results: [] };
   }
 
-  const hybridOn = req.enableHybridSearch !== false;
   const coarseUserFilter = coarseUserFilterFromRequest(req, deps.log);
+
+  // When tags are present, use exhaustive tag-based retrieval to avoid k-limit truncation
+  if (req.tags?.length) {
+    const tagNodeIds = await deps.store.searchNodesByTags(req.tags, coarseUserFilter, 200);
+    deps.log?.debug(
+      {
+        tags_count: req.tags.length,
+        exhaustive_tag_candidates: tagNodeIds.length,
+        path_globs_count: req.pathGlobs?.length ?? 0,
+        date_range_start: req.dateRange?.start,
+        date_range_end: req.dateRange?.end,
+      },
+      'searchworkflow.exhaustive_tag_retrieval',
+    );
+
+    const results: SearchResult[] = [];
+    // For tag enumeration, return all candidates (chat workflow's token budget will limit display)
+    for (const nodeId of tagNodeIds) {
+      const node = await deps.store.getNodeById(nodeId);
+      if (!node) continue;
+      const meta = await deps.store.getNoteMeta(node.noteId);
+      if (!meta) continue;
+      if (!(await searchHitSurvivesPostRetrievalFilters(deps, req, coarseUserFilter, node, meta))) {
+        continue;
+      }
+      const snippet = await buildSnippet(deps.store, node, meta.vaultPath, resolvedAssembly);
+      results.push({
+        nodeId,
+        notePath: meta.vaultPath,
+        score: 0,
+        snippet,
+        headingTrail: node.headingTrail,
+      });
+    }
+    return { results };
+  }
+
+  const hybridOn = req.enableHybridSearch !== false;
   const bm25Filter: NodeFilter = {
     ...coarseUserFilter,
     nodeTypes: [...BM25_COARSE_NODE_TYPES],

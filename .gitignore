@@ -3,4 +3,5 @@ node_modules/
 *.log
 /main.js
 /dist/
-/var/*
+/var/
+/.vscode/*

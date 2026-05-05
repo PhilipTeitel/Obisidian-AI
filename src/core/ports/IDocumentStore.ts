@@ -57,7 +57,13 @@ export interface IDocumentStore {
   getNoteMeta(noteId: string): Promise<NoteMeta | null>;
   upsertNoteMeta(meta: NoteMeta): Promise<void>;
   /**
-   * True if any `tags` row for this note matches one of `tagsAny` (case-insensitive). RET-3 Phase 1 prune.
+   * True if any `tags` row for this note matches one of `tagsAny` or a child tag (case-insensitive).
+   * RET-3 Phase 1 prune.
    */
   noteMatchesTagFilter(noteId: string, tagsAny: string[]): Promise<boolean>;
+  /**
+   * Return all node IDs that have any of `tagsAny` or child tags, applying optional filters.
+   * Used for exhaustive tag-based retrieval (no k limit, no semantic ranking).
+   */
+  searchNodesByTags(tagsAny: string[], filter?: NodeFilter, limit?: number): Promise<string[]>;
 }

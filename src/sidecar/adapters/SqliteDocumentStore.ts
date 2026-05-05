@@ -63,6 +63,15 @@ function rowToDocumentNode(row: Record<string, unknown>): DocumentNode {
   };
 }
 
+function tagFilterSql(tagsAny: string[]): { clause: string; params: string[] } {
+  const parts = tagsAny.map(() => '(lower(t.tag) = ? OR lower(t.tag) LIKE ?)');
+  const params = tagsAny.flatMap((t) => {
+    const tag = t.toLowerCase();
+    return [tag, `${tag}/%`];
+  });
+  return { clause: parts.join(' OR '), params };
+}
+
 /**
  * SQLite + sqlite-vec implementation of {@link IDocumentStore} (STO-3).
  * Expects relational + vector migrations applied; ANN uses sqlite-vec L2 `distance`.
@@ -100,9 +109,9 @@ export class SqliteDocumentStore implements IDocumentStore {
       params.push(...filter.nodeTypes);
     }
     if (filter.tagsAny?.length) {
-      const lowered = filter.tagsAny.map((t) => t.toLowerCase());
-      sql += ` AND EXISTS (SELECT 1 FROM tags t WHERE t.node_id = ${nodeAlias}.id AND lower(t.tag) IN (${lowered.map(() => '?').join(',')}))`;
-      params.push(...lowered);
+      const tagSql = tagFilterSql(filter.tagsAny);
+      sql += ` AND EXISTS (SELECT 1 FROM tags t WHERE t.node_id = ${nodeAlias}.id AND (${tagSql.clause}))`;
+      params.push(...tagSql.params);
     }
     if (filter.pathLikes?.length) {
       const ph = filter.pathLikes.map(() => `${metaAlias}.vault_path LIKE ?`).join(' OR ');
@@ -488,17 +497,41 @@ export class SqliteDocumentStore implements IDocumentStore {
 
   async noteMatchesTagFilter(noteId: string, tagsAny: string[]): Promise<boolean> {
     if (tagsAny.length === 0) return true;
-    const lowered = tagsAny.map((t) => t.toLowerCase());
-    const ph = lowered.map(() => '?').join(', ');
+    const tagSql = tagFilterSql(tagsAny);
     const row = this.db
       .prepare(
         `SELECT EXISTS (
            SELECT 1 FROM tags t
            INNER JOIN nodes n ON n.id = t.node_id
-           WHERE n.note_id = ? AND lower(t.tag) IN (${ph})
+           WHERE n.note_id = ? AND (${tagSql.clause})
          ) AS ok`,
       )
-      .get(noteId, ...lowered) as { ok: number };
+      .get(noteId, ...tagSql.params) as { ok: number };
     return row.ok === 1;
+  }
+
+  async searchNodesByTags(
+    tagsAny: string[],
+    filter?: NodeFilter,
+    limit: number = 200,
+  ): Promise<string[]> {
+    if (tagsAny.length === 0) return [];
+    const tagSql = tagFilterSql(tagsAny);
+    const { sql: filterSql, params: filterParams } = SqliteDocumentStore.appendFilterWhere(
+      'n',
+      'nm',
+      filter,
+    );
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT n.id FROM tags t
+         INNER JOIN nodes n ON n.id = t.node_id
+         INNER JOIN note_meta nm ON nm.note_id = n.note_id
+         WHERE (${tagSql.clause})
+           ${filterSql}
+         LIMIT ?`,
+      )
+      .all(...tagSql.params, ...filterParams, limit) as { id: string }[];
+    return rows.map((r) => r.id);
   }
 }

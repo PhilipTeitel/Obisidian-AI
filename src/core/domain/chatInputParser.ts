@@ -6,6 +6,7 @@ export interface ParsedChatInput {
   text: string;
   pathGlobs?: string[];
   dateRange?: { start?: string; end?: string };
+  tags?: string[];
 }
 
 function collapseSpaces(s: string): string {
@@ -25,12 +26,23 @@ function addDaysLocal(base: Date, deltaDays: number): Date {
   return d;
 }
 
+function extractInlineTags(s: string): string[] {
+  const tags = new Set<string>();
+  const re = /(^|[\s([{])#([A-Za-z0-9][A-Za-z0-9/_-]*)\b/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s)) !== null) {
+    tags.add(m[2]!.toLowerCase());
+  }
+  return [...tags];
+}
+
 /**
  * Parse `path:…`, `since:YYYY-MM-DD`, `before:YYYY-MM-DD`, `last:Nd`. Removes matched tokens from text.
  */
 export function parseChatInput(raw: string): ParsedChatInput {
   let s = raw.trim();
   const pathGlobs: string[] = [];
+  const tags = extractInlineTags(s);
   let start: string | undefined;
   let end: string | undefined;
 
@@ -62,6 +74,7 @@ export function parseChatInput(raw: string): ParsedChatInput {
   const text = collapseSpaces(s);
   const out: ParsedChatInput = { text };
   if (pathGlobs.length > 0) out.pathGlobs = pathGlobs;
+  if (tags.length > 0) out.tags = tags;
   if (start !== undefined || end !== undefined) {
     out.dateRange = {};
     if (start !== undefined) out.dateRange.start = start;

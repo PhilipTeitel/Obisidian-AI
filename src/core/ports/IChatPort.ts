@@ -1,9 +1,12 @@
 import type { ChatMessage } from '../domain/types.js';
+import type { ProviderTokenUsage } from '../domain/agentRunTrace.js';
 
 /** Per-request cancellation and wall-clock budget (ADR-009). */
 export interface ChatCompletionOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** AGT-6: provider-neutral terminal usage metadata, when adapters can report it. */
+  onUsage?: (usage: ProviderTokenUsage) => void;
 }
 
 /**

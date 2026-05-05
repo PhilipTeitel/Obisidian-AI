@@ -5,7 +5,7 @@ import {
   SUMMARY_RUBRIC_V1,
   SUMMARY_RUBRIC_VERSION,
 } from '@src/core/domain/summaryPrompts.js';
-import type { DocumentNode, StoredSummary } from '@src/core/domain/types.js';
+import type { DocumentNode, NodeFilter, StoredSummary } from '@src/core/domain/types.js';
 import type { IChatPort } from '@src/core/ports/IChatPort.js';
 import type { IDocumentStore } from '@src/core/ports/IDocumentStore.js';
 import { summarizeNote } from '@src/core/workflows/SummaryWorkflow.js';
@@ -100,6 +100,11 @@ class RubricMemoryStore implements IDocumentStore {
 
   async noteMatchesTagFilter(): Promise<boolean> {
     return true;
+  }
+
+  async searchNodesByTags(tagsAny: string[], filter?: NodeFilter, limit?: number): Promise<string[]> {
+    void tagsAny; void filter; void limit;
+    return [];
   }
 }
 

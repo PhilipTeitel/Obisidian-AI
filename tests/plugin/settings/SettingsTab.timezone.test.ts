@@ -42,7 +42,9 @@ describe('SettingsTab timezone (BUG-3)', () => {
     const textInputs = tab.containerEl.querySelectorAll('input[type="text"]');
     /** Timezone UTC offset is the first text field after Node executable path (SettingsTab order). */
     const tzInput = textInputs[1] as HTMLInputElement | undefined;
-    expect(tzInput).toBeDefined();
+    if (tzInput === undefined) {
+      throw new Error('Expected timezone offset input to exist');
+    }
     tzInput.value = '99';
     tzInput.dispatchEvent(new Event('blur'));
     await vi.waitFor(() => expect(saveSettings.mock.calls.length).toBeGreaterThan(0));

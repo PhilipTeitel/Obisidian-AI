@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../core/domain/types.js';
+import { normalizeProviderTokenUsage, unavailableProviderTokenUsage } from '../../core/domain/agentRunTrace.js';
 import type { ChatCompletionOptions, IChatPort } from '../../core/ports/IChatPort.js';
 import { buildMessagesWithContext } from './chatProviderMessages.js';
 import { composeAbortSignal } from './composeAbortSignal.js';
@@ -57,6 +58,7 @@ export class OpenAIChatAdapter implements IChatPort {
     }
 
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    let usageReported = false;
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -65,6 +67,7 @@ export class OpenAIChatAdapter implements IChatPort {
           model: this.model,
           messages: providerMessages,
           stream: true,
+          stream_options: { include_usage: true },
         }),
         signal,
       });
@@ -81,11 +84,25 @@ export class OpenAIChatAdapter implements IChatPort {
         try {
           const j = JSON.parse(raw) as {
             choices?: Array<{ message?: { content?: string } }>;
+            usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
           };
+          if (j.usage !== undefined) {
+            options?.onUsage?.(
+              normalizeProviderTokenUsage({
+                promptTokens: j.usage.prompt_tokens,
+                completionTokens: j.usage.completion_tokens,
+                totalTokens: j.usage.total_tokens,
+              }),
+            );
+            usageReported = true;
+          }
           const text = j.choices?.[0]?.message?.content;
           if (text) yield text;
         } catch {
           /* ignore */
+        }
+        if (!usageReported) {
+          options?.onUsage?.(unavailableProviderTokenUsage());
         }
         return;
       }
@@ -119,15 +136,31 @@ export class OpenAIChatAdapter implements IChatPort {
           }
           if (!t.startsWith('data: ')) continue;
           const jsonStr = t.slice(6).trim();
-          let parsed: { choices?: Array<{ delta?: { content?: string | null } }> };
+          let parsed: {
+            choices?: Array<{ delta?: { content?: string | null } }>;
+            usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null;
+          };
           try {
             parsed = JSON.parse(jsonStr) as typeof parsed;
           } catch {
             continue;
           }
+          if (parsed.usage !== undefined && parsed.usage !== null && !usageReported) {
+            options?.onUsage?.(
+              normalizeProviderTokenUsage({
+                promptTokens: parsed.usage.prompt_tokens,
+                completionTokens: parsed.usage.completion_tokens,
+                totalTokens: parsed.usage.total_tokens,
+              }),
+            );
+            usageReported = true;
+          }
           const content = parsed.choices?.[0]?.delta?.content;
           if (content) yield content;
         }
+      }
+      if (!usageReported) {
+        options?.onUsage?.(unavailableProviderTokenUsage());
       }
     } finally {
       dispose();
