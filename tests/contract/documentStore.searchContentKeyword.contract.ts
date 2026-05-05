@@ -126,6 +126,10 @@ class KeywordContractMemoryStore implements IDocumentStore {
   async noteMatchesTagFilter(_noteId: string, _tagsAny: string[]): Promise<boolean> {
     return true;
   }
+  async searchNodesByTags(tagsAny: string[], filter?: NodeFilter, limit?: number): Promise<string[]> {
+    void tagsAny; void filter; void limit;
+    return [];
+  }
 }
 
 export async function Y1_punctuation_only_returns_empty(store: IDocumentStore): Promise<void> {

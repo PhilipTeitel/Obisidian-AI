@@ -4,6 +4,7 @@ import type {
   DocumentNode,
   EmbedMeta,
   JobStep,
+  NodeFilter,
   NoteIndexJob,
   ParsedCrossRef,
   ParsedTag,
@@ -188,6 +189,11 @@ class FakeStore implements IDocumentStore {
 
   async noteMatchesTagFilter(): Promise<boolean> {
     return true;
+  }
+
+  async searchNodesByTags(tagsAny: string[], filter?: NodeFilter, limit?: number): Promise<string[]> {
+    void tagsAny; void filter; void limit;
+    return [];
   }
 }
 

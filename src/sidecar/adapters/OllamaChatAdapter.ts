@@ -58,6 +58,9 @@ export class OllamaChatAdapter implements IChatPort {
           model: this.model,
           messages: providerMessages,
           stream: true,
+          options: {
+            num_predict: 4096,
+          },
         }),
         signal,
       });

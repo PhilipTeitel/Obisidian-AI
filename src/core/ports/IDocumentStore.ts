@@ -61,4 +61,9 @@ export interface IDocumentStore {
    * RET-3 Phase 1 prune.
    */
   noteMatchesTagFilter(noteId: string, tagsAny: string[]): Promise<boolean>;
+  /**
+   * Return all node IDs that have any of `tagsAny` or child tags, applying optional filters.
+   * Used for exhaustive tag-based retrieval (no k limit, no semantic ranking).
+   */
+  searchNodesByTags(tagsAny: string[], filter?: NodeFilter, limit?: number): Promise<string[]>;
 }

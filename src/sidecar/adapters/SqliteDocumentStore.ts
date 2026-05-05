@@ -69,9 +69,6 @@ function tagFilterSql(tagsAny: string[]): { clause: string; params: string[] } {
     const tag = t.toLowerCase();
     return [tag, `${tag}/%`];
   });
-  // #region agent log
-  fetch('http://127.0.0.1:7279/ingest/93aba0d1-d956-4d96-a52b-680185909f20',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'293b7a'},body:JSON.stringify({sessionId:'293b7a',runId:'post-fix-child-tags',hypothesisId:'H1',location:'src/sidecar/adapters/SqliteDocumentStore.ts:70',message:'expanded tag filter includes child tags',data:{tagsAny,patterns:params.filter((_,i)=>i%2===1)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   return { clause: parts.join(' OR '), params };
 }
 
@@ -511,5 +508,30 @@ export class SqliteDocumentStore implements IDocumentStore {
       )
       .get(noteId, ...tagSql.params) as { ok: number };
     return row.ok === 1;
+  }
+
+  async searchNodesByTags(
+    tagsAny: string[],
+    filter?: NodeFilter,
+    limit: number = 200,
+  ): Promise<string[]> {
+    if (tagsAny.length === 0) return [];
+    const tagSql = tagFilterSql(tagsAny);
+    const { sql: filterSql, params: filterParams } = SqliteDocumentStore.appendFilterWhere(
+      'n',
+      'nm',
+      filter,
+    );
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT n.id FROM tags t
+         INNER JOIN nodes n ON n.id = t.node_id
+         INNER JOIN note_meta nm ON nm.note_id = n.note_id
+         WHERE (${tagSql.clause})
+           ${filterSql}
+         LIMIT ?`,
+      )
+      .all(...tagSql.params, ...filterParams, limit) as { id: string }[];
+    return rows.map((r) => r.id);
   }
 }

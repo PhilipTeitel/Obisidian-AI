@@ -142,4 +142,13 @@ export class SearchTestStore implements IDocumentStore {
     if (o !== undefined) return o;
     return true;
   }
+
+  async searchNodesByTags(
+    tagsAny: string[],
+    filter?: NodeFilter,
+    limit?: number,
+  ): Promise<string[]> {
+    void tagsAny; void filter; void limit;
+    return [...this.nodes.keys()];
+  }
 }

@@ -10,7 +10,7 @@ export function buildSearchAssemblyFromSettings(s: ObsidianAISettings): SearchAs
       siblingContext: s.siblingContextBudget,
       parentSummary: s.parentSummaryBudget,
     },
-    totalTokenBudget: 1024,
+    totalTokenBudget: 2048,
   };
   validateSearchAssemblyOptions(opts);
   return opts;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { NoteIndexJob, NoteMeta } from '@src/core/domain/types.js';
+import type { NoteIndexJob, NoteMeta, NodeFilter } from '@src/core/domain/types.js';
 import type { IDocumentStore } from '@src/core/ports/IDocumentStore.js';
 import type { IJobStepPort } from '@src/core/ports/IJobStepPort.js';
 import type { IQueuePort } from '@src/core/ports/IQueuePort.js';
@@ -89,6 +89,11 @@ class PlannerFakeStore implements IDocumentStore {
 
   async noteMatchesTagFilter(): Promise<boolean> {
     return true;
+  }
+
+  async searchNodesByTags(tagsAny: string[], filter?: NodeFilter, limit?: number): Promise<string[]> {
+    void tagsAny; void filter; void limit;
+    return [];
   }
 }
 
