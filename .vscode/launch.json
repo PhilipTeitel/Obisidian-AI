@@ -1,18 +1,28 @@
 {
   "configurations": [
     {
-      "type": "pwa-node",
+      "name": "Attach to Obsidian",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9229,
+      "address": "127.0.0.1",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "resolveSourceMapLocations": ["**", "!**/node_modules/**"],
+      "sourceMapPathOverrides": {
+        "../../*": "${workspaceFolder}/**"
+      }
+    },{
+      "type": "node",
       "name": "Attach: Obsidian AI sidecar",
       "request": "attach",
       "port": 62127,
       "cwd": "${workspaceFolder}",
-      "outFiles": [
-        "${workspaceFolder}/dist/sidecar/**/*.cjs",
-        "${workspaceFolder}/dist/sidecar/**/*.map",
-        "**/plugins/obsidian-ai/sidecar/**/*.cjs",
-        "**/plugins/obsidian-ai/sidecar/**/*.map"
-      ],
+      "sourceMaps": true,
       "resolveSourceMapLocations": ["**", "!**/node_modules/**"],
+      "sourceMapPathOverrides": {
+        "../..": "${workspaceFolder}/*"
+      },
       "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
     }
   ]
