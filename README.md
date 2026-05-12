@@ -2,7 +2,7 @@
 
 ## Preface
 
-This project represents 2 things. The first is AI capabilities in Obsidian. There are multiple iterations each experimenting with implementations, architectures, stacks, etc. The second is to practice using Cursor's agent features. It was built using the following agents:
+This project represents 2 things. The first is to add AI capabilities to Obsidian grounded solely in the vault's notes. There are multiple iterations each experimenting with implementations, architectures, stacks, etc. The second is to practice using Cursor's agent features. It was built using the following agents:
 
 - Architect
   - Refines requirements to produce architecture design records and Gherkin scenarios.
@@ -20,6 +20,8 @@ This project represents 2 things. The first is AI capabilities in Obsidian. Ther
   - Performs security, reliability, database, performance and test coverage audits
 
 Commands were used to execute the various steps and templates were used to maintain consistency.
+
+The whole workflow is documented and can be viewed [here](docs/sdlc/workflow-sdlc.md)
 
 ## Purpose
 
