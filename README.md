@@ -2,26 +2,7 @@
 
 ## Preface
 
-This project represents 2 things. The first is to add AI capabilities to Obsidian grounded solely in the vault's notes. There are multiple iterations each experimenting with implementations, architectures, stacks, etc. The second is to practice using Cursor's agent features. It was built using the following agents:
-
-- Architect
-  - Refines requirements to produce architecture design records and Gherkin scenarios.
-  - Build the high-level design document. It doesn't write the code, only makes sure the project is properly spec'd to be built correctly and cleanly. A template is used to assure completeness.
-  - Create user stories. Uses a template to spec everything out sufficiently so that the code meets the requirements. The critical piece is the acceptance criteria.
-- Implementer 
-  - Writes the actual code. It must follow the spec EXACTLY and generate evidence that the code meets the criteria. If any ambiguities are found, it is instructed to stop and ask how to proceed.
-- QA 
-  - Reviews implemented code to verify that each test associated with the acceptance criteria pass.  Any failed tests are returned to the implementer for resolution.
-  - Runs all regression tests
-- Documenter 
-  - Updates the documentation with any changes precipitated by the latest work.
-  - Updates project status.
-- Auditor
-  - Performs security, reliability, database, performance and test coverage audits
-
-Commands were used to execute the various steps and templates were used to maintain consistency.
-
-The whole workflow is documented and can be viewed [here](docs/sdlc/workflow-sdlc.md)
+As much as this project is an Obsidian plugin, it is a development environment for an AI-assisted software development workflow described [here](docs/sdlc/workflow-sdlc.md).  This is akin to how hobbies can become more about the toys than the activity.
 
 ## Purpose
 
@@ -29,7 +10,7 @@ A community Obsidian plugin that brings **semantic search** and **RAG-powered ch
 
 **Iteration 2** replaces the fragile WASM-in-renderer approach from iteration 1 with a **sidecar architecture**: the plugin `main.js` stays a thin UI client while a local Node.js sidecar process handles SQLite, embeddings, summarization, and search — communicating over a transport-abstracted channel (stdio IPC by default, HTTP opt-in).
 
-**Iteration 3** improves search by expanding `k` values in addition to a hybrid search using full-text search.  This iteration was also the testing ground for the new versions of the Cursor agents.
+**Iteration 3** improves search by expanding `k` values in addition to a hybrid search using full-text search.  This iteration was also the testing ground for the new version of the SDLC workflow.
 
 **Iteration 4** moves to deterministic agentic note synthesis. Previously, chat went to retrieval first, then asked the LLM to reason over whatever came back. That made responses inconsistent when the prompt needed planning, multiple searches, cross-reference follow-up, or a synthesized note. Iteration 4 changes chat to `plan retrieval intent -> run bounded note tools -> synthesize grounded output`, with Ollama first for pre-query reasoning and OpenAI next. Vault file writing is deferred; the first core iteration returns draft content only.
 
