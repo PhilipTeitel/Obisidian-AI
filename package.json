@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Obsidian AI plugin (iteration 2) — plugin + Node sidecar. See README.md.",
+  "license": "MIT",
   "engines": {
     "node": ">=18"
   },
