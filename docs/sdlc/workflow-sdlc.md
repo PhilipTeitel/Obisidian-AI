@@ -1,6 +1,6 @@
 # Document-Led AI-Assisted Software Development Workflow
 
-This guide describes a document-led software development workflow supported by the architect, implementer, QA, auditor, and docs-pm agents. The workflow turns raw ideas into refined requirements, design decisions, story-ready implementation specs, tested implementation, review evidence, QA evidence, and synchronized documentation.
+This guide describes a document-led software development workflow supported by the architect, implementer, QA, auditor, and documentor agents. The workflow turns raw ideas into refined requirements, design decisions, story-ready implementation specs, tested implementation, review evidence, QA evidence, and synchronized documentation.
 
 The goal is not to make AI generate code faster in isolation. The goal is to create a controlled delivery system around AI-assisted development, where each step has clear inputs, constrained behavior, durable artifacts, and verifiable evidence.
 
@@ -10,7 +10,7 @@ The workflow is intentionally document-led. Each stage produces a source of trut
 
 This workflow separates four concerns that are often blurred in AI-assisted development:
 
-1. **Context** — requirements, ADRs, README design notes, existing code, backlog state, and previous story artifacts.
+1. **Context** — requirements, ADRs, design notes, existing code, backlog state, and previous story artifacts.
 2. **Control** — agent definitions, commands, templates, validation rules, and acceptance criteria that constrain model behavior.
 3. **Artifacts** — requirements documents, ADRs, story specs, review reports, QA matrices, documentation updates, and completion metadata.
 4. **Evidence** — tests, changed files, review results, QA verification, traceability records, and follow-up ledgers.
@@ -21,7 +21,7 @@ The story spec is the central handoff artifact. It binds source context to imple
 
 | Building Block | Purpose | Examples |
 |---|---|---|
-| Agent | Defines role, responsibilities, and behavioral constraints | architect, implementer, QA, auditor, docs-pm |
+| Agent | Defines role, responsibilities, and behavioral constraints | architect, implementer, QA, auditor, documentor |
 | Command | Invokes a specific workflow step | `/plan-story`, `/implement-story`, `/qa-story` |
 | Template | Shapes the required output | story spec template, review template, QA evidence matrix |
 | Artifact | Durable output used by later steps | requirements doc, ADR, story spec, review report |
@@ -54,7 +54,7 @@ flowchart TD
 
     subgraph Artifacts["Documents / Outputs"]
         requirementsDoc[/"REQ-NNN refined requirements"/]
-        applicationDesign[/"README design and architecture"/]
+        applicationDesign[/"Design and architecture"/]
         backlog[/"Backlog epics and stories"/]
         storySpec[/"Implementation-ready story spec"/]
         reviewArtifact[/"Story review artifact"/]
@@ -92,7 +92,7 @@ The happy path can be run one command at a time, or the story tail can be orches
 
 ## Traceability Model
 
-The story spec is the traceability hub. Requirements, ADRs, and README design decisions flow into the story before implementation begins. Acceptance criteria and test plan rows map those inputs to executable evidence. Review, QA, documentation updates, and completion metadata then record whether the implementation satisfied the original intent.
+The story spec is the traceability hub. Requirements, ADRs, and design decisions flow into the story before implementation begins. Acceptance criteria and test plan rows map those inputs to executable evidence. Review, QA, documentation updates, and completion metadata then record whether the implementation satisfied the original intent.
 
 ```mermaid
 flowchart LR
@@ -133,9 +133,9 @@ A story should make the trace path visible enough that a reviewer can answer:
 | Stage | Primary Input | Primary Output | Traceability Role |
 |---|---|---|---|
 | `/refine-feature` | Raw notes, tickets, transcripts, pasted requirements | `docs/requirements/REQ-NNN-*.md` | Defines goals, non-goals, open questions, resolved questions, and scenario IDs |
-| `/design-application` | Refined requirements | `README.md`, ADRs as needed | Records design, stack, setup, API contract, environment variables, and architectural decisions |
+| `/design-application` | Refined requirements | design, ADRs as needed | Records design, stack, setup, API contract, environment variables, and architectural decisions |
 | `/plan-project` | Requirements and design | Backlog epics and story rows | Preserves backlog continuity and prevents orphaned story documents |
-| `/plan-story` | Requirements, README, ADRs, backlog | `docs/features/{STORY-ID}-*.md` | Maps context to acceptance criteria, tests, constraints, touchpoints, and implementation order |
+| `/plan-story` | Requirements, architecture/design artifacts, ADRs, backlog artifacts | `docs/features/{STORY-ID}-*.md` | Maps context to acceptance criteria, tests, constraints, touchpoints, and implementation order |
 | `/validate-story ready` | Story document | Readiness validation | Confirms the story is complete enough to implement |
 | `/implement-story` | Story spec and linked ADRs | Code, tests, updated story status | Produces implementation evidence and checks off passing criteria |
 | `/review-story` | Story and changed surface | `docs/features/{STORY-ID}-review.md` | Identifies reliability, security, API contract, and test coverage issues before QA |
@@ -150,7 +150,7 @@ A story should make the trace path visible enough that a reviewer can answer:
 
 ### `/design-application`
 
-`/design-application` consumes refined requirements and updates the project `README.md` with the high-level design: architecture, technical stack, key decisions, setup, API contract, environment variables, UI structure, and remaining `TBD` items where the requirements do not yet specify enough.
+`/design-application` consumes refined requirements and produces or updates the project's high-level design artifacts: architecture, technical stack, key decisions, setup guidance, API contract, environment variables, UI structure, and remaining TBD items where the requirements do not yet specify enough.
 
 When a durable technical decision is needed, the architect creates an ADR before later steps depend on that decision.
 
@@ -184,9 +184,9 @@ Any failure loops through `/fix-from-qa`, where the implementer fixes only the f
 
 ### `/document-story`
 
-`/document-story` is the docs-pm handoff. It reads the completed story, completion metadata, and follow-up ledger, then updates the README, API docs, OpenAPI specs, runbooks, setup instructions, or environment docs when the implemented behavior changed those surfaces.
+`/document-story` is the documentor handoff. It reads the completed story, completion metadata, and follow-up ledger, then updates the README, API docs, OpenAPI specs, runbooks, setup instructions, or environment docs when the implemented behavior changed those surfaces.
 
-Documentation updates are driven by the story source of truth. Docs-pm should not update unrelated documentation simply because it is nearby.
+Documentation updates are driven by the story source of truth. Documentor should not update unrelated documentation simply because it is nearby.
 
 ### `/validate-story`
 
@@ -210,9 +210,9 @@ QA work checks story claims against executable evidence. QA does not infer compl
 
 Auditor work provides review gates. Per-story review focuses on the changed surface before QA, while diff review covers work that did not originate from a story. Full-repo audits are periodic health checks rather than story completion steps.
 
-### Docs-PM
+### Documentor
 
-Docs-pm work keeps project documentation and status synchronized with the story source of truth. Story documents drive status. README backlog rows, API docs, OpenAPI specs, runbooks, setup instructions, and environment docs are updated only when the story or follow-up ledger shows that they should change.
+Documentor work keeps project documentation and status synchronized with the story source of truth. Story documents drive status. README, backlog, API docs, OpenAPI specs, runbooks, setup instructions, and environment docs are updated only when the story or follow-up ledger shows that they should change.
 
 ## Post-Story Work
 
@@ -284,7 +284,7 @@ Run `/refine-feature` against the source notes. The architect asks clarifying qu
 
 ### 2. Design the application impact
 
-Run `/design-application` with the refined requirements. The architect updates the project README with the high-level architecture, key decisions, API contract, environment variables, and setup notes.
+Run `/design-application` with the refined requirements. The architect updates the project's design and onboarding artifacts with the high-level architecture, key decisions, API contract, environment variables, and setup notes.
 
 If the search feature requires a durable decision, such as local SQLite versus an external search service, the decision is captured in an ADR before implementation depends on it.
 
@@ -302,11 +302,11 @@ Run `/implement-story SEARCH-1`. The implementer reads the story and ADRs, print
 
 Run `/review-story SEARCH-1`. If the auditor finds a high-severity coverage, security, reliability, or API contract issue, the gate blocks and the implementer fixes the required actions before review is run again.
 
-Once the gate passes, run `/qa-story SEARCH-1`. QA verifies each criterion and either hands the all-pass matrix to docs-pm or sends failed criteria through `/fix-from-qa`.
+Once the gate passes, run `/qa-story SEARCH-1`. QA verifies each criterion and either hands the all-pass matrix to documentor or sends failed criteria through `/fix-from-qa`.
 
 ### 6. Document and validate completion
 
-Run `/document-story SEARCH-1` after QA is fully green. Docs-pm updates project documentation where the story changed setup, API behavior, environment variables, or operational procedures.
+Run `/document-story SEARCH-1` after QA is fully green. Documentor updates project documentation where the story changed setup, API behavior, environment variables, or operational procedures.
 
 The story's completion metadata records the final review summary, QA result, docs handoff, and completion ref.
 
@@ -320,6 +320,6 @@ If that is purely copy tied to the completed story and does not change the accep
 
 This workflow keeps requirements, design, implementation, tests, review evidence, QA evidence, and documentation connected.
 
-Refined requirements stop ambiguity from leaking into architecture. ADRs prevent silent substitution of important technical choices. Story specs make acceptance criteria and tests explicit before implementation begins. Review and QA gates catch different classes of mistakes. Docs-pm closes the loop so project documentation reflects what actually shipped. Post-story lanes keep small fixes visible without forcing every polish change through a full new feature workflow.
+Refined requirements stop ambiguity from leaking into architecture. ADRs prevent silent substitution of important technical choices. Story specs make acceptance criteria and tests explicit before implementation begins. Review and QA gates catch different classes of mistakes. Documentor closes the loop so project documentation reflects what actually shipped. Post-story lanes keep small fixes visible without forcing every polish change through a full new feature workflow.
 
 The result is an AI-assisted development process that is faster than manual-only delivery, but still reviewable, traceable, and grounded in software engineering discipline.
